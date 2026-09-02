@@ -3531,18 +3531,34 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     let sessionId = null;
     if (ccSessionState) {
       const saved = ccSessionState.get();
-      // 跨天或空则新建会话
       if (saved && saved.day === today && saved.sessionId) {
         sessionId = saved.sessionId;
       }
     }
+    const isNewSession = !sessionId;
 
-    // 工具描述注入 system prompt
+    // ── 工具描述（静态，写入 system prompt） ──
     const roundTools = availableToolsForRound(availableTools, toolState);
     const toolDesc = ccToolDescriptions(roundTools);
-    const ccSystemPrompt = [systemPrompt, toolDesc].filter(Boolean).join("\n\n");
 
-    // 第一轮发送用户消息
+    // ── 动态上下文（每次调用都不同：时间/天气/日历/记忆/状态） ──
+    const ccDynamic = [
+      `当前时间：${nowStr}`,
+      dailyNoteContext ? `【Iris 未读 Moment】\n${dailyNoteContext}` : "",
+      companionStatusText ? `【最近陪伴状态】\n${companionStatusText}` : "",
+      pendingCompanionText ? `【待处理陪伴邀请】\n${pendingCompanionText}` : "",
+      pendingListeningText ? `【待处理一起听邀请】\n${pendingListeningText}` : "",
+      transferStatusText ? `【最近转账状态】\n${transferStatusText}` : "",
+      dailyCalendarText ? `【今日日程】\n${dailyCalendarText}` : "",
+      dailyWeatherText ? `【当前天气】\n${dailyWeatherText}` : "",
+      diaryStatusText ? `【日记状态】\n${diaryStatusText}` : "",
+      ensureArray(settings.recentToolActivity).length ? `【近期工具行动】\n${ensureArray(settings.recentToolActivity).map(item => `- ${item.at || ""}｜${item.name}｜${item.ok ? "成功" : "未执行"}｜${item.args || "—"}｜${item.result || "—"}`).join("\n")}` : "",
+      relatedMemoryLookupPerformed && !memoryText ? "【自动记忆检索】未命中相关记忆。" : "",
+      memoryText ? `【相关记忆】\n${memoryText}` : "",
+      canQuoteUserMessage ? `【可引用消息】\n${quoteableMessages.slice(-12).map(m => `- id=${m.id}：${String(m.content || "[图片]").replace(/\s+/g, " ").slice(0, 100)}`).join("\n")}` : ""
+    ].filter(Boolean).join("\n");
+
+    // ── 首次调用：发完整人设 + 工具；resume：只发动态上下文 ──
     const ccSend = async (msg, sysPrompt) => {
       const resp = await fetch(baseUrl + "/relay/send", {
         method: "POST",
@@ -3554,7 +3570,6 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
         throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
       }
       const data = await resp.json();
-      // 保存 session ID
       if (data.sessionId) {
         sessionId = data.sessionId;
         if (ccSessionState) ccSessionState.set({ day: today, sessionId });
@@ -3563,16 +3578,25 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     };
 
     try {
-    // 工具调用循环（最多 6 轮）
-    let lastText = "";
     let lastThinking = "";
+    let lastToolResult = "";
     for (let round = 0; round < 6; round++) {
-      const msg = round === 0 ? userText : undefined;
-      const sysP = round === 0 ? ccSystemPrompt : undefined;
-
-      const data = round === 0
-        ? await ccSend(userText, ccSystemPrompt)
-        : await ccSend(lastText, null);  // 工具结果作为下一条消息发送
+      let data;
+      if (round === 0) {
+        if (isNewSession) {
+          // 新 session：完整 system prompt（人设 + 工具定义），动态上下文 + 用户消息
+          const fullSystemPrompt = [systemPrompt, toolDesc].filter(Boolean).join("\n\n");
+          const firstMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
+          data = await ccSend(firstMsg, fullSystemPrompt);
+        } else {
+          // resume：不发 system prompt（已在 session 里），只发动态上下文 + 用户消息
+          const resumeMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
+          data = await ccSend(resumeMsg, null);
+        }
+      } else {
+        // 工具结果轮：直接发送结果文本（在已有 session 内）
+        data = await ccSend(lastToolResult, null);
+      }
 
       const ccText = data.text || "";
       const { text: rawVisible, reasoning: inlineReasoning } = splitInlineThinking(ccText);
@@ -3582,7 +3606,6 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       // 解析工具调用
       const toolCalls = parseCcToolCalls(rawVisible);
       if (!toolCalls.length) {
-        // 没有工具调用，返回最终文本
         return { model: data.model || model || "cc-pro", text: rawVisible, reasoning: lastThinking, recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls };
       }
 
@@ -3603,19 +3626,16 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
         }
       }
 
-      // 构造工具结果消息，作为下一轮的输入
+      // 构造工具结果消息
       const availableNow = availableToolsForRound(availableTools, toolState);
-      const toolResultMsg = [
+      lastToolResult = [
         "【工具执行结果】",
         ...resultParts,
         "---",
         availableNow.length ? `仍可用的工具: ${availableNow.map(t => t.name).join(", ")}` : "",
         "请根据工具结果继续回复 Iris。如果还需要调用工具可以继续，否则直接用自然语言回复。"
       ].filter(Boolean).join("\n");
-
-      lastText = toolResultMsg;
     }
-    // 超过 6 轮
     throw new Error("CC 工具调用次数过多，请缩小本次请求范围");
     } catch (error) {
       throw attachToolStateToError(error, toolState);

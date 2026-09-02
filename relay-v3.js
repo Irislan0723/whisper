@@ -48,8 +48,7 @@ function invokeClaude({ systemPrompt, message, model, sessionId }) {
       args.push("--resume", sessionId);
     }
 
-    // 自动压缩上下文
-    args.push("--autocompact", "auto");
+    // 不使用 autocompact — 由前端控制上下文，不让 CC 花额度压缩
 
     // 系统提示词：写入临时文件再用 --system-prompt-file（避免 shell 参数过长）
     let sysPromptFile = null;
