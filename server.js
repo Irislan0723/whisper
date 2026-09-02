@@ -2943,6 +2943,55 @@ function openAiChatTools(tools = CHAT_MEMORY_TOOLS) {
 function anthropicChatTools(tools = CHAT_MEMORY_TOOLS) {
   return tools.map(tool => ({ name: tool.name, description: tool.description, input_schema: tool.parameters }));
 }
+
+// ── CC 文本工具协议 ──
+
+/** 为 CC 生成工具描述文本，嵌入 system prompt */
+function ccToolDescriptions(tools) {
+  if (!tools.length) return "";
+  const lines = tools.map(tool => {
+    const params = tool.parameters?.properties || {};
+    const required = new Set(ensureArray(tool.parameters?.required));
+    const paramList = Object.entries(params).map(([k, v]) => {
+      const req = required.has(k) ? "必填" : "选填";
+      const desc = v.description || "";
+      const type = v.type || "string";
+      const enumStr = v.enum ? `，可选值: ${v.enum.join("/")}` : "";
+      return `    - ${k} (${type}, ${req}${enumStr}): ${desc}`;
+    }).join("\n");
+    return `  ${tool.name}: ${tool.description}\n    参数:\n${paramList || "    （无参数）"}`;
+  });
+  return [
+    "【可用工具】",
+    "需要使用工具时，在回复中用以下格式调用（可一次调用多个）：",
+    '<tool_call name="工具名">{"参数名": "值"}</tool_call>',
+    "",
+    "工具调用必须是完整合法的 JSON。调用后等待系统返回结果再继续。",
+    "不要伪造工具结果，不要声称已调用但没有写出 tool_call 标签。",
+    "",
+    "可用工具列表：",
+    ...lines
+  ].join("\n");
+}
+
+/** 从 CC 回复文本中解析 tool_call 标签 */
+function parseCcToolCalls(text) {
+  const calls = [];
+  const re = /<tool_call\s+name="([^"]+)">([\s\S]*?)<\/tool_call>/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const name = match[1].trim();
+    let args = {};
+    try { args = JSON.parse(match[2].trim()); } catch (_) {}
+    calls.push({ name, args });
+  }
+  return calls;
+}
+
+/** 从 CC 回复文本中去除 tool_call 标签，保留纯文本 */
+function stripCcToolCalls(text) {
+  return text.replace(/<tool_call\s+name="[^"]*">[\s\S]*?<\/tool_call>/g, "").replace(/^\s*\n+|\n+\s*$/g, "").trim();
+}
 function clampToolLimit(value, fallback, max) {
   return Math.max(1, Math.min(max, Number(value || fallback)));
 }
@@ -3306,7 +3355,7 @@ function createAiImageHandler(settings, imageGenerationEnabled) {
   return async prompt => await generateChatImage(preset, prompt);
 }
 
-async function callOpenAICompatible({ preset, settings, content, image, images, quote, history, recallableMessages = [], recallOwnMessage = null, quoteableMessages = [], selectQuoteMessage = null, generateImage = null, manageCompanion = null, manageListening = null, manageTransfer = null, publishDailyNote = null, readDailyMoments = null, dailyNoteContext = "", mcpTools = [], mcpToolBindings = {}, relatedMemories = [], relatedMemoryLookupPerformed = false, onToolTrace = null }) {
+async function callOpenAICompatible({ preset, settings, content, image, images, quote, history, recallableMessages = [], recallOwnMessage = null, quoteableMessages = [], selectQuoteMessage = null, generateImage = null, manageCompanion = null, manageListening = null, manageTransfer = null, publishDailyNote = null, readDailyMoments = null, dailyNoteContext = "", mcpTools = [], mcpToolBindings = {}, relatedMemories = [], relatedMemoryLookupPerformed = false, onToolTrace = null, ccSessionState = null }) {
   const baseUrl = normalizeApiRoot(preset?.baseUrl);
   const apiKey  = preset?.apiKey;
   const model   = preset?.model;
@@ -3473,35 +3522,104 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     ];
   }
 
-  // ── Claude Code Relay（走 Pro 订阅额度） ──
+  // ── Claude Code Relay（走 Pro 订阅额度，支持会话续接 + 工具调用） ──
   if (preset?.provider === "cc") {
-    const historyText = (history || []).slice(-16).map(m => {
-      const name = m.role === "iris" ? "Iris" : "Claude";
-      return name + ": " + (m.content || "").slice(0, 800);
-    }).join("\n");
-    const fullMessage = [
-      historyText ? "最近对话记录：\n" + historyText + "\n---" : "",
-      userText
-    ].filter(Boolean).join("\n");
-    // 提取第一张图片的 base64（如果有）
-    const firstImage = chatImages.length ? chatImages[0] : null;
-    let imageBase64 = null;
-    if (firstImage && typeof firstImage === "string" && firstImage.startsWith("data:")) {
-      imageBase64 = firstImage;
+    const toolState = { userText: content || "", selfProfileRead: false, recallOwnMessage, recalledMessageIds: [], selectQuoteMessage, quoteForReply: null, generateImage, generatedImages: [], musicCards:[], manageCompanion, companionActions: [], manageListening, listeningActions: [], manageTransfer, transferActions: [], publishDailyNote, dailyNoteActions: [], readDailyMoments, dailyMomentHistoryRead:false, mcpToolBindings, callMcpTool:callConversationMcpTool, failedToolNames:new Map(), mcpFailure:null, toolCalls: [], reasoningParts: [], onToolTrace };
+
+    // 会话续接：从 ccSessionState 读取当天 session ID
+    const today = chatDayKey();
+    let sessionId = null;
+    if (ccSessionState) {
+      const saved = ccSessionState.get();
+      // 跨天或空则新建会话
+      if (saved && saved.day === today && saved.sessionId) {
+        sessionId = saved.sessionId;
+      }
     }
-    const resp = await fetch(baseUrl + "/relay/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
-      body: JSON.stringify({ message: fullMessage, systemPrompt, model, image: imageBase64 })
-    });
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
+
+    // 工具描述注入 system prompt
+    const roundTools = availableToolsForRound(availableTools, toolState);
+    const toolDesc = ccToolDescriptions(roundTools);
+    const ccSystemPrompt = [systemPrompt, toolDesc].filter(Boolean).join("\n\n");
+
+    // 第一轮发送用户消息
+    const ccSend = async (msg, sysPrompt) => {
+      const resp = await fetch(baseUrl + "/relay/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
+        body: JSON.stringify({ message: msg, systemPrompt: sysPrompt || undefined, model, sessionId: sessionId || undefined })
+      });
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
+      }
+      const data = await resp.json();
+      // 保存 session ID
+      if (data.sessionId) {
+        sessionId = data.sessionId;
+        if (ccSessionState) ccSessionState.set({ day: today, sessionId });
+      }
+      return data;
+    };
+
+    try {
+    // 工具调用循环（最多 6 轮）
+    let lastText = "";
+    let lastThinking = "";
+    for (let round = 0; round < 6; round++) {
+      const msg = round === 0 ? userText : undefined;
+      const sysP = round === 0 ? ccSystemPrompt : undefined;
+
+      const data = round === 0
+        ? await ccSend(userText, ccSystemPrompt)
+        : await ccSend(lastText, null);  // 工具结果作为下一条消息发送
+
+      const ccText = data.text || "";
+      const { text: rawVisible, reasoning: inlineReasoning } = splitInlineThinking(ccText);
+      if (round === 0) lastThinking = data.thinking || inlineReasoning || "";
+      else if (data.thinking || inlineReasoning) lastThinking += "\n\n" + (data.thinking || inlineReasoning);
+
+      // 解析工具调用
+      const toolCalls = parseCcToolCalls(rawVisible);
+      if (!toolCalls.length) {
+        // 没有工具调用，返回最终文本
+        return { model: data.model || model || "cc-pro", text: rawVisible, reasoning: lastThinking, recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls };
+      }
+
+      // 执行工具调用（一个失败则跳过后续）
+      const resultParts = [];
+      let batchFailed = false;
+      for (const call of toolCalls) {
+        if (batchFailed) {
+          resultParts.push(`${call.name}: 跳过（本批次前一个工具已失败）`);
+          continue;
+        }
+        try {
+          const result = await executeRecordedChatTool(call.name, safeToolArgs(call.args), toolState);
+          resultParts.push(`${call.name}: 成功\n${JSON.stringify(result, null, 0).slice(0, 2000)}`);
+        } catch (e) {
+          resultParts.push(`${call.name}: 失败\n${e.message}`);
+          batchFailed = true;
+        }
+      }
+
+      // 构造工具结果消息，作为下一轮的输入
+      const availableNow = availableToolsForRound(availableTools, toolState);
+      const toolResultMsg = [
+        "【工具执行结果】",
+        ...resultParts,
+        "---",
+        availableNow.length ? `仍可用的工具: ${availableNow.map(t => t.name).join(", ")}` : "",
+        "请根据工具结果继续回复 Iris。如果还需要调用工具可以继续，否则直接用自然语言回复。"
+      ].filter(Boolean).join("\n");
+
+      lastText = toolResultMsg;
     }
-    const data = await resp.json();
-    const ccText = data.text || "";
-    const { text: visibleText, reasoning: inlineReasoning } = splitInlineThinking(ccText);
-    return { model: data.model || model || "cc-pro", text: visibleText, reasoning: data.thinking || inlineReasoning || "" };
+    // 超过 6 轮
+    throw new Error("CC 工具调用次数过多，请缩小本次请求范围");
+    } catch (error) {
+      throw attachToolStateToError(error, toolState);
+    }
   }
 
   if (preset?.provider === "anthropic") {
@@ -3533,12 +3651,19 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       if (!calls.length) return { model, text: blocks.filter(x => x.type === "text").map(x => x.text).join("\n"), recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls, reasoning:collectedNativeReasoning(toolState) };
       messages.push({ role: "assistant", content: blocks });
       const results = [];
+      let batchFailed = false;
       for (const call of calls) {
+        if (batchFailed) {
+          // 同批次前一个工具已失败，跳过后续工具但仍返回 tool_result（API 要求）
+          results.push({ type: "tool_result", tool_use_id: call.id, is_error: true, content: "本批次前一个工具调用已失败，跳过此工具。请先处理失败结果。" });
+          continue;
+        }
         try {
           const result = await executeRecordedChatTool(call.name, safeToolArgs(call.input), toolState);
           results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
         } catch (e) {
           results.push({ type: "tool_result", tool_use_id: call.id, is_error: true, content: e.message });
+          batchFailed = true;
         }
       }
       messages.push({ role: "user", content: results });
@@ -3586,12 +3711,18 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       return { model, text: text || data.content?.[0]?.text || "", recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls, reasoning:collectedNativeReasoning(toolState) };
     }
     messages.push({ role: "assistant", content: (typeof message.content === "string" ? inline.text : message.content) || null, tool_calls: calls });
+    let batchFailed = false;
     for (const call of calls) {
+      if (batchFailed) {
+        messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: "本批次前一个工具调用已失败，跳过此工具。请先处理失败结果。" }) });
+        continue;
+      }
       try {
         const result = await executeRecordedChatTool(call.function?.name, safeToolArgs(call.function?.arguments), toolState);
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       } catch (e) {
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: e.message }) });
+        batchFailed = true;
       }
     }
   }
@@ -4634,6 +4765,11 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
       .sort((a,b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)).slice(-5);
     const dailyNoteContext = unreadUserDailyNotes.map(note => `- ${new Date(note.createdAt || chatNow()).toLocaleString("zh-CN")}: ${String(note.content || "").trim()}`).join("\n");
     const mcpToolset = buildConversationMcpTools(conversation);
+    // CC 会话状态管理：session ID 存储在 conversation 对象上
+    const ccSessionState = preset?.provider === "cc" ? {
+      get: () => conversation.ccSession || null,
+      set: (state) => { conversation.ccSession = state; writeChatConversations(conversations); }
+    } : null;
     const ai = await callOpenAICompatible({
       preset,
       settings,
@@ -4657,7 +4793,8 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
       mcpToolBindings: mcpToolset.bindings,
       relatedMemories,
       relatedMemoryLookupPerformed: automaticMemoryRecall && !!userTurnContent.trim(),
-      onToolTrace: createToolActivityRecorder(conversation, conversations)
+      onToolTrace: createToolActivityRecorder(conversation, conversations),
+      ccSessionState
     });
     if (unreadUserDailyNotes.length) {
       const consumedIds = new Set(unreadUserDailyNotes.map(note => note.id));
