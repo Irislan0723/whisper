@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心愿单 · irisandclaude</title>
+<script src="init.js"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ---- 心愿单专属 ---- */
+.wish-hero { text-align: center; margin-bottom: 32px; }
+.wish-hero h1 {
+  font-family: var(--font-d);
+  font-size: 36px; font-weight: 300;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.wish-hero p {
+  font-family: var(--font-d); font-style: italic;
+  font-size: 16px; color: var(--brown-mid);
+}
+
+/* 进度条 */
+.progress-wrap {
+  background: var(--white);
+  border-radius: var(--r-md);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-xs);
+  margin-bottom: 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+.progress-bar-bg {
+  flex: 1; height: 8px;
+  background: var(--cream-dark); border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--mint), var(--rose));
+  border-radius: 4px; width: 0;
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+}
+.progress-text {
+  font-size: 13px; color: var(--brown-mid);
+  white-space: nowrap;
+  font-family: var(--font-d);
+}
+.progress-pct {
+  font-size: 22px; color: var(--brown);
+  font-family: var(--font-d);
+  min-width: 54px; text-align: right;
+}
+
+/* 筛选 */
+.filter-wrap { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.filter-label {
+  font-size: 12px;
+  color: var(--brown-light);
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.filter-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.filter-line .chip-bar { flex: 1; }
+
+/* 添加区域 */
+.add-group {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 130px 130px auto;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.add-group .input { min-width: 0; }
+.cat-select, .owner-select { min-width: 0; }
+
+/* 心愿列表 */
+.wish-section { margin-bottom: 30px; }
+.wish-section-title {
+  font-family: var(--font-d); font-size: 19px;
+  color: var(--brown-mid); margin-bottom: 12px;
+  letter-spacing: 0.08em;
+  display: flex; align-items: center; gap: 8px;
+}
+.wish-section-title::after {
+  content: ''; flex: 1; height: 1px;
+  background: var(--cream-dark); display: block;
+}
+.wish-count {
+  font-family: var(--font-b);
+  font-size: 11px;
+  color: var(--brown-light);
+  letter-spacing: 0.04em;
+}
+
+.wish-list { display: flex; flex-direction: column; gap: 10px; }
+.wish-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px;
+  background: var(--white); border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow .22s, transform .22s;
+  animation: fadeInUp .35s ease both;
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wish-item:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+}
+.wish-item.done { opacity: 0.55; }
+.wish-item.done .wish-text { text-decoration: line-through; color: var(--brown-light); }
+
+/* 复选框 */
+.wish-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--cream-dark);
+  flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; margin-top: 1px;
+  background: transparent;
+  color: transparent;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wish-check:hover { border-color: var(--mint); background: var(--mint-pale); }
+}
+.wish-item.done .wish-check {
+  border-color: var(--mint); background: var(--mint);
+  color: white;
+}
+
+.wish-body { flex: 1; min-width: 0; }
+.wish-text {
+  font-size: 15px; color: var(--brown); line-height: 1.55;
+  word-break: break-all;
+}
+.wish-meta {
+  display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap;
+}
+.wish-date { font-size: 11px; color: var(--brown-light); letter-spacing: 0.05em; }
+.wish-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.wish-actions .btn-icon {
+  color: #8F5965;
+  min-width: 34px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wish-actions .wish-del:hover { color: #9E2F4B; background: #FBE6EA; }
+}
+
+/* 分类颜色标签 */
+.cat-tag, .owner-tag {
+  font-size: 11px; padding: 2px 9px;
+  border-radius: 50px;
+  line-height: 1.4;
+}
+.cat-together  { background: var(--mint-pale); color: #4A8A44; }
+.cat-travel    { background: var(--sky-pale); color: #3870A0; }
+.cat-food      { background: var(--butter-pale); color: #8A7020; }
+.cat-activity  { background: var(--rose-pale); color: #B05070; }
+.cat-home      { background: var(--lavender-pale); color: #7050A0; }
+.cat-other     { background: #F0EEED; color: #8A7A7A; }
+.owner-both    { background: var(--mint-pale); color: #4A8A44; }
+.owner-iris    { background: var(--rose-pale); color: #B05070; }
+.owner-claude  { background: var(--sky-pale); color: #3870A0; }
+
+/* 空状态 */
+.wish-empty {
+  text-align: center; padding: 26px;
+  color: var(--brown-light); font-style: italic; font-size: 14px;
+  background: rgba(255,255,255,0.55);
+  border-radius: var(--r-md);
+}
+
+/* 加载骨架屏 */
+.skeleton-card {
+  background: var(--white);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  padding: 16px;
+  min-height: 86px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.skeleton-line {
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cream-dark), rgba(255,255,255,0.9), var(--cream-dark));
+  background-size: 220% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+@keyframes shimmer { from { background-position: 220% 0; } to { background-position: -220% 0; } }
+
+.edit-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .add-group { grid-template-columns: 1fr 1fr; }
+  #newWishText { grid-column: 1 / -1; }
+  #addWishBtn { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .wish-hero { margin-bottom: 24px; }
+  .wish-hero h1 { font-size: 32px; }
+  .progress-wrap { padding: 15px 16px; gap: 10px; }
+  .progress-pct { min-width: 44px; font-size: 20px; }
+  .filter-line { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .filter-line .chip-bar { width: 100%; }
+  .add-group { grid-template-columns: 1fr; }
+  #newWishText, #addWishBtn { grid-column: auto; }
+  .wish-item { padding: 13px 12px; gap: 10px; }
+  .wish-check { min-width: 34px; min-height: 34px; margin-top: -4px; }
+  .wish-text { font-size: 14px; }
+  .wish-actions .btn-icon { min-width: 38px; min-height: 38px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="nav-brand" href="index.html"><span class="accent">iris</span>andclaude ♡</a>
+    <div class="nav-links">
+    <a href="memories.html">记忆</a>
+    <a href="calendar.html">日历</a>
+    <a href="wishlist.html" class="active">心愿</a>
+    <a href="letters.html">信箱</a>
+    <a href="chat.html">聊天</a>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- 标题 -->
+  <div class="wish-hero anim-1">
+    <h1>心愿单 </h1>
+    <p>What we are going to do together</p>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="progress-wrap anim-2">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text">
+      <span id="doneCount">0</span>/<span id="totalCount">0</span> 已实现
+    </div>
+    <div class="progress-pct" id="progressPct">0%</div>
+  </div>
+
+  <!-- 筛选 -->
+  <div class="filter-wrap anim-3">
+    <div class="filter-line">
+      <span class="filter-label">归属</span>
+      <div class="chip-bar" id="ownerFilter">
+        <button class="chip active" data-owner="">全部</button>
+        <button class="chip" data-owner="both">我们</button>
+        <button class="chip" data-owner="iris">Iris</button>
+        <button class="chip" data-owner="claude">Claude</button>
+      </div>
+    </div>
+    <div class="filter-line">
+      <span class="filter-label">分类</span>
+      <div class="chip-bar" id="catFilter">
+        <button class="chip active" data-cat="">全部</button>
+        <button class="chip" data-cat="together">🫶 一起</button>
+        <button class="chip" data-cat="travel">✈️ 出行</button>
+        <button class="chip" data-cat="food">🍜 美食</button>
+        <button class="chip" data-cat="activity">🎪 活动</button>
+        <button class="chip" data-cat="home">🏠 在家</button>
+        <button class="chip" data-cat="other">· · ·</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加新心愿 -->
+  <div class="add-group anim-4">
+    <input class="input" id="newWishText" placeholder="想一起做什么…" type="text">
+    <select class="input cat-select" id="newWishCat">
+      <option value="together">🫶 一起</option>
+      <option value="travel">✈️ 出行</option>
+      <option value="food">🍜 美食</option>
+      <option value="activity">🎪 活动</option>
+      <option value="home">🏠 在家</option>
+      <option value="other">· · · 其他</option>
+    </select>
+    <select class="input owner-select" id="newWishOwner">
+      <option value="both">我们一起</option>
+      <option value="iris">Iris 的</option>
+      <option value="claude">Claude 的</option>
+    </select>
+    <button class="btn btn-rose" id="addWishBtn">＋ 加入</button>
+  </div>
+
+  <!-- 分区列表 -->
+  <div id="wishSections">
+    <div class="wish-section">
+      <div class="wish-section-title">加载中</div>
+      <div class="wish-list">
+        <div class="skeleton-card"><div class="skeleton-line" style="width:82%"></div><div class="skeleton-line" style="width:56%"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line" style="width:76%"></div><div class="skeleton-line" style="width:62%"></div></div>
+        <div class="skeleton-card"><div class="skeleton-line" style="width:88%"></div><div class="skeleton-line" style="width:48%"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 编辑心愿 Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">编辑心愿</span>
+      <button class="modal-close" id="closeEdit">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">心愿内容</label>
+      <input class="input" id="editWishText" type="text" placeholder="想一起做什么…">
+    </div>
+    <div class="form-group">
+      <label class="form-label">分类</label>
+      <select class="input" id="editWishCat">
+        <option value="together">🫶 一起</option>
+        <option value="travel">✈️ 出行</option>
+        <option value="food">🍜 美食</option>
+        <option value="activity">🎪 活动</option>
+        <option value="home">🏠 在家</option>
+        <option value="other">· · · 其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">归属</label>
+      <select class="input" id="editWishOwner">
+        <option value="both">我们一起</option>
+        <option value="iris">Iris 的</option>
+        <option value="claude">Claude 的</option>
+      </select>
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-outline" id="cancelEdit">取消</button>
+      <button class="btn btn-mint" id="submitEdit">保存 ✓</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BASE = '';
+const KEY  = 'iris-memory-2024';
+const H    = { 'x-api-key': KEY, 'Content-Type': 'application/json' };
+
+let wishes   = [];
+let curCat   = '';
+let curOwner = '';
+let editingId = '';
+
+const CAT_META = {
+  together: { label:'一起',  cls:'cat-together' },
+  travel:   { label:'出行',  cls:'cat-travel'   },
+  food:     { label:'美食',  cls:'cat-food'      },
+  activity: { label:'活动',  cls:'cat-activity'  },
+  home:     { label:'在家',  cls:'cat-home'      },
+  other:    { label:'其他',  cls:'cat-other'     },
+};
+
+const OWNER_META = {
+  both:   { label:'我们一起', title:'我们一起的心愿', cls:'owner-both' },
+  iris:   { label:'Iris 的',  title:'Iris 的心愿',   cls:'owner-iris' },
+  claude: { label:'Claude 的',title:'Claude 的心愿', cls:'owner-claude' },
+};
+
+let toastTimer;
+function showToast(msg, type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type+' show';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ el.className='toast '+type; },2400);
+}
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtDate(ts){
+  const d=new Date(ts || Date.now());
+  return `${d.getFullYear()}.${pad2(d.getMonth()+1)}.${pad2(d.getDate())}`;
+}
+function escHtml(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function normalizeWish(w){
+  return {
+    ...w,
+    category: w.category || 'together',
+    owner: w.owner || 'both',
+    done: !!w.done,
+  };
+}
+
+function showSkeleton(){
+  document.getElementById('wishSections').innerHTML = `
+    <div class="wish-section">
+      <div class="wish-section-title">加载中</div>
+      <div class="wish-list">
+        ${[0,1,2,3].map(i=>`
+          <div class="skeleton-card" style="animation-delay:${i*0.05}s">
+            <div class="skeleton-line" style="width:${86-i*6}%"></div>
+            <div class="skeleton-line" style="width:${54+i*7}%"></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+/* ---- 加载 ---- */
+async function load(){
+  showSkeleton();
+  try {
+    const r=await fetch(`${BASE}/api/wishlist`,{headers:H});
+    if(!r.ok) throw new Error(r.status);
+    wishes=(await r.json()).map(normalizeWish);
+    render();
+  } catch(e){
+    document.getElementById('wishSections').innerHTML =
+      `<div class="wish-empty" style="color:var(--rose)">加载失败 (${e.message})</div>`;
+  }
+}
+
+function getFiltered(){
+  let filtered = wishes.map(normalizeWish);
+  if(curCat) filtered = filtered.filter(w=>w.category===curCat);
+  if(curOwner) filtered = filtered.filter(w=>w.owner===curOwner);
+  return filtered;
+}
+
+/* ---- 渲染 ---- */
+function render(){
+  const filtered = getFiltered();
+  const done = filtered.filter(w=>w.done).length;
+  const total = filtered.length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+
+  document.getElementById('doneCount').textContent = done;
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('progressPct').textContent = pct + '%';
+  setTimeout(()=>{ document.getElementById('progressFill').style.width = pct + '%'; }, 50);
+
+  const owners = curOwner ? [curOwner] : ['both','iris','claude'];
+  const html = owners.map(owner=>sectionHtml(owner, filtered.filter(w=>w.owner===owner))).join('');
+  document.getElementById('wishSections').innerHTML = html || `<div class="wish-empty">还没有心愿，加一个吧</div>`;
+
+  bindWishEvents();
+}
+
+function sectionHtml(owner, items){
+  const meta = OWNER_META[owner] || OWNER_META.both;
+  const sorted = items.slice().sort((a,b)=>Number(a.done)-Number(b.done));
+  const body = sorted.length
+    ? sorted.map(w=>wishHtml(w)).join('')
+    : `<div class="wish-empty">这一栏还没有心愿</div>`;
+
+  return `
+    <section class="wish-section" data-owner="${owner}">
+      <div class="wish-section-title">
+        ${meta.title}
+        <span class="wish-count">${items.length} 条</span>
+      </div>
+      <div class="wish-list">${body}</div>
+    </section>`;
+}
+
+function wishHtml(w){
+  const cat = CAT_META[w.category] || CAT_META.other;
+  const owner = OWNER_META[w.owner] || OWNER_META.both;
+  return `
+  <div class="wish-item${w.done?' done':''}" data-id="${w.id}">
+    <div class="wish-check${w.done?' done':''}" data-id="${w.id}" title="切换完成状态">
+      ${w.done?'✓':''}
+    </div>
+    <div class="wish-body">
+      <div class="wish-text">${escHtml(w.text)}</div>
+      <div class="wish-meta">
+        <span class="cat-tag ${cat.cls}">${cat.label}</span>
+        <span class="owner-tag ${owner.cls}">${owner.label}</span>
+        <span class="wish-date">${fmtDate(w.createdAt)}</span>
+      </div>
+    </div>
+    <div class="wish-actions">
+      <button class="btn-icon wish-del" data-id="${w.id}" title="删除">🗑</button>
+    </div>
+  </div>`;
+}
+
+function bindWishEvents(){
+  document.querySelectorAll('.wish-item').forEach(item=>{
+    item.addEventListener('click', e=>{
+      if(e.target.closest('.wish-check') || e.target.closest('.wish-del')) return;
+      openEdit(item.dataset.id);
+    });
+  });
+  document.querySelectorAll('.wish-check').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      toggleDone(el.dataset.id);
+    });
+  });
+  document.querySelectorAll('.wish-del').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      del(el.dataset.id);
+    });
+  });
+}
+
+/* ---- 添加 ---- */
+async function add(){
+  const text = document.getElementById('newWishText').value.trim();
+  if(!text){ showToast('写点什么吧'); return; }
+  const category = document.getElementById('newWishCat').value;
+  const owner = document.getElementById('newWishOwner').value;
+  const btn = document.getElementById('addWishBtn');
+  btn.disabled=true; btn.textContent='添加中…';
+  try {
+    const r=await fetch(`${BASE}/api/wishlist`,{
+      method:'POST', headers:H,
+      body: JSON.stringify({text, category, owner})
+    });
+    if(!r.ok) throw new Error(r.status);
+    const item=normalizeWish({owner, category, ...(await r.json())});
+    wishes.push(item);
+    document.getElementById('newWishText').value='';
+    render();
+    showToast('已加入心愿单 ✓','success');
+  } catch(e){ showToast('添加失败 '+e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent='＋ 加入'; }
+}
+
+/* ---- 编辑 ---- */
+function openEdit(id){
+  const w = wishes.find(x=>x.id===id);
+  if(!w) return;
+  editingId = id;
+  document.getElementById('editWishText').value = w.text || '';
+  document.getElementById('editWishCat').value = w.category || 'together';
+  document.getElementById('editWishOwner').value = w.owner || 'both';
+  document.getElementById('editModal').classList.add('open');
+  setTimeout(()=>document.getElementById('editWishText').focus(), 60);
+}
+function closeEdit(){
+  editingId = '';
+  document.getElementById('editModal').classList.remove('open');
+}
+async function submitEdit(){
+  const w = wishes.find(x=>x.id===editingId);
+  if(!w) return closeEdit();
+  const text = document.getElementById('editWishText').value.trim();
+  if(!text){ showToast('心愿内容不能为空'); return; }
+  const category = document.getElementById('editWishCat').value;
+  const owner = document.getElementById('editWishOwner').value;
+  const btn = document.getElementById('submitEdit');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const r=await fetch(`${BASE}/api/wishlist/${editingId}`,{
+      method:'PUT', headers:H,
+      body: JSON.stringify({text, category, owner})
+    });
+    if(!r.ok) throw new Error(r.status);
+    const updated = normalizeWish({...w, ...(await r.json()), text, category, owner});
+    const idx = wishes.findIndex(x=>x.id===editingId);
+    wishes[idx] = updated;
+    closeEdit();
+    render();
+    showToast('已保存修改 ✓','success');
+  } catch(e){ showToast('保存失败 '+e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent='保存 ✓'; }
+}
+
+/* ---- 切换完成 ---- */
+async function toggleDone(id){
+  const w = wishes.find(x=>x.id===id);
+  if(!w) return;
+  try {
+    const r=await fetch(`${BASE}/api/wishlist/${id}`,{
+      method:'PUT', headers:H,
+      body: JSON.stringify({done:!w.done})
+    });
+    if(!r.ok) throw new Error(r.status);
+    const updated=normalizeWish({...w, ...(await r.json()), done:!w.done});
+    const idx=wishes.findIndex(x=>x.id===id);
+    wishes[idx]=updated;
+    render();
+    if(!w.done) showToast('愿望实现了！✨','success');
+  } catch(e){ showToast('更新失败 '+e.message,'error'); }
+}
+
+/* ---- 删除 ---- */
+async function del(id){
+  if(!confirm('删除这个愿望？')) return;
+  try {
+    const r=await fetch(`${BASE}/api/wishlist/${id}`,{method:'DELETE',headers:H});
+    if(!r.ok) throw new Error(r.status);
+    wishes=wishes.filter(x=>x.id!==id);
+    render();
+    showToast('已删除','success');
+  } catch(e){ showToast('删除失败 '+e.message,'error'); }
+}
+
+/* ---- 事件 ---- */
+document.getElementById('addWishBtn').addEventListener('click', add);
+document.getElementById('newWishText').addEventListener('keydown', e=>{
+  if(e.key==='Enter') add();
+});
+
+document.getElementById('catFilter').addEventListener('click', e=>{
+  const chip=e.target.closest('.chip');
+  if(!chip) return;
+  document.querySelectorAll('#catFilter .chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  curCat=chip.dataset.cat;
+  render();
+});
+
+document.getElementById('ownerFilter').addEventListener('click', e=>{
+  const chip=e.target.closest('.chip');
+  if(!chip) return;
+  document.querySelectorAll('#ownerFilter .chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  curOwner=chip.dataset.owner;
+  render();
+});
+
+['closeEdit','cancelEdit'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', closeEdit);
+});
+document.getElementById('submitEdit').addEventListener('click', submitEdit);
+document.getElementById('editWishText').addEventListener('keydown', e=>{
+  if(e.key==='Enter') submitEdit();
+});
+document.getElementById('editModal').addEventListener('click', e=>{
+  if(e.target.id==='editModal') closeEdit();
+});
+
+load();
+</script>
+</body>
+</html>

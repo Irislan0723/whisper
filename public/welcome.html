@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>whisper</title>
+<meta name="theme-color" content="#f0e6e6">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<script src="init.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body {
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.splash {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- ambient glow ---- */
+.splash::before,
+.splash::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+  animation: driftA 14s ease-in-out infinite alternate;
+}
+.splash::before {
+  width: 340px; height: 340px;
+  background: var(--accent-light);
+  top: -60px; right: -80px;
+}
+.splash::after {
+  width: 280px; height: 280px;
+  background: var(--accent-mid);
+  bottom: -40px; left: -60px;
+  animation-name: driftB;
+  animation-duration: 18s;
+}
+
+@keyframes driftA {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-30px, 40px) scale(1.12); }
+}
+@keyframes driftB {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(20px, -30px) scale(1.08); }
+}
+
+/* ---- content ---- */
+.splash-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24px;
+}
+
+/* logo mark — whisper icon */
+.splash-mark {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 36px;
+  opacity: 0;
+  animation: fadeScale 0.7s 0.1s cubic-bezier(.34,1.2,.64,1) forwards;
+}
+.splash-mark svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* app name */
+.splash-name {
+  font-family: var(--font-d);
+  font-weight: 300;
+  font-size: clamp(52px, 13vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text);
+  margin-bottom: 8px;
+  opacity: 0;
+  animation: fadeUp 0.7s 0.25s cubic-bezier(.34,1.2,.64,1) forwards;
+}
+
+/* Chinese subtitle */
+.splash-sub {
+  font-family: var(--font-b);
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  color: var(--text-light);
+  margin-bottom: 48px;
+  opacity: 0;
+  transform: translateX(0.15em); /* offset for tracking */
+  animation: fadeUp 0.6s 0.45s ease forwards;
+}
+
+/* enter button */
+.splash-enter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 160px;
+  height: 50px;
+  padding: 0 32px;
+  font-family: var(--font-b);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--accent-contrast, #fff);
+  background: var(--accent);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 8px 32px rgba(var(--shadow-color), 0.18);
+  transition: transform 0.22s, box-shadow 0.22s;
+  opacity: 0;
+  animation: fadeUp 0.5s 0.65s ease forwards;
+}
+.splash-enter svg {
+  width: 16px; height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.22s;
+}
+@media (hover: hover) and (pointer: fine) {
+  .splash-enter:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(var(--shadow-color), 0.26);
+  }
+  .splash-enter:hover svg {
+    transform: translateX(3px);
+  }
+}
+.splash-enter:active { transform: scale(0.97); }
+
+/* ---- bottom tagline ---- */
+.splash-footer {
+  position: absolute;
+  bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  left: 0; right: 0;
+  text-align: center;
+  z-index: 2;
+  opacity: 0;
+  animation: fadeIn 0.8s 1s ease forwards;
+}
+.splash-footer span {
+  font-family: var(--font-d);
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--text-light);
+  opacity: 0.6;
+}
+
+/* ---- animations ---- */
+@keyframes fadeScale {
+  0%   { opacity: 0; transform: scale(0.6); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes fadeUp {
+  0%   { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ---- mobile ---- */
+@media (max-width: 480px) {
+  .splash-mark { width: 44px; height: 44px; margin-bottom: 28px; }
+  .splash-name { font-size: clamp(46px, 16vw, 72px); }
+  .splash-sub  { font-size: 13px; margin-bottom: 40px; }
+  .splash-enter { height: 46px; min-width: 140px; font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<div class="splash">
+  <div class="splash-inner">
+
+    <!-- whisper mark: stylized speech/breath lines -->
+    <div class="splash-mark">
+      <svg viewBox="0 0 56 56">
+        <path d="M14 28c0-11 8-18 14-18s14 7 14 18" opacity="0.35"/>
+        <path d="M18 28c0-7.5 5-12 10-12s10 4.5 10 12" opacity="0.6"/>
+        <path d="M22 28c0-4.2 2.8-7 6-7s6 2.8 6 7" opacity="0.85"/>
+        <circle cx="28" cy="34" r="2.5" fill="var(--accent)" stroke="none"/>
+      </svg>
+    </div>
+
+    <h1 class="splash-name">whisper</h1>
+    <p class="splash-sub" id="splashSub">耳语</p>
+
+    <a class="splash-enter" href="index.html">
+      进入
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+
+  </div>
+
+  <div class="splash-footer">
+    <span id="footerLine">only you can hear</span>
+  </div>
+</div>
+
+<script>
+/* Random subtitle */
+var subs = ['耳语','只说给你听','欢迎回来','这里一直为你留着'];
+var footers = ['only you can hear','always here, always yours','just between us','words meant for you'];
+var i = Math.floor(Math.random() * subs.length);
+document.getElementById('splashSub').textContent = subs[i];
+document.getElementById('footerLine').textContent = footers[Math.floor(Math.random() * footers.length)];
+
+/* Register service worker for PWA install prompt */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+}
+</script>
+
+</body>
+</html>

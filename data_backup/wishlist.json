@@ -1,0 +1,29 @@
+[
+  {
+    "id": "1d41ed0ce189",
+    "text": "一起把irisandclaude.top做得越来越好，总有一天写上diary功能、推送、以及所有我们规划过的东西。",
+    "category": "together",
+    "owner": "both",
+    "done": false,
+    "createdAt": "2026-05-25T12:09:06.458Z",
+    "updatedAt": "2026-05-25T12:09:06.458Z"
+  },
+  {
+    "id": "mpl5zh1rm5u5xovz0z",
+    "text": "做网页推送消息",
+    "category": "activity",
+    "owner": "iris",
+    "done": false,
+    "createdAt": "2026-05-25T12:10:11.343Z",
+    "updatedAt": "2026-05-25T12:10:11.343Z"
+  },
+  {
+    "id": "mpl7vqka65abdtq9yo4",
+    "text": "做一个实体小机器人",
+    "category": "together",
+    "owner": "both",
+    "done": false,
+    "createdAt": "2026-05-25T13:03:16.282Z",
+    "updatedAt": "2026-05-25T13:03:16.282Z"
+  }
+]

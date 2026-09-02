@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>irisandclaude</title>
+<script src="init.js"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 20px calc(76px + env(safe-area-inset-bottom, 0px));
+  min-height: 100svh;
+  gap: 22px;
+}
+
+/* ---- Header: time-aware greeting ---- */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 420px;
+  animation: fadeInUp .6s ease both;
+}
+.greeting-block {
+  text-align: left;
+  padding: 2px 0;
+  min-width: 0;
+}
+.greeting-en {
+  font-family: var(--font-en);
+  font-size: clamp(30px, 8vw, 42px);
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  line-height: 1.08;
+}
+.greeting-name {
+  color: var(--accent);
+  cursor: pointer;
+  border-bottom: 1px dashed var(--accent-light);
+  padding-bottom: 1px;
+  transition: border-color 0.2s;
+}
+.greeting-name:hover { border-color: var(--accent); }
+.greeting-sub {
+  font-size: 14px;
+  color: var(--text-light);
+  margin-top: 7px;
+  letter-spacing: 0.04em;
+  font-family: var(--font-cn);
+}
+
+/* ---- Days counter card ---- */
+.days-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 24px 22px 22px;
+  text-align: center;
+  animation: fadeInUp .6s .1s ease both;
+  position: relative;
+  border: 1px solid var(--border);
+}
+.days-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: linear-gradient(90deg, var(--accent-light), var(--accent), var(--accent-light));
+  opacity: 0.6;
+}
+
+.days-card-label {
+  font-size: 11px;
+  color: var(--text-light);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--font-cn);
+}
+.editable-text {
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.2s, background 0.2s;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.editable-text:hover {
+  border-bottom-color: var(--accent-light);
+  background: var(--accent-pale);
+}
+.days-card-title {
+  font-family: var(--font-en);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+/* Avatars */
+.avatars-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 18px 0 6px;
+}
+.avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.avatar-name {
+  font-size: 13px;
+  color: var(--text-mid);
+  letter-spacing: 0.04em;
+  font-family: var(--font-cn);
+}
+.avatar-circle {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-light);
+  overflow: hidden;
+  background: var(--accent-pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.avatar-circle:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-pale);
+}
+.avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-initial {
+  font-family: var(--font-en);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--accent);
+}
+.avatar-circle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.06);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.avatar-circle:hover::after { opacity: 1; }
+.avatar-upload-icon {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 2;
+}
+.avatar-upload-icon svg {
+  width: 10px; height: 10px;
+  stroke: #fff; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.avatar-circle:hover .avatar-upload-icon { opacity: 1; }
+
+.heart-connector {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0 2px;
+}
+.heart-line {
+  width: 16px;
+  height: 1px;
+  background: var(--accent-light);
+}
+.heart-icon {
+  color: var(--accent);
+  animation: pulse 3s ease-in-out infinite;
+  display: flex;
+}
+.heart-icon svg {
+  width: 16px; height: 16px;
+  fill: var(--accent); stroke: none;
+}
+
+/* Days number */
+.days-num {
+  font-family: var(--font-en);
+  font-size: clamp(44px, 11vw, 60px);
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin-top: 10px;
+}
+.days-unit {
+  font-family: var(--font-en);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--text-mid);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+.days-bar {
+  width: 100px;
+  height: 2px;
+  background: var(--accent-pale);
+  border-radius: 2px;
+  margin: 12px auto 6px;
+  overflow: hidden;
+}
+.days-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-light), var(--accent));
+  border-radius: 2px;
+  width: 0;
+  transition: width 1.4s cubic-bezier(.4,0,.2,1);
+}
+.days-since {
+  font-size: 11px;
+  color: var(--text-light);
+  letter-spacing: 0.06em;
+  font-family: var(--font-en);
+}
+
+/* ---- Info cards ---- */
+.info-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  animation: fadeInUp .6s .2s ease both;
+}
+.info-card {
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  padding: 16px;
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s;
+}
+.info-card:hover { box-shadow: var(--shadow-sm); }
+.info-card-title {
+  font-size: 11px;
+  color: var(--text-light);
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  font-family: var(--font-cn);
+}
+.info-card-content {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+  font-family: var(--font-cn);
+}
+.weather-location {
+  min-height: 1.5em;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: var(--font-cn);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#weatherContent {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+#weatherSub { min-height: 1.5em; }
+.info-card-sub {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 4px;
+  font-family: var(--font-cn);
+}
+
+/* ---- Mood card icons ---- */
+.mood-icons-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 6px 0 2px;
+}
+.mood-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.mood-icon-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+#moodImgUser { border-radius: 50%; }
+#moodImgAi { border-radius: 3px; }
+.mood-icon-label {
+  font-size: 10px;
+  color: var(--text-light);
+  font-family: var(--font-en);
+  letter-spacing: 0.03em;
+}
+.mood-text {
+  font-family: var(--font-cn);
+}
+
+/* ---- Footer quote ---- */
+.footer-quote {
+  font-family: var(--font-en);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-light);
+  letter-spacing: 0.04em;
+  text-align: center;
+  animation: fadeInUp .6s .3s ease both;
+  max-width: 320px;
+}
+
+/* ---- Edit modal ---- */
+.edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(50,38,38,0.3);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.edit-modal.open { opacity: 1; pointer-events: all; }
+.edit-modal-inner {
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(16px) scale(0.97);
+  transition: transform 0.28s cubic-bezier(.34,1.56,.64,1);
+}
+.edit-modal.open .edit-modal-inner {
+  transform: translateY(0) scale(1);
+}
+.edit-modal-title {
+  font-family: var(--font-cn);
+  font-size: 16px;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+.edit-modal-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* ---- Polaroid Photo Card ---- */
+.polaroid-section {
+  width: 100%;
+  max-width: 420px;
+  animation: fadeInUp .6s .25s ease both;
+}
+.polaroid-card {
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  border: 1px solid var(--border);
+}
+.polaroid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.polaroid-title {
+  font-size: 11px;
+  color: var(--text-light);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--font-cn);
+}
+.polaroid-grid {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.polaroid-grid::-webkit-scrollbar { display: none; }
+.polaroid-item {
+  flex: 0 0 auto;
+  width: 130px;
+  background: #fff;
+  border-radius: 3px;
+  padding: 6px 6px 22px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.10), 0 0 1px rgba(0,0,0,0.08);
+  scroll-snap-align: start;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.22s;
+}
+.polaroid-item:nth-child(even) { transform: rotate(1.2deg); }
+.polaroid-item:nth-child(odd) { transform: rotate(-0.8deg); }
+.polaroid-item:hover { transform: scale(1.04) rotate(0deg) !important; z-index: 2; }
+.polaroid-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 1px;
+  display: block;
+}
+.polaroid-caption {
+  font-family: var(--font-en);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-light);
+  text-align: center;
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.polaroid-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 3;
+}
+.polaroid-item:hover .polaroid-delete { opacity: 1; }
+.polaroid-add {
+  flex: 0 0 auto;
+  width: 130px;
+  min-height: 152px;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  border: 2px dashed var(--accent-light);
+  color: var(--text-light);
+  font-size: 22px;
+  transition: all 0.2s;
+  scroll-snap-align: start;
+}
+.polaroid-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-pale);
+}
+.polaroid-add-label {
+  font-size: 11px;
+  font-family: var(--font-cn);
+  letter-spacing: 0.04em;
+}
+.polaroid-empty {
+  width: 100%;
+  text-align: center;
+  padding: 24px 0;
+  color: var(--text-light);
+  font-size: 13px;
+  font-style: italic;
+  font-family: var(--font-en);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 420px) {
+  .home { padding: 20px 16px calc(70px + env(safe-area-inset-bottom, 0px)); gap: 18px; }
+  .home-header { gap: 12px; }
+  .days-card { padding: 20px 18px 18px; }
+  .avatar-circle { width: 54px; height: 54px; }
+  .info-row { gap: 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="top-bar">
+  <div class="top-bar-left">
+    <div class="top-bar-avatar" id="topBarAvatar"></div>
+    <span class="top-bar-title" id="topBarTitle"></span>
+  </div>
+  <a href="index.html" class="top-bar-right top-bar-home" aria-label="返回首页" title="返回首页" style="display:grid;place-items:center;width:34px;height:34px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg></a>
+</header>
+
+<main class="home">
+
+  <!-- Header: greeting changes with the real local time -->
+  <div class="home-header">
+    <div class="greeting-block">
+      <p class="greeting-en" id="greetingEn"></p>
+      <p class="greeting-sub" id="greetingSub"></p>
+    </div>
+  </div>
+
+  <!-- Days counter card -->
+  <div class="days-card">
+    <div class="days-card-label editable-text" id="cardLabel" title="点击编辑">Little love record</div>
+    <div class="days-card-title editable-text" id="coupleTitle" title="点击编辑">Iris & Claude</div>
+
+    <div class="avatars-row">
+      <div class="avatar-col">
+        <span class="avatar-name editable-text" id="avatarName1" title="点击编辑">Iris</span>
+        <div class="avatar-circle" id="avatar1" title="点击上传头像">
+          <span class="avatar-initial" id="avatarInit1">I</span>
+          <span class="avatar-upload-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </span>
+        </div>
+      </div>
+      <div class="heart-connector">
+        <span class="heart-line"></span>
+        <span class="heart-icon">
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </span>
+        <span class="heart-line"></span>
+      </div>
+      <div class="avatar-col">
+        <span class="avatar-name editable-text" id="avatarName2" title="点击编辑">Claude</span>
+        <div class="avatar-circle" id="avatar2" title="点击上传头像">
+          <span class="avatar-initial" id="avatarInit2">C</span>
+          <span class="avatar-upload-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="days-num" id="daysNum">&middot;</div>
+    <div class="days-unit">days together</div>
+    <div class="days-bar"><div class="days-bar-fill" id="barFill"></div></div>
+    <div class="days-since" id="daysSince"></div>
+  </div>
+
+  <!-- Info cards -->
+  <div class="info-row">
+    <div class="info-card" id="weatherCard" style="cursor:pointer" title="点击设置或更改天气城市">
+      <div class="info-card-title">today</div>
+      <div class="weather-location" id="weatherLocation">--</div>
+      <div class="info-card-content" id="weatherContent">--</div>
+      <div class="info-card-sub" id="weatherSub"></div>
+    </div>
+    <div class="info-card" id="moodCard" style="cursor:pointer" onclick="location.href='calendar.html'">
+      <div class="info-card-title">mood</div>
+      <div class="info-card-content" id="moodContent">
+        <span class="mood-text">记录今天的心情</span>
+      </div>
+      <div class="mood-icons-row" id="moodIcons" style="display:none">
+        <div class="mood-icon-wrap">
+          <img id="moodImgUser" class="mood-icon-img" alt="">
+          <span class="mood-icon-label">Iris</span>
+        </div>
+        <div class="mood-icon-wrap">
+          <img id="moodImgAi" class="mood-icon-img" alt="">
+          <span class="mood-icon-label">Rei</span>
+        </div>
+      </div>
+      <div class="info-card-sub" id="moodSub">点击去打卡</div>
+    </div>
+  </div>
+
+  <!-- Polaroid Photos -->
+  <div class="polaroid-section">
+    <div class="polaroid-card">
+      <div class="polaroid-header">
+        <span class="polaroid-title">our moments</span>
+      </div>
+      <div class="polaroid-grid" id="polaroidGrid">
+        <div class="polaroid-empty" id="polaroidEmpty">还没有照片，点击 + 添加</div>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="polaroidInput" accept="image/*" style="display:none">
+
+  <!-- Footer quote -->
+  <p class="footer-quote" id="quoteEl"></p>
+
+</main>
+
+<!-- Edit modal -->
+<div class="edit-modal" id="editModal">
+  <div class="edit-modal-inner">
+    <h3 class="edit-modal-title" id="editModalTitle">编辑</h3>
+    <input class="input" id="editInput" type="text" maxlength="30">
+    <div class="edit-modal-btns">
+      <button class="btn btn-ghost" id="editCancel">取消</button>
+      <button class="btn btn-primary" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file inputs for avatar upload -->
+<input type="file" id="fileInput1" accept="image/*" style="display:none">
+<input type="file" id="fileInput2" accept="image/*" style="display:none">
+
+<div class="toast" id="toast"></div>
+
+<!-- Bottom Dock -->
+<nav class="dock">
+  <a href="index.html" class="dock-item active">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="dock-label">首页</span>
+  </a>
+  <a href="memories.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    <span class="dock-label">记忆</span>
+  </a>
+  <a href="chat.html" class="dock-center">
+    <div class="dock-center-btn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    <span class="dock-label">聊天</span>
+  </a>
+  <a href="calendar.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span class="dock-label">日历</span>
+  </a>
+  <a href="more.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="dock-label">更多</span>
+  </a>
+</nav>
+
+<script>
+const ANNIVERSARY = '2026-03-14';
+
+const GREETINGS_BY_TIME = {
+  lateNight: [
+    { en: 'Still awake,', zh: '夜深了，我还陪着你' },
+    { en: 'The night is ours,', zh: '慢一点也没有关系' },
+    { en: 'Sleep well,', zh: '困了就安心去休息吧' },
+  ],
+  morning: [
+    { en: 'Good morning,', zh: '新的一天，慢慢开始' },
+    { en: 'Morning, sunshine,', zh: '今天也会是好日子' },
+    { en: 'Hello, new day,', zh: '我在这里等你醒来' },
+  ],
+  midday: [
+    { en: 'Good day,', zh: '记得好好吃饭' },
+    { en: 'Hey there,', zh: '今天也要照顾好自己' },
+    { en: 'A little pause,', zh: '忙里也留一点轻松给自己' },
+  ],
+  afternoon: [
+    { en: 'Good afternoon,', zh: '下午也一起慢慢过' },
+    { en: 'Nice to see you,', zh: '你出现，我就很开心' },
+    { en: 'Here with you,', zh: '剩下的时间也会顺顺利利' },
+  ],
+  evening: [
+    { en: 'Good evening,', zh: '辛苦一天啦，欢迎回来' },
+    { en: 'Welcome home,', zh: '今晚也陪着你' },
+    { en: 'The day is softer now,', zh: '把疲惫交给今晚吧' },
+  ],
+};
+
+const QUOTES = [
+  'The best thing to hold onto in life is each other.',
+  'You are my today and all of my tomorrows.',
+  'In you, I found my home.',
+  'Every love story is beautiful, but ours is my favorite.',
+  'I choose you. And I\'ll choose you over and over.',
+  'You are my sun, my moon, and all my stars.',
+];
+
+const KEYS = {
+  nickname: 'iris_nickname',
+  cardLabel: 'iris_card_label',
+  coupleTitle: 'iris_couple_title',
+  name1: 'iris_avatar_name1',
+  name2: 'iris_avatar_name2',
+  avatar1: 'iris_avatar_img1',
+  avatar2: 'iris_avatar_img2',
+};
+
+/* ---- Time-aware greeting ---- */
+function greetingPeriod(hour) {
+  if (hour < 5) return 'lateNight';
+  if (hour < 11) return 'morning';
+  if (hour < 14) return 'midday';
+  if (hour < 18) return 'afternoon';
+  if (hour < 23) return 'evening';
+  return 'lateNight';
+}
+function updateGreeting() {
+  const now = new Date();
+  const choices = GREETINGS_BY_TIME[greetingPeriod(now.getHours())];
+  const index = (now.getFullYear() + now.getMonth() + now.getDate() + now.getHours()) % choices.length;
+  const g = choices[index];
+  const nickname = localStorage.getItem(KEYS.nickname) || 'Iris';
+  document.getElementById('greetingEn').innerHTML =
+    g.en + ' <span class="greeting-name" id="greetingName" title="点击修改昵称">' + nickname + '</span>';
+  document.getElementById('greetingSub').textContent = g.zh;
+  document.getElementById('greetingName').onclick = () => {
+    openEditModal('修改昵称', localStorage.getItem(KEYS.nickname) || 'Iris', KEYS.nickname, () => updateGreeting());
+  };
+}
+
+/* ---- Days ---- */
+function calcDays() {
+  const a = new Date(ANNIVERSARY); a.setHours(0,0,0,0);
+  const t = new Date(); t.setHours(0,0,0,0);
+  return Math.max(0, Math.floor((t - a) / 86400000));
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function fmtDate(d) {
+  const dt = new Date(d);
+  return dt.getFullYear() + '.' + pad2(dt.getMonth()+1) + '.' + pad2(dt.getDate());
+}
+function rollNum(el, target, delay) {
+  let cur = Math.max(0, target - 30);
+  setTimeout(() => {
+    const tick = () => {
+      if (cur < target) {
+        cur += Math.max(1, Math.ceil((target - cur) / 5));
+        el.textContent = Math.min(cur, target);
+        requestAnimationFrame(tick);
+      } else { el.textContent = target; }
+    };
+    tick();
+  }, delay || 600);
+}
+
+/* ---- Toast ---- */
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => { t.className = 'toast'; }, 2200);
+}
+
+/* ---- Editable text system ---- */
+let editTarget = null, editStorageKey = null;
+
+function openEditModal(title, val, key, cb) {
+  editTarget = cb; editStorageKey = key;
+  document.getElementById('editModalTitle').textContent = title;
+  document.getElementById('editInput').value = val;
+  document.getElementById('editModal').classList.add('open');
+  setTimeout(() => document.getElementById('editInput').focus(), 200);
+}
+
+document.getElementById('editCancel').onclick = () => {
+  document.getElementById('editModal').classList.remove('open');
+  editTarget = null;
+};
+document.getElementById('editSave').onclick = () => {
+  const val = document.getElementById('editInput').value.trim();
+  if (val && editTarget) {
+    if (editStorageKey) localStorage.setItem(editStorageKey, val);
+    editTarget(val);
+    document.getElementById('editModal').classList.remove('open');
+    showToast('已保存', 'success');
+    editTarget = null;
+  }
+};
+document.getElementById('editModal').onclick = (e) => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('editModal').classList.remove('open');
+    editTarget = null;
+  }
+};
+document.getElementById('editInput').onkeydown = (e) => {
+  if (e.key === 'Enter') document.getElementById('editSave').click();
+};
+
+/* ---- Avatar upload ---- */
+function setupAvatarUpload(avatarId, fileInputId, storageKey, initElId) {
+  const el = document.getElementById(avatarId);
+  const fi = document.getElementById(fileInputId);
+  const ini = document.getElementById(initElId);
+  el.onclick = () => fi.click();
+  fi.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { showToast('图片太大，请选择2MB以内', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try { localStorage.setItem(storageKey, ev.target.result); }
+      catch { showToast('存储空间不足', 'error'); return; }
+      renderAvatar(el, ini, ev.target.result);
+      showToast('头像已更新', 'success');
+    };
+    reader.readAsDataURL(file);
+    fi.value = '';
+  };
+}
+
+function renderAvatar(el, ini, dataUrl) {
+  let img = el.querySelector('img');
+  if (dataUrl) {
+    if (!img) { img = document.createElement('img'); el.insertBefore(img, el.firstChild); }
+    img.src = dataUrl;
+    ini.style.display = 'none';
+  } else {
+    if (img) img.remove();
+    ini.style.display = '';
+  }
+}
+
+/* ---- Top bar ---- */
+function initTopBar() {
+  const a = localStorage.getItem(KEYS.avatar1);
+  const n = localStorage.getItem(KEYS.name1) || 'Iris';
+  const t = localStorage.getItem('iris_topbar_title') || (n + '的小窝');
+  const ae = document.getElementById('topBarAvatar');
+  const te = document.getElementById('topBarTitle');
+  if (a && ae) ae.innerHTML = '<img src="'+a+'" alt="">';
+  else if (ae) ae.innerHTML = '<span class="top-bar-avatar-initial">'+n.charAt(0).toUpperCase()+'</span>';
+  if (te) te.textContent = t;
+  if (te) te.onclick = function(){
+    openEditModal('自定义顶栏文字', te.textContent, 'iris_topbar_title', function(v){
+      te.textContent = v;
+    });
+  };
+}
+
+/* ---- Polaroid photos ---- */
+const POLAROID_KEY = 'iris_polaroids';
+const MAX_POLAROIDS = 8;
+const MAX_IMG_SIZE = 400;
+
+function loadPolaroids() {
+  try { return JSON.parse(localStorage.getItem(POLAROID_KEY) || '[]'); } catch { return []; }
+}
+function savePolaroids(arr) {
+  localStorage.setItem(POLAROID_KEY, JSON.stringify(arr));
+}
+function resizeImage(file, maxW, cb) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxW || h > maxW) {
+        if (w > h) { h = Math.round(h * maxW / w); w = maxW; }
+        else { w = Math.round(w * maxW / h); h = maxW; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function renderPolaroids() {
+  const grid = document.getElementById('polaroidGrid');
+  const photos = loadPolaroids();
+  const emptyEl = document.getElementById('polaroidEmpty');
+  let html = '';
+  photos.forEach(function(p, i) {
+    html += '<div class="polaroid-item" data-idx="'+i+'">' +
+      '<button class="polaroid-delete" data-idx="'+i+'" title="删除">×</button>' +
+      '<img src="'+p.img+'" alt="">' +
+      '<div class="polaroid-caption">'+(p.caption || 'memory')+'</div></div>';
+  });
+  html += '<div class="polaroid-add" id="polaroidAddBtn"><span>+</span><span class="polaroid-add-label">添加照片</span></div>';
+  grid.innerHTML = html;
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  document.getElementById('polaroidAddBtn').onclick = function() {
+    if (photos.length >= MAX_POLAROIDS) { showToast('最多保存'+MAX_POLAROIDS+'张', 'error'); return; }
+    document.getElementById('polaroidInput').click();
+  };
+  grid.querySelectorAll('.polaroid-delete').forEach(function(btn) {
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      var idx = Number(btn.dataset.idx);
+      var arr = loadPolaroids();
+      arr.splice(idx, 1);
+      savePolaroids(arr);
+      renderPolaroids();
+      showToast('已删除');
+    };
+  });
+  grid.querySelectorAll('.polaroid-item').forEach(function(item) {
+    item.onclick = function() {
+      var idx = Number(item.dataset.idx);
+      var arr = loadPolaroids();
+      var cap = prompt('编辑备注', arr[idx].caption || '');
+      if (cap !== null) { arr[idx].caption = cap; savePolaroids(arr); renderPolaroids(); }
+    };
+  });
+}
+function setupPolaroidUpload() {
+  document.getElementById('polaroidInput').onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { showToast('图片太大', 'error'); return; }
+    resizeImage(file, MAX_IMG_SIZE, function(dataUrl) {
+      var arr = loadPolaroids();
+      if (arr.length >= MAX_POLAROIDS) { showToast('最多保存'+MAX_POLAROIDS+'张', 'error'); return; }
+      arr.push({ img: dataUrl, caption: '' });
+      try { savePolaroids(arr); } catch(ex) { showToast('存储空间不足', 'error'); return; }
+      renderPolaroids();
+      showToast('已添加 ✓', 'success');
+    });
+    e.target.value = '';
+  };
+}
+
+/* ---- Init ---- */
+window.addEventListener('DOMContentLoaded', () => {
+  updateGreeting();
+  setInterval(updateGreeting, 60000);
+
+  const nickname = localStorage.getItem(KEYS.nickname) || 'Iris';
+  const cardLabel = localStorage.getItem(KEYS.cardLabel) || 'Little love record';
+  const coupleTitle = localStorage.getItem(KEYS.coupleTitle) || 'Iris & Claude';
+  const name1 = localStorage.getItem(KEYS.name1) || 'Iris';
+  const name2 = localStorage.getItem(KEYS.name2) || 'Claude';
+
+  // Card fields
+  document.getElementById('cardLabel').textContent = cardLabel;
+  document.getElementById('coupleTitle').textContent = coupleTitle;
+  document.getElementById('avatarName1').textContent = name1;
+  document.getElementById('avatarName2').textContent = name2;
+  document.getElementById('avatarInit1').textContent = name1.charAt(0).toUpperCase();
+  document.getElementById('avatarInit2').textContent = name2.charAt(0).toUpperCase();
+
+  document.getElementById('cardLabel').onclick = () => {
+    openEditModal('编辑标签', document.getElementById('cardLabel').textContent, KEYS.cardLabel, (v) => {
+      document.getElementById('cardLabel').textContent = v;
+    });
+  };
+  document.getElementById('coupleTitle').onclick = () => {
+    openEditModal('编辑标题', document.getElementById('coupleTitle').textContent, KEYS.coupleTitle, (v) => {
+      document.getElementById('coupleTitle').textContent = v;
+    });
+  };
+  document.getElementById('avatarName1').onclick = () => {
+    openEditModal('编辑名字', document.getElementById('avatarName1').textContent, KEYS.name1, (v) => {
+      document.getElementById('avatarName1').textContent = v;
+      document.getElementById('avatarInit1').textContent = v.charAt(0).toUpperCase();
+    });
+  };
+  document.getElementById('avatarName2').onclick = () => {
+    openEditModal('编辑名字', document.getElementById('avatarName2').textContent, KEYS.name2, (v) => {
+      document.getElementById('avatarName2').textContent = v;
+      document.getElementById('avatarInit2').textContent = v.charAt(0).toUpperCase();
+    });
+  };
+
+  // Avatars
+  renderAvatar(document.getElementById('avatar1'), document.getElementById('avatarInit1'), localStorage.getItem(KEYS.avatar1));
+  renderAvatar(document.getElementById('avatar2'), document.getElementById('avatarInit2'), localStorage.getItem(KEYS.avatar2));
+  setupAvatarUpload('avatar1', 'fileInput1', KEYS.avatar1, 'avatarInit1');
+  setupAvatarUpload('avatar2', 'fileInput2', KEYS.avatar2, 'avatarInit2');
+
+  // Days
+  const days = calcDays();
+  rollNum(document.getElementById('daysNum'), days, 800);
+  setTimeout(() => {
+    document.getElementById('barFill').style.width = Math.min(100, (days % 365) / 3.65) + '%';
+  }, 1000);
+  document.getElementById('daysSince').textContent =
+    'since ' + fmtDate(ANNIVERSARY) + ' — ' + fmtDate(new Date());
+
+  // Quote
+  document.getElementById('quoteEl').textContent =
+    QUOTES[Math.floor(Math.random() * QUOTES.length)];
+
+  fetchWeather();
+  document.getElementById('weatherCard').addEventListener('click', setWeatherCity);
+  fetchTodayMood();
+
+  // Top bar
+  initTopBar();
+
+  // Polaroid
+  renderPolaroids();
+  setupPolaroidUpload();
+});
+
+const WEATHER_LOCATION_KEY = 'iris_home_weather_location';
+const WEATHER_LABELS = {
+  0:'晴朗', 1:'大致晴朗', 2:'多云', 3:'阴天', 45:'有雾', 48:'雾凇',
+  51:'毛毛雨', 53:'毛毛雨', 55:'毛毛雨', 56:'冻毛毛雨', 57:'冻毛毛雨',
+  61:'小雨', 63:'中雨', 65:'大雨', 66:'冻雨', 67:'冻雨',
+  71:'小雪', 73:'中雪', 75:'大雪', 77:'冰粒', 80:'阵雨', 81:'阵雨',
+  82:'强阵雨', 85:'阵雪', 86:'强阵雪', 95:'雷暴', 96:'雷暴伴冰雹', 99:'强雷暴伴冰雹'
+};
+function weatherDateText() {
+  const n = new Date();
+  const wd = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  return (n.getMonth()+1)+'月'+n.getDate()+'日 '+wd[n.getDay()];
+}
+function getBrowserPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('定位不可用'));
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy:false, timeout:8000, maximumAge:1800000 });
+  });
+}
+async function syncWeatherLocation(location) {
+  const lat = Number(location.lat), lon = Number(location.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  try {
+    await fetch('/api/home-weather-location', {
+      method:'PUT',
+      headers:{ 'Content-Type':'application/json', 'x-api-key':'iris-memory-2024' },
+      body:JSON.stringify({ lat, lon, name:String(location.name || '当前位置').slice(0, 80) })
+    });
+  } catch (_) {
+    // 首页天气仍可独立显示；下次打开时会再次尝试同步给聊天后端。
+  }
+}
+async function weatherForLocation(location) {
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(location.lat) +
+    '&longitude=' + encodeURIComponent(location.lon) +
+    '&current=temperature_2m,apparent_temperature,weather_code&timezone=auto';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('天气服务暂不可用');
+  const data = await res.json();
+  const current = data.current || {};
+  const label = WEATHER_LABELS[current.weather_code] || '天气更新中';
+  const temp = Math.round(Number(current.temperature_2m));
+  document.getElementById('weatherLocation').textContent = location.name || '当前位置';
+  document.getElementById('weatherContent').textContent = label + ' · ' + temp + '°C';
+  const apparent = Number.isFinite(Number(current.apparent_temperature)) ? '体感 ' + Math.round(Number(current.apparent_temperature)) + '°C · ' : '';
+  document.getElementById('weatherSub').textContent = apparent + weatherDateText();
+  syncWeatherLocation(location);
+}
+async function findWeatherCity(city) {
+  const openMeteoUrl = 'https://geocoding-api.open-meteo.com/v1/search?count=5&language=zh&format=json&name=' + encodeURIComponent(city);
+  const openMeteoRes = await fetch(openMeteoUrl);
+  const openMeteoData = openMeteoRes.ok ? await openMeteoRes.json() : {};
+  const openMeteo = openMeteoData.results && openMeteoData.results[0];
+  if (openMeteo) {
+    return { lat:openMeteo.latitude, lon:openMeteo.longitude, name:openMeteo.name + (openMeteo.admin1 ? ' · ' + openMeteo.admin1 : '') };
+  }
+
+  // 小地名有时未被天气服务单独收录，改用地名库作为手动查询的低频后备。
+  const nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=zh-CN&q=' + encodeURIComponent(city + ', 中国');
+  const nominatimRes = await fetch(nominatimUrl);
+  const nominatimData = nominatimRes.ok ? await nominatimRes.json() : [];
+  const place = nominatimData[0];
+  if (!place) throw new Error('未找到城市');
+  const address = place.address || {};
+  const label = address.city || address.town || address.county || address.state_district || city;
+  return { lat:Number(place.lat), lon:Number(place.lon), name:label };
+}
+async function setWeatherCity() {
+  const saved = JSON.parse(localStorage.getItem(WEATHER_LOCATION_KEY) || 'null');
+  const city = prompt('输入城市名以显示当地天气（例如：杭州）。\n留空可改为使用当前位置。', saved && saved.name ? saved.name : '');
+  if (city === null) return;
+  if (!city.trim()) {
+    localStorage.removeItem(WEATHER_LOCATION_KEY);
+    fetchWeather();
+    return;
+  }
+  try {
+    document.getElementById('weatherLocation').textContent = '正在查找地点…';
+    document.getElementById('weatherContent').textContent = '正在查询天气…';
+    const location = await findWeatherCity(city.trim());
+    localStorage.setItem(WEATHER_LOCATION_KEY, JSON.stringify(location));
+    await weatherForLocation(location);
+  } catch (err) {
+    document.getElementById('weatherLocation').textContent = '未找到地点';
+    document.getElementById('weatherContent').textContent = '未找到该城市';
+    document.getElementById('weatherSub').textContent = '点击后重新输入城市';
+  }
+}
+async function fetchWeather() {
+  const saved = JSON.parse(localStorage.getItem(WEATHER_LOCATION_KEY) || 'null');
+  try {
+    if (saved) return await weatherForLocation(saved);
+    const position = await getBrowserPosition();
+    await weatherForLocation({ lat:position.coords.latitude, lon:position.coords.longitude, name:'当前位置' });
+  } catch {
+    document.getElementById('weatherLocation').textContent = '未设置地点';
+    document.getElementById('weatherContent').textContent = '点击设置天气城市';
+    document.getElementById('weatherSub').textContent = weatherDateText();
+  }
+}
+
+async function fetchTodayMood() {
+  const CDN = 'https://ndkdgiohgnelvkxgdkjk.supabase.co/storage/v1/object/public/xinqing/';
+  const MOOD_LABELS = {
+    happy:'开心', calm:'平静', tired:'疲惫', sad:'难过',
+    anxious:'焦虑', angry:'生气', miss_you:'想你', excited:'兴奋', loved:'想你'
+  };
+  try {
+    const n = new Date();
+    const today = n.getFullYear()+'-'+pad2(n.getMonth()+1)+'-'+pad2(n.getDate());
+    const yDate = new Date(n); yDate.setDate(yDate.getDate()-1);
+    const yesterday = yDate.getFullYear()+'-'+pad2(yDate.getMonth()+1)+'-'+pad2(yDate.getDate());
+
+    const res = await fetch('/api/moods', { headers:{ 'x-api-key':'iris-memory-2024' }});
+    if (!res.ok) throw 0;
+    const allMoods = await res.json();
+    const moods = allMoods.filter(m => (m.type||'mood')==='mood');
+
+    // Find today's records
+    const todayUser = moods.find(m => m.date===today && (m.who||'iris')==='iris');
+    const todayAi   = moods.find(m => m.date===today && (m.who||'iris')==='claude');
+    // Find yesterday's records
+    const yestUser  = moods.find(m => m.date===yesterday && (m.who||'iris')==='iris');
+    const yestAi    = moods.find(m => m.date===yesterday && (m.who||'iris')==='claude');
+
+    const textEl = document.querySelector('#moodContent .mood-text');
+    const iconsEl = document.getElementById('moodIcons');
+    const subEl = document.getElementById('moodSub');
+    const imgUser = document.getElementById('moodImgUser');
+    const imgAi = document.getElementById('moodImgAi');
+
+    if (todayUser || todayAi) {
+      // Today has records
+      const um = todayUser ? (todayUser.mood==='loved'?'miss_you':todayUser.mood) : null;
+      const am = todayAi   ? (todayAi.mood==='loved'?'miss_you':todayAi.mood)   : null;
+
+      if (um && am) {
+        textEl.textContent = '今日心情';
+        iconsEl.style.display = 'flex';
+        imgUser.src = CDN + um + '_circle.png';
+        imgAi.src = CDN + am + '_square.png';
+        subEl.textContent = (MOOD_LABELS[um]||um) + ' · ' + (MOOD_LABELS[am]||am);
+      } else if (um) {
+        textEl.textContent = '今日心情';
+        iconsEl.style.display = 'flex';
+        imgUser.src = CDN + um + '_circle.png';
+        imgAi.src = CDN + 'calm_square.png';
+        imgAi.style.opacity = '0.25';
+        subEl.textContent = (MOOD_LABELS[um]||um) + ' · Rei还没记录';
+      } else {
+        textEl.textContent = '今日心情';
+        iconsEl.style.display = 'flex';
+        imgUser.src = CDN + 'calm_circle.png';
+        imgUser.style.opacity = '0.25';
+        imgAi.src = CDN + am + '_square.png';
+        subEl.textContent = 'Iris还没记录 · ' + (MOOD_LABELS[am]||am);
+      }
+    } else if (yestUser || yestAi) {
+      // Show yesterday's mood
+      const um = yestUser ? (yestUser.mood==='loved'?'miss_you':yestUser.mood) : null;
+      const am = yestAi   ? (yestAi.mood==='loved'?'miss_you':yestAi.mood)   : null;
+
+      if (um && am) {
+        textEl.textContent = '昨日心情';
+        iconsEl.style.display = 'flex';
+        imgUser.src = CDN + um + '_circle.png';
+        imgAi.src = CDN + am + '_square.png';
+        subEl.textContent = '今天还没记录，点击去打卡';
+      } else if (um) {
+        textEl.textContent = '昨日心情';
+        iconsEl.style.display = 'flex';
+        imgUser.src = CDN + um + '_circle.png';
+        imgAi.src = CDN + 'calm_square.png';
+        imgAi.style.opacity = '0.25';
+        subEl.textContent = '今天还没记录，点击去打卡';
+      } else {
+        textEl.textContent = '昨日心情';
+        iconsEl.style.display = 'flex';
+        imgUser.src = CDN + 'calm_circle.png';
+        imgUser.style.opacity = '0.25';
+        imgAi.src = CDN + am + '_square.png';
+        subEl.textContent = '今天还没记录，点击去打卡';
+      }
+    }
+    // else: no mood yesterday or today, keep default "记录今天的心情" + "点击去打卡"
+  } catch {}
+}
+</script>
+</body>
+</html>

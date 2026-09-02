@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>拾月日历 · irisandclaude</title>
+<script src="init.js"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ========== 拾月日历 v2 ========== */
+
+/* ---- Tab bar ---- */
+.cal-tabs{display:flex;padding:3px;background:var(--bg-card);border-radius:999px;margin-bottom:18px;box-shadow:var(--shadow-sm);border:1px solid var(--border)}
+.cal-tab{flex:1;border:none;background:transparent;padding:9px 0;font-family:var(--font-cn);font-size:13px;color:var(--text-mid);border-radius:999px;cursor:pointer;transition:all .22s;letter-spacing:.04em;font-weight:400}
+.cal-tab.active{background:var(--accent);color:var(--accent-contrast);font-weight:600;box-shadow:0 2px 8px rgba(var(--shadow-color),.18)}
+
+/* ---- Month nav ---- */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 2px}
+.cal-nav-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--text-mid);transition:all .18s;flex-shrink:0}
+@media(hover:hover)and(pointer:fine){.cal-nav-btn:hover{border-color:var(--accent);color:var(--accent)}}
+.cal-month-center{text-align:center;cursor:pointer;padding:4px 14px;border-radius:var(--r-sm);transition:background .18s}
+@media(hover:hover)and(pointer:fine){.cal-month-center:hover{background:var(--accent-pale)}}
+.cal-year{font-size:12px;color:var(--text-light);letter-spacing:.06em}
+.cal-month-text{font-family:var(--font-en);font-size:20px;font-weight:400;color:var(--text);letter-spacing:.04em}
+
+/* ---- Week header ---- */
+.cal-week-header{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:3px}
+.wh{text-align:center;font-size:11px;color:var(--text-light);padding:5px 0;letter-spacing:.06em}
+.wh-weekend{color:var(--accent)}
+
+/* ---- Calendar grid ---- */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px}
+.cal-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:var(--r-sm);cursor:pointer;transition:all .15s;gap:2px;position:relative;min-height:62px;border:1.5px solid transparent}
+.cal-cell.empty{cursor:default}
+@media(hover:hover)and(pointer:fine){.cal-cell:not(.empty):hover{background:var(--bg-secondary)}}
+.cal-cell.selected{background:var(--accent-pale);border-color:var(--accent)}
+.cal-cell.anniversary{background:linear-gradient(135deg,rgba(242,170,186,.12),rgba(173,142,142,.08))}
+.cal-cell.anniversary::after{content:'♡';position:absolute;top:1px;right:3px;font-size:8px;color:var(--accent);opacity:.6}
+.day-num{font-size:12px;color:var(--text);line-height:1;font-family:var(--font-en)}
+.cal-cell.other-month .day-num{color:var(--text-light);opacity:.35}
+.cal-cell.today .day-num{background:var(--accent);color:var(--accent-contrast);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:11px}
+
+/* ---- Mood indicators (images) ---- */
+.mood-dots{display:flex;align-items:center;gap:3px;min-height:14px}
+.mood-img{width:14px;height:14px;object-fit:contain}
+.mood-placeholder{width:12px;height:12px;flex-shrink:0;background:var(--bg-secondary)}
+.mood-placeholder.circle{border-radius:50%}
+.mood-placeholder.square{border-radius:2px}
+
+/* ---- Period tab cells (fixed Morandi colors, theme-independent) ---- */
+.tab-period .cal-cell{min-height:48px}
+.cal-cell.phase-menstrual{background:#F0D0D0;border-left:2.5px solid #D4A0A0}
+.cal-cell.phase-predicted{border:1.5px dashed #D4A0A0;background:transparent}
+.cal-cell.phase-ovulation{background:#D0E0F0}
+.cal-cell.phase-follicular{background:#D0E8D4}
+.cal-cell.phase-luteal{background:#E8DCC8}
+.phase-dot{width:6px;height:6px;border-radius:50%;min-height:6px}
+.phase-dot.menstrual{background:#D4A0A0}
+.phase-dot.predicted{width:5px;height:5px;border:1.5px dashed #D4A0A0;background:transparent}
+.phase-dot.ovulation{background:#7BA8CC}
+.phase-dot.follicular{background:#8BBF90}
+.phase-dot.luteal{background:#C8B080}
+
+/* ---- Schedule tab cells ---- */
+.tab-schedule .cal-cell{min-height:56px;gap:1px}
+.lunar-text{font-size:9px;color:var(--text-light);line-height:1;margin-top:1px}
+.lunar-text.month-start{color:var(--accent);font-weight:600}
+.course-dots{display:flex;gap:2px;min-height:6px;flex-wrap:wrap;justify-content:center}
+.course-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+
+/* ---- Day schedule card ---- */
+.day-schedule{background:var(--bg-card);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-xs);margin-bottom:14px}
+.day-schedule-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.day-schedule-title{font-size:14px;font-weight:600;color:var(--text)}
+.day-schedule-date{font-size:11px;color:var(--text-light)}
+.schedule-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.schedule-item:last-child{border-bottom:none}
+.schedule-color-bar{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch}
+.schedule-info{flex:1;min-width:0}
+.schedule-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.schedule-detail{font-size:11px;color:var(--text-mid)}
+.schedule-empty{font-size:13px;color:var(--text-light);padding:8px 0;text-align:center}
+
+/* ---- Legend ---- */
+.cal-legend{display:flex;gap:12px;flex-wrap:wrap;padding:10px 14px;background:var(--bg-card);border-radius:var(--r-md);box-shadow:var(--shadow-xs);margin-bottom:12px;align-items:center}
+.legend-dot{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-mid)}
+.legend-icon{width:10px;height:10px;flex-shrink:0}
+.legend-icon.circle{border-radius:50%}
+.legend-icon.square{border-radius:2px}
+.legend-icon.dashed{border:1.5px dashed #D4A0A0;background:transparent!important;width:8px;height:8px}
+
+/* ---- CTA button ---- */
+.cal-cta{display:block;width:100%;padding:13px 0;border:none;border-radius:999px;background:var(--accent);color:#fff;font-family:var(--font-cn);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.06em;transition:all .18s;box-shadow:0 2px 10px rgba(var(--shadow-color),.16);margin-bottom:14px}
+@media(hover:hover)and(pointer:fine){.cal-cta:hover{box-shadow:0 4px 16px rgba(var(--shadow-color),.24);transform:translateY(-1px)}}
+
+/* ---- My timetable button ---- */
+.schedule-btns{display:flex;gap:8px;margin-bottom:14px}
+.timetable-btn{display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px 0;border:1.5px solid var(--accent);border-radius:999px;background:transparent;color:var(--accent);font-family:var(--font-cn);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
+@media(hover:hover)and(pointer:fine){.timetable-btn:hover{background:var(--accent-pale)}}
+
+/* ---- Stats card ---- */
+.stats-card{background:var(--bg-card);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-xs);margin-bottom:14px}
+.stats-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.stats-title-text{font-size:14px;font-weight:600;color:var(--text)}
+.stats-title-count{font-size:12px;color:var(--text-light)}
+.stats-empty{font-size:13px;color:var(--text-light);padding:8px 0}
+.stats-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.stats-bar-row:last-child{margin-bottom:0}
+.stats-bar-img{width:18px;height:18px;object-fit:contain;flex-shrink:0}
+.stats-bar-label{font-size:11px;color:var(--text-mid);width:28px;flex-shrink:0}
+.stats-bar-track{flex:1;height:7px;border-radius:999px;background:var(--bg-secondary);overflow:hidden}
+.stats-bar-fill{height:100%;border-radius:999px;transition:width .4s ease}
+.stats-bar-count{font-size:11px;color:var(--text-light);width:18px;text-align:right;flex-shrink:0}
+.stats-divider{height:1px;background:var(--border);margin:12px 0}
+
+/* ---- Period card ---- */
+.period-card{background:var(--bg-card);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-xs);margin-bottom:14px}
+.period-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.period-header-title{font-size:15px;font-weight:600;color:var(--text)}
+.period-edit-btn{border:none;background:var(--accent-pale);color:var(--accent);font-family:var(--font-cn);font-size:12px;padding:5px 12px;border-radius:999px;cursor:pointer;transition:all .18s}
+.period-nums{display:flex;gap:14px;margin-bottom:14px}
+.period-num-block{flex:1;text-align:center}
+.period-num-value{font-family:var(--font-en);font-size:28px;font-weight:400;line-height:1.1}
+.period-num-label{font-size:11px;color:var(--text-light);margin-top:2px}
+.period-nums-divider{width:1px;background:var(--border);align-self:stretch}
+.period-actions{display:flex;gap:8px}
+.period-action-btn{flex:1;border:none;padding:10px 0;border-radius:999px;font-family:var(--font-cn);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.03em}
+.period-action-start{background:var(--accent-pale);color:var(--accent)}
+.period-action-end{background:var(--bg-secondary);color:var(--text-mid)}
+.phase-status{font-size:12px;color:#9A5555;text-align:center;margin-bottom:10px;padding:6px;background:#F0D0D0;border-radius:var(--r-sm)}
+
+/* ---- Bottom sheet ---- */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.36);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .24s}
+.sheet-overlay.open{opacity:1;pointer-events:auto}
+.sheet-card{width:100%;max-width:440px;max-height:85vh;overflow-y:auto;background:var(--bg-card);border-radius:var(--r-lg) var(--r-lg) 0 0;padding:22px 18px max(18px,env(safe-area-inset-bottom));box-shadow:var(--shadow-lg);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,.24,1.02)}
+.sheet-overlay.open .sheet-card{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--bg-secondary);margin:0 auto 16px}
+.sheet-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.sheet-title{font-size:17px;font-weight:600;color:var(--text)}
+.sheet-close{width:28px;height:28px;border-radius:50%;border:none;background:var(--bg-secondary);color:var(--text-mid);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* ---- Detail popup ---- */
+.detail-sub{font-size:12px;color:var(--text-light);margin-bottom:8px}
+.detail-mood-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.detail-mood-img{width:32px;height:32px;object-fit:contain;flex-shrink:0}
+.detail-mood-text{font-size:14px;color:var(--text)}
+.detail-note{font-size:12px;color:var(--text-mid);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:8px;line-height:1.6;white-space:pre-wrap}
+.detail-note-user{background:rgba(var(--shadow-color),.06)}
+.detail-note-ai{background:rgba(143,167,175,.1)}
+.detail-empty{font-size:13px;color:var(--text-light);font-style:italic;padding:4px 0}
+.detail-phase-tag{display:inline-block;font-size:12px;padding:4px 10px;border-radius:999px;margin-top:6px}
+.detail-actions{display:flex;gap:6px;margin-top:14px}
+.detail-btn{flex:1;border:none;padding:10px 0;border-radius:999px;font-family:var(--font-cn);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
+.detail-btn-primary{background:var(--accent);color:#fff}
+.detail-btn-danger{background:var(--accent-pale);color:var(--accent)}
+.detail-btn-ghost{background:var(--bg-secondary);color:var(--text-mid)}
+
+/* ---- Record mood sheet ---- */
+.record-date{font-size:12px;color:var(--text-light);margin-bottom:12px}
+.who-tabs{display:flex;gap:3px;padding:3px;border-radius:999px;background:var(--bg);margin-bottom:12px}
+.who-tab{flex:1;border:none;background:transparent;color:var(--text-mid);padding:7px 0;font-family:var(--font-cn);font-size:13px;border-radius:999px;cursor:pointer;transition:all .18s}
+.who-tab.active{background:var(--bg-card);color:var(--text);box-shadow:var(--shadow-xs);font-weight:600}
+.mood-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:12px}
+.mood-cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px;border-radius:var(--r-sm);border:2px solid transparent;cursor:pointer;transition:all .18s}
+@media(hover:hover)and(pointer:fine){.mood-cell:hover{background:var(--bg)}}
+.mood-cell.selected{background:var(--accent-pale);border-color:var(--accent)}
+.mood-cell-img{width:36px;height:36px;object-fit:contain}
+.mood-cell-label{font-size:10px;color:var(--text-mid)}
+.mood-cell.selected .mood-cell-label{color:var(--accent);font-weight:600}
+.record-note{width:100%;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--font-cn);font-size:13px;color:var(--text);background:var(--bg);resize:none;outline:none;transition:border-color .18s;margin-bottom:12px;box-sizing:border-box}
+.record-note:focus{border-color:var(--accent)}
+.record-note::placeholder{color:var(--text-light)}
+.sheet-btn{width:100%;border:none;padding:11px 0;border-radius:999px;font-family:var(--font-cn);font-size:14px;font-weight:600;cursor:pointer;transition:all .18s;margin-bottom:5px}
+.sheet-btn-primary{background:var(--accent);color:#fff}
+.sheet-btn-disabled{background:var(--text-light);color:#fff;cursor:default}
+.sheet-btn-ghost{background:transparent;color:var(--text-mid);font-weight:400;font-size:13px}
+
+/* ---- Picker ---- */
+.picker-year-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.picker-year-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--bg-secondary);color:var(--text-mid);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.picker-year-text{font-size:18px;font-weight:600;color:var(--text)}
+.picker-month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:14px}
+.picker-month-cell{padding:10px 0;border-radius:var(--r-sm);border:none;background:transparent;font-family:var(--font-cn);font-size:13px;color:var(--text);cursor:pointer;text-align:center;transition:all .18s}
+.picker-month-cell.current{background:var(--accent);color:#fff;font-weight:600}
+.picker-month-cell.today-month{background:var(--accent-pale);color:var(--accent)}
+.picker-actions{display:flex;gap:8px}
+.picker-btn{flex:1;border:none;padding:10px 0;border-radius:999px;font-family:var(--font-cn);font-size:13px;cursor:pointer;transition:all .18s}
+.picker-btn-today{background:var(--accent-pale);color:var(--accent);font-weight:600}
+.picker-btn-cancel{background:var(--bg-secondary);color:var(--text-mid)}
+
+/* ---- Settings ---- */
+.setting-label{font-size:13px;color:var(--text-mid);margin-bottom:6px}
+.setting-stepper{display:flex;justify-content:center;align-items:center;gap:20px;margin-bottom:16px}
+.stepper-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--bg-secondary);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.stepper-value{font-family:var(--font-en);font-size:32px;font-weight:400;min-width:44px;text-align:center}
+
+/* ---- Course form ---- */
+.form-row{margin-bottom:12px}
+.form-label{font-size:12px;color:var(--text-mid);margin-bottom:4px;display:block}
+.form-input{width:100%;border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 11px;font-family:var(--font-cn);font-size:13px;color:var(--text);background:var(--bg);outline:none;box-sizing:border-box}
+.form-input:focus{border-color:var(--accent)}
+.form-row-inline{display:flex;gap:8px}
+.form-row-inline .form-row{flex:1;margin-bottom:0}
+.form-select{width:100%;border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 11px;font-family:var(--font-cn);font-size:13px;color:var(--text);background:var(--bg);outline:none;appearance:none;box-sizing:border-box}
+.course-list-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.course-list-item:last-child{border-bottom:none}
+.course-list-color{width:8px;height:36px;border-radius:4px;flex-shrink:0}
+.course-list-info{flex:1;min-width:0}
+.course-list-name{font-size:13px;font-weight:600;color:var(--text)}
+.course-list-detail{font-size:11px;color:var(--text-mid)}
+.course-list-del{border:none;background:var(--accent-pale);color:var(--accent);font-size:11px;padding:4px 10px;border-radius:999px;cursor:pointer;flex-shrink:0}
+.semester-setting{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:10px 12px;background:var(--bg);border-radius:var(--r-sm)}
+.semester-label{font-size:12px;color:var(--text-mid);flex-shrink:0}
+.semester-input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-family:var(--font-cn);font-size:12px;color:var(--text);background:var(--bg-card);outline:none;box-sizing:border-box}
+
+/* ---- Extra ---- */
+.extra-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-mid);background:var(--bg);padding:5px 10px;border-radius:var(--r-sm);margin-top:6px;line-height:1.5;white-space:pre-wrap}
+
+/* ---- Skeleton ---- */
+.cal-skeleton-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-skeleton{min-height:62px;border-radius:var(--r-sm);background:linear-gradient(90deg,var(--bg-card),var(--bg-secondary),var(--bg-card));background-size:220% 100%;animation:shimmer 1.3s ease-in-out infinite}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
+
+/* ---- Calendar card wrapper ---- */
+.cal-card{background:var(--bg-card);border-radius:var(--r-lg);padding:14px 10px 10px;box-shadow:var(--shadow-sm);margin-bottom:14px}
+
+/* ---- Period detail form ---- */
+.pd-section{margin-bottom:14px}
+.pd-label{font-size:12px;color:var(--text-mid);margin-bottom:6px;font-weight:600}
+.pd-chips{display:flex;gap:6px;flex-wrap:wrap}
+.pd-chip{padding:6px 14px;border-radius:999px;border:1.5px solid var(--border);background:transparent;color:var(--text-mid);font-family:var(--font-cn);font-size:12px;cursor:pointer;transition:all .18s}
+@media(hover:hover)and(pointer:fine){.pd-chip:hover{border-color:var(--accent-mid);color:var(--accent)}}
+.pd-chip.selected{background:var(--accent-pale);border-color:var(--accent);color:var(--accent);font-weight:600}
+.pd-summary{display:flex;gap:8px;flex-wrap:wrap;padding:6px 0}
+.pd-tag{font-size:11px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:3px}
+
+/* ---- Responsive ---- */
+@media(max-width:480px){
+  .cal-cell{min-height:54px}
+  .tab-period .cal-cell{min-height:42px}
+  .tab-schedule .cal-cell{min-height:50px}
+  .day-num{font-size:11px}
+  .cal-cell.today .day-num{width:20px;height:20px;font-size:10px}
+  .mood-img{width:12px;height:12px}
+  .mood-placeholder{width:10px;height:10px}
+  .lunar-text{font-size:8px}
+  .cal-month-text{font-size:18px}
+  .mood-grid{gap:3px}
+  .mood-cell{padding:6px 1px}
+  .mood-cell-img{width:30px;height:30px}
+  .sheet-card{padding:18px 14px max(14px,env(safe-area-inset-bottom))}
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="top-bar">
+  <div class="top-bar-left">
+    <div class="top-bar-avatar" id="topBarAvatar"></div>
+    <span class="top-bar-title" id="topBarTitle"></span>
+  </div>
+  <a href="index.html" class="top-bar-right top-bar-home" aria-label="返回首页" title="返回首页" style="display:grid;place-items:center;width:34px;height:34px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg></a>
+</header>
+
+<!-- Bottom Dock -->
+<nav class="dock">
+  <a href="index.html" class="dock-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="dock-label">首页</span></a>
+  <a href="memories.html" class="dock-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="dock-label">记忆</span></a>
+  <a href="chat.html" class="dock-center"><div class="dock-center-btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div><span class="dock-label">聊天</span></a>
+  <a href="calendar.html" class="dock-item active"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="dock-label">日历</span></a>
+  <a href="more.html" class="dock-item"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="dock-label">更多</span></a>
+</nav>
+
+<div class="page-wrap">
+  <div class="cal-tabs anim-1" id="calTabs">
+    <button class="cal-tab active" data-tab="mood">心情</button>
+    <button class="cal-tab" data-tab="period">经期</button>
+    <button class="cal-tab" data-tab="schedule">日程</button>
+  </div>
+  <div class="cal-card anim-1">
+    <div class="cal-head">
+      <button class="cal-nav-btn" id="prevMonth">‹</button>
+      <div class="cal-month-center" id="monthCenter">
+        <div class="cal-year" id="calYear"></div>
+        <div class="cal-month-text" id="calMonth"></div>
+      </div>
+      <button class="cal-nav-btn" id="nextMonth">›</button>
+    </div>
+    <div class="cal-week-header">
+      <div class="wh">一</div><div class="wh">二</div><div class="wh">三</div>
+      <div class="wh">四</div><div class="wh">五</div>
+      <div class="wh wh-weekend">六</div><div class="wh wh-weekend">日</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+  <div id="calLegend" class="cal-legend anim-3"></div>
+  <div id="tabContent" class="anim-4"></div>
+</div>
+
+<!-- Sheets -->
+<div class="sheet-overlay" id="detailSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title" id="detailTitle"></span><button class="sheet-close" onclick="closeSheet('detailSheet')">✕</button></div>
+  <div id="detailBody"></div><div class="detail-actions" id="detailActions"></div>
+</div></div>
+
+<div class="sheet-overlay" id="recordSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title">记录心情</span><button class="sheet-close" onclick="closeSheet('recordSheet')">✕</button></div>
+  <div class="record-date" id="recordDate"></div>
+  <div class="who-tabs" id="whoTabs"></div>
+  <div class="mood-grid" id="moodGrid"></div>
+  <textarea class="record-note" id="recordNote" placeholder="写点什么吧…（可选）" rows="2"></textarea>
+  <button class="sheet-btn sheet-btn-disabled" id="recordSave">保存</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('recordSheet')">取消</button>
+</div></div>
+
+<div class="sheet-overlay" id="pickerSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="picker-year-row"><button class="picker-year-btn" id="pickerPrevYear">‹</button><span class="picker-year-text" id="pickerYear"></span><button class="picker-year-btn" id="pickerNextYear">›</button></div>
+  <div class="picker-month-grid" id="pickerMonths"></div>
+  <div class="picker-actions"><button class="picker-btn picker-btn-today" id="pickerToday">回到今天</button><button class="picker-btn picker-btn-cancel" onclick="closeSheet('pickerSheet')">取消</button></div>
+</div></div>
+
+<div class="sheet-overlay" id="settingsSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title">周期设置</span><button class="sheet-close" onclick="closeSheet('settingsSheet')">✕</button></div>
+  <div class="setting-label">月经周期（天）</div>
+  <div class="setting-stepper"><button class="stepper-btn" id="cycleMinus">−</button><span class="stepper-value" id="cycleValue" style="color:var(--accent)">28</span><button class="stepper-btn" id="cyclePlus">+</button></div>
+  <div class="setting-label">经期时长（天）</div>
+  <div class="setting-stepper"><button class="stepper-btn" id="periodMinus">−</button><span class="stepper-value" id="periodValue" style="color:var(--accent-mid)">5</span><button class="stepper-btn" id="periodPlus">+</button></div>
+  <button class="sheet-btn sheet-btn-primary" id="settingsSave">保存设置</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('settingsSheet')">取消</button>
+</div></div>
+
+<div class="sheet-overlay" id="courseSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title" id="courseSheetTitle">添加课程</span><button class="sheet-close" onclick="closeSheet('courseSheet')">✕</button></div>
+  <div class="form-row"><label class="form-label">课程名称</label><input class="form-input" id="cName" placeholder="例：数据新闻与信息可视化"></div>
+  <div class="form-row-inline">
+    <div class="form-row"><label class="form-label">星期</label><select class="form-select" id="cDay"><option value="1">星期一</option><option value="2">星期二</option><option value="3">星期三</option><option value="4">星期四</option><option value="5">星期五</option><option value="6">星期六</option><option value="7">星期日</option></select></div>
+    <div class="form-row"><label class="form-label">节次</label><div class="form-row-inline"><input class="form-input" id="cStart" type="number" min="1" max="10" placeholder="起"><input class="form-input" id="cEnd" type="number" min="1" max="10" placeholder="止"></div></div>
+  </div>
+  <div class="form-row-inline">
+    <div class="form-row"><label class="form-label">周数起</label><input class="form-input" id="cWeekStart" type="number" min="1" placeholder="1"></div>
+    <div class="form-row"><label class="form-label">周数止</label><input class="form-input" id="cWeekEnd" type="number" min="1" placeholder="16"></div>
+  </div>
+  <div class="form-row"><label class="form-label">教室/地点</label><input class="form-input" id="cLocation" placeholder="例：文渊楼411"></div>
+  <div class="form-row"><label class="form-label">教师</label><input class="form-input" id="cTeacher" placeholder="选填"></div>
+  <input type="hidden" id="cEditId">
+  <button class="sheet-btn sheet-btn-primary" id="courseSave" style="margin-top:4px">保存课程</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('courseSheet')">取消</button>
+</div></div>
+
+<div class="sheet-overlay" id="courseListSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title">我的课表</span><button class="sheet-close" onclick="closeSheet('courseListSheet')">✕</button></div>
+  <div class="semester-setting"><span class="semester-label">学期开始</span><input class="semester-input" id="semesterStart" type="date"></div>
+  <div id="courseListBody"></div>
+  <button class="sheet-btn sheet-btn-primary" onclick="openCourseEditor()" style="margin-top:10px">+ 添加课程</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('courseListSheet')">关闭</button>
+</div></div>
+
+<div class="sheet-overlay" id="eventSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title" id="eventSheetTitle">添加日程</span><button class="sheet-close" onclick="closeSheet('eventSheet')">✕</button></div>
+  <div class="form-row"><label class="form-label">日程名称</label><input class="form-input" id="eName" placeholder="例：考试、聚会、约会…"></div>
+  <div class="form-row"><label class="form-label">日期</label><input class="form-input" id="eDate" type="date"></div>
+  <div class="form-row-inline">
+    <div class="form-row"><label class="form-label">开始时间</label><input class="form-input" id="eTimeStart" type="time"></div>
+    <div class="form-row"><label class="form-label">结束时间</label><input class="form-input" id="eTimeEnd" type="time"></div>
+  </div>
+  <div class="form-row"><label class="form-label">地点</label><input class="form-input" id="eLocation" placeholder="选填"></div>
+  <div class="form-row"><label class="form-label">备注</label><input class="form-input" id="eNote" placeholder="选填"></div>
+  <input type="hidden" id="eEditId">
+  <button class="sheet-btn sheet-btn-primary" id="eventSave" style="margin-top:4px">保存日程</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('eventSheet')">取消</button>
+</div></div>
+
+<div class="sheet-overlay" id="periodDetailSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title" id="pdSheetTitle">经期详情</span><button class="sheet-close" onclick="closeSheet('periodDetailSheet')">✕</button></div>
+  <div class="record-date" id="pdDate"></div>
+  <div class="pd-section"><div class="pd-label">经血量</div>
+    <div class="pd-chips" id="pdFlow">
+      <button class="pd-chip" data-v="light">少量</button>
+      <button class="pd-chip" data-v="medium">中等</button>
+      <button class="pd-chip" data-v="heavy">较多</button>
+    </div>
+  </div>
+  <div class="pd-section"><div class="pd-label">颜色</div>
+    <div class="pd-chips" id="pdColor">
+      <button class="pd-chip" data-v="bright_red">鲜红</button>
+      <button class="pd-chip" data-v="dark_red">暗红</button>
+      <button class="pd-chip" data-v="brown">褐色</button>
+      <button class="pd-chip" data-v="pink">粉色</button>
+    </div>
+  </div>
+  <div class="pd-section"><div class="pd-label">疼痛程度</div>
+    <div class="pd-chips" id="pdPain">
+      <button class="pd-chip" data-v="0">无痛</button>
+      <button class="pd-chip" data-v="1">轻微</button>
+      <button class="pd-chip" data-v="2">中等</button>
+      <button class="pd-chip" data-v="3">较重</button>
+      <button class="pd-chip" data-v="4">严重</button>
+    </div>
+  </div>
+  <div class="pd-section"><div class="pd-label">伴随症状（可多选）</div>
+    <div class="pd-chips" id="pdSymptoms">
+      <button class="pd-chip" data-v="cramps">痛经</button>
+      <button class="pd-chip" data-v="backache">腰痛</button>
+      <button class="pd-chip" data-v="headache">头痛</button>
+      <button class="pd-chip" data-v="bloating">腹胀</button>
+      <button class="pd-chip" data-v="fatigue">疲劳</button>
+      <button class="pd-chip" data-v="mood_swing">情绪波动</button>
+      <button class="pd-chip" data-v="breast_pain">胸胀</button>
+      <button class="pd-chip" data-v="acne">长痘</button>
+    </div>
+  </div>
+  <textarea class="record-note" id="pdNote" placeholder="其他备注…（可选）" rows="2"></textarea>
+  <button class="sheet-btn sheet-btn-primary" id="pdSave">保存详情</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('periodDetailSheet')">取消</button>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){'use strict';
+
+/* ===== Constants ===== */
+var CDN='https://ndkdgiohgnelvkxgdkjk.supabase.co/storage/v1/object/public/xinqing/';
+var MOOD_TYPES=['happy','calm','tired','sad','anxious','angry','miss_you','excited'];
+var MOOD_META={
+  happy:{label:'开心',emoji:'😊',color:'#FFD700',uc:CDN+'happy_circle.png',us:CDN+'happy_square.png'},
+  calm:{label:'平静',emoji:'😌',color:'#87CEEB',uc:CDN+'calm_circle.png',us:CDN+'calm_square.png'},
+  tired:{label:'疲惫',emoji:'😴',color:'#A0A0A0',uc:CDN+'tired_circle.png',us:CDN+'tired_square.png'},
+  sad:{label:'难过',emoji:'🥺',color:'#6495ED',uc:CDN+'sad_circle.png',us:CDN+'sad_square.png'},
+  anxious:{label:'焦虑',emoji:'😰',color:'#FFA500',uc:CDN+'anxious_circle.png',us:CDN+'anxious_square.png'},
+  angry:{label:'生气',emoji:'😤',color:'#FF4444',uc:CDN+'angry_circle.png',us:CDN+'angry_square.png'},
+  miss_you:{label:'想你',emoji:'🥰',color:'#FF69B4',uc:CDN+'miss_you_circle.png',us:CDN+'miss_you_square.png'},
+  excited:{label:'兴奋',emoji:'🤩',color:'#FF6347',uc:CDN+'excited_circle.png',us:CDN+'excited_square.png'},
+  loved:{label:'被爱',emoji:'🥰',color:'#F2AABA',uc:CDN+'miss_you_circle.png',us:CDN+'miss_you_square.png'}
+};
+var COURSE_COLORS=['#C48B83','#7BA8CC','#8BBF90','#B5A4CB','#C8B080','#82B8B0','#CC9EAA','#A0A8C0'];
+var PHASE_NAMES={menstrual:'经期',follicular:'卵泡期',ovulation:'排卵期',luteal:'黄体期'};
+var CH_MONTHS=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+var LUNAR_MONTHS=['正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
+var LUNAR_DAYS=['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];
+
+/* Lunar calendar data 1900-2100 */
+var LI=[0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,0x06ca0,0x0b550,0x15355,0x04da0,0x0a5b0,0x14573,0x052b0,0x0a9a8,0x0e950,0x06aa0,0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b6a0,0x195a6,0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x05ac0,0x0ab60,0x096d5,0x092e0,0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,0x05aa0,0x076a3,0x096d0,0x04afb,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0,0x14b63,0x09370,0x049f8,0x04970,0x064b0,0x168a6,0x0ea50,0x06b20,0x1a6c4,0x0aae0,0x092e0,0x0d2e3,0x0c960,0x0d557,0x0d4a0,0x0da50,0x05d55,0x056a0,0x0a6d0,0x055d4,0x052d0,0x0a9b8,0x0a950,0x0b4a0,0x0b6a6,0x0ad50,0x055a0,0x0aba4,0x0a5b0,0x052b0,0x0b273,0x06930,0x07337,0x06aa0,0x0ad50,0x14b55,0x04b60,0x0a570,0x054e4,0x0d160,0x0e968,0x0d520,0x0daa0,0x16aa6,0x056d0,0x04ae0,0x0a9d4,0x0a4d0,0x0d150,0x0f252,0x0d520];
+
+var BASE='';
+var H={'x-api-key':'iris-memory-2024','Content-Type':'application/json'};
+var LOCAL_KEY='iris-calendar-records-v2';
+var SETTINGS_KEY='iris-calendar-settings';
+var COURSE_KEY='iris-calendar-courses';
+var EVENTS_KEY='iris-calendar-events';
+var PDETAIL_KEY='iris-period-details';
+var CALENDAR_RECORDS_MIGRATION_KEY='iris-calendar-records-server-v1';
+var CALENDAR_MIGRATION_KEY='iris-calendar-supabase-migrated-v2';
+var ANN_MONTH=2,ANN_DAY=14;
+
+/* ===== State ===== */
+var now=new Date(),TY=now.getFullYear(),TM=now.getMonth(),TD=now.getDate();
+var curYear=TY,curMonth=TM,curTab='mood',selDay=0,selMood='',selWho='iris';
+var records=[],settings=loadJSON(SETTINGS_KEY)||{cycle_length:28,period_length:5};
+var courseData=loadJSON(COURSE_KEY)||{semester_start:'2026-09-07',courses:[]};
+var eventsData=loadJSON(EVENTS_KEY)||[];
+var periodDetails=loadJSON(PDETAIL_KEY)||{};
+var pickerYear=TY,editCycle=28,editPeriod=5;
+var name1=localStorage.getItem('iris_avatar_name1')||'Iris';
+var name2=localStorage.getItem('iris_avatar_name2')||'Claude';
+
+/* ===== Utilities ===== */
+function pad2(n){return String(n).padStart(2,'0')}
+function ds(y,m,d){return y+'-'+pad2(m+1)+'-'+pad2(d)}
+function ms(y,m){return y+'-'+pad2(m+1)}
+function todayStr(){return ds(TY,TM,TD)}
+function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+function loadJSON(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function saveJSON(k,v){localStorage.setItem(k,JSON.stringify(v))}
+var toastTimer;
+function showToast(msg,type){var el=$('toast');el.textContent=msg;el.className='toast '+(type||'')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.className='toast'},2400)}
+function $(id){return document.getElementById(id)}
+function openSheet(id){$(id).classList.add('open');document.body.style.overflow='hidden'}
+function closeSheet(id){$(id).classList.remove('open');if(!document.querySelector('.sheet-overlay.open'))document.body.style.overflow=''}
+window.closeSheet=closeSheet;
+window.openCourseEditor=function(id){openCourseForm(id)};
+document.querySelectorAll('.sheet-overlay').forEach(function(el){el.addEventListener('click',function(e){if(e.target===el)closeSheet(el.id)})});
+
+/* ===== Lunar Calendar ===== */
+function lLeapMonth(y){return LI[y-1900]&0xf}
+function lLeapDays(y){return lLeapMonth(y)?(LI[y-1900]&0x10000?30:29):0}
+function lMonthDays(y,m){return(LI[y-1900]&(0x10000>>m))?30:29}
+function lYearDays(y){var s=348;for(var i=0x8000;i>0x8;i>>=1)s+=(LI[y-1900]&i)?1:0;return s+lLeapDays(y)}
+function solar2lunar(y,m,d){
+  var base=new Date(1900,0,31),target=new Date(y,m-1,d);
+  var off=Math.floor((target-base)/86400000);
+  var ly,tmp;for(ly=1900;ly<2101&&off>0;ly++){tmp=lYearDays(ly);off-=tmp}
+  if(off<0){off+=tmp;ly--}
+  var leap=lLeapMonth(ly),isLeap=false,lm;
+  for(lm=1;lm<13&&off>0;lm++){
+    if(leap>0&&lm===(leap+1)&&!isLeap){lm--;isLeap=true;tmp=lLeapDays(ly)}
+    else{tmp=lMonthDays(ly,lm)}
+    if(isLeap&&lm===(leap+1))isLeap=false;
+    off-=tmp;
+  }
+  if(off===0&&leap>0&&lm===(leap+1)){if(isLeap)isLeap=false;else{isLeap=true;lm--}}
+  if(off<0){off+=tmp;lm--}
+  return{year:ly,month:lm,day:off+1,isLeap:isLeap}
+}
+function lunarDayText(y,m,d){
+  var l=solar2lunar(y,m,d);
+  if(l.day===1)return{text:(l.isLeap?'闰':'')+LUNAR_MONTHS[l.month-1],isMonthStart:true};
+  return{text:LUNAR_DAYS[l.day-1],isMonthStart:false}
+}
+
+/* ===== Data Management ===== */
+function normalizeRec(r){
+  if(!r||!r.date)return null;
+  var t=r.type||'mood';
+  return{date:r.date,type:t,who:t==='mood'?(r.who||'iris'):(r.who||''),mood:r.mood||'',note:r.note||r.text||'',phase:r.phase||'',predicted:!!r.predicted}
+}
+function recKey(r){return r.type==='mood'?r.date+'|mood|'+(r.who||'iris'):r.date+'|'+(r.type||'mood')+'|'+(r.phase||'')}
+function uniqueRecs(list){
+  var map={};list.forEach(function(r){var n=normalizeRec(r);if(n)map[recKey(n)]=n});
+  return Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){return a.date.localeCompare(b.date)})
+}
+function readLocal(){try{return JSON.parse(localStorage.getItem(LOCAL_KEY)||'[]')}catch(e){return[]}}
+function writeLocal(){localStorage.setItem(LOCAL_KEY,JSON.stringify(records))}
+function upsertLocal(rec){
+  var n=normalizeRec(rec);if(!n)return;var k=recKey(n);
+  var idx=-1;for(var i=0;i<records.length;i++){if(recKey(records[i])===k){idx=i;break}}
+  if(idx>=0)records[idx]=n;else records.push(n);
+  records=uniqueRecs(records);writeLocal();
+}
+function getMoodRec(date,who){return records.find(function(r){return r.date===date&&r.type==='mood'&&r.who===who})}
+function getDayRecs(date){return records.filter(function(r){return r.date===date})}
+
+/* ===== Period Computation ===== */
+function getPeriodRanges(){
+  var starts=records.filter(function(r){return r.type==='period'&&r.phase==='start'&&!r.predicted}).sort(function(a,b){return a.date.localeCompare(b.date)});
+  var ends=records.filter(function(r){return r.type==='period'&&r.phase==='end'}).sort(function(a,b){return a.date.localeCompare(b.date)});
+  var ranges=[];
+  starts.forEach(function(s){var e=ends.find(function(e){return e.date>=s.date});ranges.push({start:s.date,end:e?e.date:null})});
+  return ranges;
+}
+function computePhaseInfo(year,month){
+  var first=new Date(year,month,1),last=new Date(year,month+1,0);
+  var ranges=getPeriodRanges();
+  var actual=[],predicted=[],ovulation=[],follicular=[],luteal=[];
+  var cl=settings.cycle_length,pl=settings.period_length;
+  var ovDay=cl-14;
+
+  /* Mark actual menstrual days from all ranges */
+  ranges.forEach(function(rng){
+    var s=new Date(rng.start+'T00:00:00');
+    var e=rng.end?new Date(rng.end+'T00:00:00'):new Date(s.getTime()+(pl-1)*864e5);
+    for(var d=new Date(s);d<=e&&d<=last;d.setDate(d.getDate()+1)){if(d>=first)actual.push(d.getDate())}
+  });
+
+  /* Compute phases: use last range as reference.
+     i=0 → current cycle (always shown: follicular / ovulation / luteal after menstruation).
+     i≥1 → future predicted cycles (only when range is completed). */
+  if(ranges.length>0){
+    var lastRng=ranges[ranges.length-1];
+    var ls=new Date(lastRng.start+'T00:00:00');
+    var isComplete=!!lastRng.end;
+    var maxI=isComplete?6:0;
+    for(var i=0;i<=maxI;i++){
+      var cycleStart=new Date(ls.getTime()+cl*i*864e5);
+      for(var dd=0;dd<cl;dd++){
+        var cur=new Date(cycleStart.getTime()+dd*864e5);
+        if(cur<first||cur>last)continue;
+        var dn=cur.getDate();
+        if(dd<pl){
+          /* i=0 menstrual days are already in actual; i>0 are predictions */
+          if(i>0&&actual.indexOf(dn)===-1&&predicted.indexOf(dn)===-1)predicted.push(dn);
+        }else if(dd>=ovDay-2&&dd<=ovDay+2){
+          if(ovulation.indexOf(dn)===-1)ovulation.push(dn);
+        }else if(dd>=pl&&dd<ovDay-2){
+          if(follicular.indexOf(dn)===-1)follicular.push(dn);
+        }else if(dd>ovDay+2){
+          if(luteal.indexOf(dn)===-1)luteal.push(dn);
+        }
+      }
+    }
+  }
+  return{actual:actual,predicted:predicted,ovulation:ovulation,follicular:follicular,luteal:luteal}
+}
+function getCurrentPhase(){
+  var ranges=getPeriodRanges();
+  if(ranges.length===0)return null;
+  var ls=new Date(ranges[ranges.length-1].start+'T00:00:00');
+  var today=new Date(TY,TM,TD);
+  var diff=Math.floor((today-ls)/864e5);
+  if(diff<0)return null;
+  var cl=settings.cycle_length,pl=settings.period_length,ovDay=cl-14;
+  var dayInCycle=((diff%cl)+cl)%cl;
+  if(dayInCycle<pl)return'menstrual';
+  if(dayInCycle>=ovDay-2&&dayInCycle<=ovDay+2)return'ovulation';
+  if(dayInCycle>=pl&&dayInCycle<ovDay-2)return'follicular';
+  return'luteal';
+}
+
+/* ===== Course Management ===== */
+function getSemesterWeek(dateStr){
+  var ss=new Date(courseData.semester_start+'T00:00:00');
+  var d=new Date(dateStr+'T00:00:00');
+  var diff=Math.floor((d-ss)/864e5);
+  return diff>=0?Math.floor(diff/7)+1:-1;
+}
+function getCoursesForDate(dateStr){
+  var d=new Date(dateStr+'T00:00:00');
+  var dow=d.getDay();dow=dow===0?7:dow;
+  var week=getSemesterWeek(dateStr);
+  if(week<1)return[];
+  return courseData.courses.filter(function(c){
+    return c.day===dow&&week>=c.weekStart&&week<=c.weekEnd;
+  });
+}
+function saveCourses(){saveJSON(COURSE_KEY,courseData);queueCalendarSync()}
+function openCourseForm(editId){
+  var c=editId?courseData.courses.find(function(x){return x.id===editId}):null;
+  $('courseSheetTitle').textContent=c?'编辑课程':'添加课程';
+  $('cName').value=c?c.name:'';
+  $('cDay').value=c?c.day:1;
+  $('cStart').value=c?c.startP:'';
+  $('cEnd').value=c?c.endP:'';
+  $('cWeekStart').value=c?c.weekStart:'';
+  $('cWeekEnd').value=c?c.weekEnd:'';
+  $('cLocation').value=c?c.location:'';
+  $('cTeacher').value=c?c.teacher:'';
+  $('cEditId').value=editId||'';
+  closeSheet('courseListSheet');
+  openSheet('courseSheet');
+}
+function saveCourseForm(){
+  var name=$('cName').value.trim();if(!name){showToast('请填写课程名称');return}
+  var day=parseInt($('cDay').value),sp=parseInt($('cStart').value)||1,ep=parseInt($('cEnd').value)||sp;
+  var ws=parseInt($('cWeekStart').value)||1,we=parseInt($('cWeekEnd').value)||16;
+  var loc=$('cLocation').value.trim(),teacher=$('cTeacher').value.trim();
+  var editId=$('cEditId').value;
+  if(editId){
+    var c=courseData.courses.find(function(x){return x.id===editId});
+    if(c){c.name=name;c.day=day;c.startP=sp;c.endP=ep;c.weekStart=ws;c.weekEnd=we;c.location=loc;c.teacher=teacher}
+  }else{
+    courseData.courses.push({id:'c'+Date.now(),name:name,day:day,startP:sp,endP:ep,weekStart:ws,weekEnd:we,location:loc,teacher:teacher,color:courseData.courses.length%COURSE_COLORS.length});
+  }
+  saveCourses();closeSheet('courseSheet');renderAll();showToast('课程已保存 ✓','success');
+}
+function deleteCourse(id){
+  courseData.courses=courseData.courses.filter(function(c){return c.id!==id});
+  saveCourses();renderCourseList();renderAll();showToast('已删除');
+}
+window.deleteCourse=deleteCourse;
+function renderCourseList(){
+  $('semesterStart').value=courseData.semester_start;
+  var body=$('courseListBody');
+  if(courseData.courses.length===0){body.innerHTML='<div class="schedule-empty">还没有添加课程</div>';return}
+  var dayNames=['','周一','周二','周三','周四','周五','周六','周日'];
+  body.innerHTML=courseData.courses.map(function(c){
+    return '<div class="course-list-item">'+
+      '<div class="course-list-color" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'+
+      '<div class="course-list-info"><div class="course-list-name">'+escHtml(c.name)+'</div>'+
+      '<div class="course-list-detail">'+dayNames[c.day]+' 第'+c.startP+'-'+c.endP+'节 · '+c.weekStart+'-'+c.weekEnd+'周'+(c.location?' · '+escHtml(c.location):'')+'</div></div>'+
+      '<button class="course-list-del" onclick="deleteCourse(\''+c.id+'\')">删除</button></div>';
+  }).join('');
+}
+
+/* ===== Custom Events ===== */
+function saveEvents(){saveJSON(EVENTS_KEY,eventsData);queueCalendarSync()}
+function getEventsForDate(dstr){return eventsData.filter(function(e){return e.date===dstr})}
+function openEventForm(dateStr,editId){
+  var ev=editId?eventsData.find(function(e){return e.id===editId}):null;
+  $('eventSheetTitle').textContent=ev?'编辑日程':'添加日程';
+  $('eName').value=ev?ev.name:'';
+  $('eDate').value=ev?ev.date:(dateStr||todayStr());
+  $('eTimeStart').value=ev?ev.timeStart||'':'';
+  $('eTimeEnd').value=ev?ev.timeEnd||'':'';
+  $('eLocation').value=ev?ev.location||'':'';
+  $('eNote').value=ev?ev.note||'':'';
+  $('eEditId').value=editId||'';
+  openSheet('eventSheet');
+}
+function saveEventForm(){
+  var name=$('eName').value.trim();if(!name){showToast('请填写日程名称');return}
+  var date=$('eDate').value;if(!date){showToast('请选择日期');return}
+  var ts=$('eTimeStart').value,te=$('eTimeEnd').value;
+  var loc=$('eLocation').value.trim(),note=$('eNote').value.trim();
+  var editId=$('eEditId').value;
+  if(editId){
+    var ev=eventsData.find(function(e){return e.id===editId});
+    if(ev){ev.name=name;ev.date=date;ev.timeStart=ts;ev.timeEnd=te;ev.location=loc;ev.note=note}
+  }else{
+    eventsData.push({id:'ev'+Date.now(),name:name,date:date,timeStart:ts,timeEnd:te,location:loc,note:note,color:eventsData.length%COURSE_COLORS.length});
+  }
+  saveEvents();closeSheet('eventSheet');renderAll();showToast('日程已保存 ✓','success');
+}
+function deleteEvent(id){
+  eventsData=eventsData.filter(function(e){return e.id!==id});
+  saveEvents();renderAll();showToast('已删除');
+}
+window.deleteEvent=deleteEvent;
+window.openEventForm=function(d,id){openEventForm(d,id)};
+
+/* ===== Period Details ===== */
+var FLOW_LABELS={light:'少量',medium:'中等',heavy:'较多'};
+var COLOR_LABELS={bright_red:'鲜红',dark_red:'暗红',brown:'褐色',pink:'粉色'};
+var PAIN_LABELS={'0':'无痛','1':'轻微','2':'中等','3':'较重','4':'严重'};
+var SYMPTOM_LABELS={cramps:'痛经',backache:'腰痛',headache:'头痛',bloating:'腹胀',fatigue:'疲劳',mood_swing:'情绪波动',breast_pain:'胸胀',acne:'长痘'};
+var pdEditDate='';
+
+function savePeriodDetails(){saveJSON(PDETAIL_KEY,periodDetails);queueCalendarSync()}
+function getPeriodDetail(dstr){return periodDetails[dstr]||null}
+
+function openPeriodDetail(dstr){
+  pdEditDate=dstr;
+  var parts=dstr.split('-');
+  $('pdDate').textContent=parseInt(parts[0])+'年'+parseInt(parts[1])+'月'+parseInt(parts[2])+'日';
+  var existing=getPeriodDetail(dstr);
+
+  /* Single-select groups */
+  ['pdFlow','pdColor','pdPain'].forEach(function(gid){
+    var group=$(gid);
+    group.querySelectorAll('.pd-chip').forEach(function(c){
+      c.classList.remove('selected');
+      if(existing){
+        if(gid==='pdFlow'&&existing.flow===c.dataset.v)c.classList.add('selected');
+        if(gid==='pdColor'&&existing.color===c.dataset.v)c.classList.add('selected');
+        if(gid==='pdPain'&&existing.pain===c.dataset.v)c.classList.add('selected');
+      }
+    });
+  });
+  /* Multi-select symptoms */
+  $('pdSymptoms').querySelectorAll('.pd-chip').forEach(function(c){
+    c.classList.toggle('selected',existing&&existing.symptoms&&existing.symptoms.indexOf(c.dataset.v)!==-1);
+  });
+  $('pdNote').value=existing?existing.note||'':'';
+  openSheet('periodDetailSheet');
+}
+
+function savePeriodDetailForm(){
+  var flow='',color='',pain='',symptoms=[],note=$('pdNote').value.trim();
+  var fc=$('pdFlow').querySelector('.pd-chip.selected');if(fc)flow=fc.dataset.v;
+  var cc=$('pdColor').querySelector('.pd-chip.selected');if(cc)color=cc.dataset.v;
+  var pc=$('pdPain').querySelector('.pd-chip.selected');if(pc)pain=pc.dataset.v;
+  $('pdSymptoms').querySelectorAll('.pd-chip.selected').forEach(function(c){symptoms.push(c.dataset.v)});
+  if(!flow&&!color&&!pain&&symptoms.length===0&&!note){showToast('请至少填写一项');return}
+  periodDetails[pdEditDate]={flow:flow,color:color,pain:pain,symptoms:symptoms,note:note};
+  savePeriodDetails();closeSheet('periodDetailSheet');renderAll();showToast('详情已保存 ✓','success');
+}
+
+/* Chip click handlers for period detail */
+['pdFlow','pdColor','pdPain'].forEach(function(gid){
+  $(gid).addEventListener('click',function(e){
+    var chip=e.target.closest('.pd-chip');if(!chip)return;
+    $(gid).querySelectorAll('.pd-chip').forEach(function(c){c.classList.remove('selected')});
+    chip.classList.add('selected');
+  });
+});
+$('pdSymptoms').addEventListener('click',function(e){
+  var chip=e.target.closest('.pd-chip');if(!chip)return;
+  chip.classList.toggle('selected');
+});
+$('pdSave').addEventListener('click',savePeriodDetailForm);
+window.openPeriodDetail=function(d){openPeriodDetail(d)};
+
+/* ===== Render ===== */
+function renderAll(){renderHeader();renderCalendar();renderLegend();renderTabContent()}
+function renderHeader(){$('calYear').textContent=curYear;$('calMonth').textContent=CH_MONTHS[curMonth]}
+
+function renderCalendar(){
+  var grid=$('calGrid');
+  var mstr=ms(curYear,curMonth);
+  var pi=curTab==='period'?computePhaseInfo(curYear,curMonth):null;
+  var fdow=new Date(curYear,curMonth,1).getDay();
+  var off=fdow===0?6:fdow-1;
+  var dim=new Date(curYear,curMonth+1,0).getDate();
+  var prevDim=new Date(curYear,curMonth,0).getDate();
+  var isPeriod=curTab==='period',isSchedule=curTab==='schedule';
+  var html='';
+
+  for(var i=0;i<off;i++){
+    var pd=prevDim-off+i+1;
+    html+='<div class="cal-cell empty other-month"><span class="day-num">'+pd+'</span></div>';
+  }
+
+  for(var day=1;day<=dim;day++){
+    var dstr=mstr+'-'+pad2(day);
+    var isToday=curYear===TY&&curMonth===TM&&day===TD;
+    var isSel=selDay===day;
+    var ann=curMonth===ANN_MONTH&&day===ANN_DAY;
+    var cls='cal-cell';
+    if(isToday)cls+=' today';
+    if(isSel)cls+=' selected';
+    if(ann)cls+=' anniversary';
+
+    if(isPeriod&&pi){
+      if(pi.actual.indexOf(day)!==-1)cls+=' phase-menstrual';
+      else if(pi.predicted.indexOf(day)!==-1)cls+=' phase-predicted';
+      else if(pi.ovulation.indexOf(day)!==-1)cls+=' phase-ovulation';
+      else if(pi.follicular.indexOf(day)!==-1)cls+=' phase-follicular';
+      else if(pi.luteal.indexOf(day)!==-1)cls+=' phase-luteal';
+    }
+
+    html+='<div class="'+cls+'" data-day="'+day+'">';
+    html+='<span class="day-num">'+day+'</span>';
+
+    if(isSchedule){
+      var lunar=lunarDayText(curYear,curMonth+1,day);
+      html+='<span class="lunar-text'+(lunar.isMonthStart?' month-start':'')+'">'+lunar.text+'</span>';
+      var courses=getCoursesForDate(dstr);
+      var events=getEventsForDate(dstr);
+      var allItems=courses.concat(events);
+      if(allItems.length>0){
+        html+='<div class="course-dots">';
+        allItems.slice(0,3).forEach(function(c){html+='<div class="course-dot" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'});
+        html+='</div>';
+      }
+    }else if(isPeriod&&pi){
+      var phs='';
+      if(pi.actual.indexOf(day)!==-1)phs='menstrual';
+      else if(pi.predicted.indexOf(day)!==-1)phs='predicted';
+      else if(pi.ovulation.indexOf(day)!==-1)phs='ovulation';
+      else if(pi.follicular.indexOf(day)!==-1)phs='follicular';
+      else if(pi.luteal.indexOf(day)!==-1)phs='luteal';
+      if(phs)html+='<div class="phase-dot '+phs+'"></div>';
+    }else{
+      // Mood tab: show images
+      var im=getMoodRec(dstr,'iris'),cm=getMoodRec(dstr,'claude');
+      html+='<div class="mood-dots">';
+      if(im&&MOOD_META[im.mood])html+='<img class="mood-img" src="'+MOOD_META[im.mood].uc+'" alt="'+MOOD_META[im.mood].label+'">';
+      else html+='<div class="mood-placeholder circle"></div>';
+      if(cm&&MOOD_META[cm.mood])html+='<img class="mood-img" src="'+MOOD_META[cm.mood].us+'" alt="'+MOOD_META[cm.mood].label+'">';
+      else html+='<div class="mood-placeholder square"></div>';
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+
+  var total=off+dim,rem=total%7===0?0:7-(total%7);
+  for(var j=1;j<=rem;j++)html+='<div class="cal-cell empty other-month"><span class="day-num">'+j+'</span></div>';
+
+  grid.className='cal-grid anim-2'+(isPeriod?' tab-period':'')+(isSchedule?' tab-schedule':'');
+  grid.innerHTML=html;
+  grid.querySelectorAll('.cal-cell:not(.empty)').forEach(function(el){
+    el.addEventListener('click',function(){selDay=parseInt(el.dataset.day);showDayDetail(selDay)});
+  });
+}
+
+function renderLegend(){
+  var el=$('calLegend');
+  if(curTab==='mood'){
+    el.innerHTML='<div class="legend-dot"><div class="legend-icon circle" style="background:var(--bg-secondary)"></div>'+name1+'</div>'+
+      '<div class="legend-dot"><div class="legend-icon square" style="background:var(--bg-secondary)"></div>'+name2+'</div>'+
+      '<div class="legend-dot" style="font-size:10px;color:var(--text-light)">点击日期查看详情</div>';
+  }else if(curTab==='period'){
+    el.innerHTML='<div class="legend-dot"><div class="legend-icon circle" style="background:#D4A0A0"></div>经期</div>'+
+      '<div class="legend-dot"><div class="legend-icon dashed circle"></div>预测经期</div>'+
+      '<div class="legend-dot"><div class="legend-icon circle" style="background:#7BA8CC"></div>排卵期</div>'+
+      '<div class="legend-dot"><div class="legend-icon circle" style="background:#8BBF90"></div>卵泡期</div>'+
+      '<div class="legend-dot"><div class="legend-icon circle" style="background:#C8B080"></div>黄体期</div>';
+  }else{
+    var week=getSemesterWeek(todayStr());
+    el.innerHTML='<div class="legend-dot" style="font-size:12px;color:var(--text)">'+(week>0?'第 '+week+' 教学周':'学期未开始')+'</div>'+
+      '<div class="legend-dot" style="font-size:10px;color:var(--text-light)">点击日期查看日程</div>';
+  }
+}
+
+function renderTabContent(){
+  var sec=$('tabContent');
+  if(curTab==='mood'){
+    sec.innerHTML='<button class="cal-cta" id="recordBtn">记录今日心情</button><div id="statsSection"></div>';
+    $('recordBtn').addEventListener('click',function(){selDay=TD;curYear=TY;curMonth=TM;renderAll();openRecordSheet(TD)});
+    renderStats();
+  }else if(curTab==='period'){
+    var phase=getCurrentPhase();
+    var phaseHtml=phase?'<div class="phase-status">当前阶段：'+PHASE_NAMES[phase]+'</div>':'';
+    sec.innerHTML=phaseHtml+
+      '<div class="period-card"><div class="period-header"><span class="period-header-title">周期设置</span>'+
+      '<button class="period-edit-btn" id="openSettings">编辑</button></div>'+
+      '<div class="period-nums"><div class="period-num-block"><div class="period-num-value" style="color:var(--accent)">'+settings.cycle_length+'</div><div class="period-num-label">天/周期</div></div>'+
+      '<div class="period-nums-divider"></div><div class="period-num-block"><div class="period-num-value" style="color:var(--accent-mid)">'+settings.period_length+'</div><div class="period-num-label">天/经期</div></div></div>'+
+      '<div class="period-actions"><button class="period-action-btn period-action-start" id="pStartBtn">标记经期开始</button>'+
+      '<button class="period-action-btn period-action-end" id="pEndBtn">标记经期结束</button></div>'+
+      '<div style="margin-top:8px"><button class="period-action-btn period-action-start" id="pDetailBtn" style="width:100%">记录今日详情</button></div></div>';
+    $('openSettings').addEventListener('click',function(){editCycle=settings.cycle_length;editPeriod=settings.period_length;$('cycleValue').textContent=editCycle;$('periodValue').textContent=editPeriod;openSheet('settingsSheet')});
+    $('pStartBtn').addEventListener('click',function(){savePeriodMark(todayStr(),'start')});
+    $('pEndBtn').addEventListener('click',function(){savePeriodMark(todayStr(),'end')});
+    $('pDetailBtn').addEventListener('click',function(){openPeriodDetail(todayStr())});
+  }else{
+    // Schedule tab
+    var selDate=selDay?ms(curYear,curMonth)+'-'+pad2(selDay):todayStr();
+    var dayCourses=getCoursesForDate(selDate);
+    var dayEvents=getEventsForDate(selDate);
+    var dayNames=['','周一','周二','周三','周四','周五','周六','周日'];
+    var scheduleHtml='<div class="schedule-btns"><button class="timetable-btn" id="openTimetable">课表管理</button>'+
+      '<button class="timetable-btn" id="addEventBtn">添加日程</button></div>';
+    scheduleHtml+='<div class="day-schedule"><div class="day-schedule-header"><span class="day-schedule-title">'+(selDay?(curMonth+1)+'月'+selDay+'日':'今日')+'日程</span>'+
+      '<span class="day-schedule-date">'+(getSemesterWeek(selDate)>0?'第'+getSemesterWeek(selDate)+'周':'')+'</span></div>';
+    if(dayCourses.length>0){
+      dayCourses.sort(function(a,b){return a.startP-b.startP});
+      dayCourses.forEach(function(c){
+        scheduleHtml+='<div class="schedule-item"><div class="schedule-color-bar" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'+
+          '<div class="schedule-info"><div class="schedule-name">'+escHtml(c.name)+'</div>'+
+          '<div class="schedule-detail">第'+c.startP+'-'+c.endP+'节'+(c.location?' · '+escHtml(c.location):'')+(c.teacher?' · '+escHtml(c.teacher):'')+'</div></div></div>';
+      });
+    }
+    if(dayEvents.length>0){
+      dayEvents.forEach(function(e){
+        var timeStr=e.timeStart?(e.timeStart+(e.timeEnd?' - '+e.timeEnd:'')):'';
+        scheduleHtml+='<div class="schedule-item"><div class="schedule-color-bar" style="background:'+COURSE_COLORS[e.color||0]+'"></div>'+
+          '<div class="schedule-info"><div class="schedule-name">'+escHtml(e.name)+'</div>'+
+          '<div class="schedule-detail">'+(timeStr?timeStr:'全天')+(e.location?' · '+escHtml(e.location):'')+(e.note?' · '+escHtml(e.note):'')+'</div></div>'+
+          '<button class="course-list-del" onclick="deleteEvent(\''+e.id+'\')">删</button></div>';
+      });
+    }
+    if(dayCourses.length===0&&dayEvents.length===0){
+      scheduleHtml+='<div class="schedule-empty">这天没有日程安排</div>';
+    }
+    scheduleHtml+='</div>';
+    sec.innerHTML=scheduleHtml;
+    $('openTimetable').addEventListener('click',function(){renderCourseList();openSheet('courseListSheet')});
+    $('addEventBtn').addEventListener('click',function(){openEventForm(selDate)});
+  }
+}
+
+function renderStats(){
+  var sec=$('statsSection');if(!sec)return;
+  var mstr=ms(curYear,curMonth);
+  var uc={},ac={},ut=0,at=0;
+  records.forEach(function(r){
+    if(r.type!=='mood'||r.date.indexOf(mstr)!==0)return;
+    if(r.who==='iris'){uc[r.mood]=(uc[r.mood]||0)+1;ut++}
+    if(r.who==='claude'){ac[r.mood]=(ac[r.mood]||0)+1;at++}
+  });
+  if(ut===0&&at===0){sec.innerHTML='<div class="stats-card"><div class="stats-empty">本月还没有心情记录</div></div>';return}
+  var html='<div class="stats-card">';
+  if(ut>0){html+='<div class="stats-title"><span class="stats-title-text">'+name1+' 的心情</span><span class="stats-title-count">'+ut+' 天</span></div>'+buildBars(uc,ut,'uc')}
+  if(ut>0&&at>0)html+='<div class="stats-divider"></div>';
+  if(at>0){html+='<div class="stats-title"><span class="stats-title-text">'+name2+' 的心情</span><span class="stats-title-count">'+at+' 天</span></div>'+buildBars(ac,at,'us')}
+  sec.innerHTML=html+'</div>';
+}
+function buildBars(counts,total,shape){
+  var entries=Object.keys(counts).map(function(k){return[k,counts[k]]}).sort(function(a,b){return b[1]-a[1]});
+  return entries.map(function(e){
+    var m=MOOD_META[e[0]]||{label:e[0],color:'#CCC',uc:'',us:''};
+    var pct=Math.round(e[1]/total*100);
+    var imgUrl=shape==='uc'?m.uc:m.us;
+    return '<div class="stats-bar-row"><img class="stats-bar-img" src="'+imgUrl+'" alt="'+m.label+'">'+
+      '<span class="stats-bar-label">'+m.label+'</span>'+
+      '<div class="stats-bar-track"><div class="stats-bar-fill" style="width:'+pct+'%;background:'+m.color+'"></div></div>'+
+      '<span class="stats-bar-count">'+e[1]+'</span></div>';
+  }).join('');
+}
+
+/* ===== Day Detail ===== */
+function showDayDetail(day){
+  var dstr=ms(curYear,curMonth)+'-'+pad2(day);
+  var dayRecs=getDayRecs(dstr);
+  var im=getMoodRec(dstr,'iris'),cm=getMoodRec(dstr,'claude');
+  var pi=computePhaseInfo(curYear,curMonth);
+  var sickRecs=dayRecs.filter(function(r){return r.type==='sick'});
+  var pinRecs=dayRecs.filter(function(r){return r.type==='pin'});
+
+  $('detailTitle').textContent=curYear+'.'+pad2(curMonth+1)+'.'+pad2(day);
+  var body='';
+
+  // Mood section
+  if(im||cm){
+    body+='<div class="detail-sub">双人心情</div>';
+    if(im){var m1=MOOD_META[im.mood]||{label:im.mood,uc:'',color:'#CCC'};
+      body+='<div class="detail-mood-row"><img class="detail-mood-img" src="'+m1.uc+'" alt=""><span class="detail-mood-text">'+name1+'：'+m1.label+'</span></div>';
+      if(im.note)body+='<div class="detail-note detail-note-user">'+escHtml(im.note)+'</div>';}
+    if(cm){var m2=MOOD_META[cm.mood]||{label:cm.mood,us:'',color:'#CCC'};
+      body+='<div class="detail-mood-row"><img class="detail-mood-img" src="'+m2.us+'" alt=""><span class="detail-mood-text">'+name2+'：'+m2.label+'</span></div>';
+      if(cm.note)body+='<div class="detail-note detail-note-ai">'+escHtml(cm.note)+'</div>';}
+  }else if(curTab==='mood'){
+    body+='<div class="detail-empty">这天还没有心情记录</div>';
+  }
+
+  // Period phase info
+  if(pi.actual.indexOf(day)!==-1)body+='<div class="detail-phase-tag" style="background:#F0D0D0;color:#9A5555">经期中</div>';
+  if(pi.predicted.indexOf(day)!==-1)body+='<div class="detail-phase-tag" style="border:1.5px dashed #D4A0A0;color:#B07070">预测经期</div>';
+  if(pi.ovulation.indexOf(day)!==-1)body+='<div class="detail-phase-tag" style="background:#D0E0F0;color:#5577AA">排卵期</div>';
+  if(pi.follicular.indexOf(day)!==-1)body+='<div class="detail-phase-tag" style="background:#D0E8D4;color:#558866">卵泡期</div>';
+  if(pi.luteal.indexOf(day)!==-1)body+='<div class="detail-phase-tag" style="background:#E8DCC8;color:#887755">黄体期</div>';
+
+  // Period detail summary
+  var pd=getPeriodDetail(dstr);
+  if(pd){
+    body+='<div class="pd-summary" style="margin-top:8px">';
+    if(pd.flow)body+='<span class="pd-tag" style="background:#F0D0D0;color:#9A5555">'+FLOW_LABELS[pd.flow]+'</span>';
+    if(pd.color)body+='<span class="pd-tag" style="background:#F0D0D0;color:#9A5555">'+COLOR_LABELS[pd.color]+'</span>';
+    if(pd.pain)body+='<span class="pd-tag" style="background:#E8DCC8;color:#887755">疼痛:'+PAIN_LABELS[pd.pain]+'</span>';
+    if(pd.symptoms&&pd.symptoms.length>0)pd.symptoms.forEach(function(s){body+='<span class="pd-tag" style="background:#D0E0F0;color:#5577AA">'+SYMPTOM_LABELS[s]+'</span>'});
+    body+='</div>';
+    if(pd.note)body+='<div class="detail-note detail-note-user" style="margin-top:4px">'+escHtml(pd.note)+'</div>';
+  }
+
+  // Schedule info
+  if(curTab==='schedule'){
+    var courses=getCoursesForDate(dstr);
+    var dayEvts=getEventsForDate(dstr);
+    if(courses.length>0){
+      body+='<div class="detail-sub" style="margin-top:10px">课程安排</div>';
+      courses.sort(function(a,b){return a.startP-b.startP});
+      courses.forEach(function(c){
+        body+='<div class="schedule-item"><div class="schedule-color-bar" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'+
+          '<div class="schedule-info"><div class="schedule-name">'+escHtml(c.name)+'</div>'+
+          '<div class="schedule-detail">第'+c.startP+'-'+c.endP+'节'+(c.location?' · '+escHtml(c.location):'')+(c.teacher?' · '+escHtml(c.teacher):'')+'</div></div></div>';
+      });
+    }
+    if(dayEvts.length>0){
+      body+='<div class="detail-sub" style="margin-top:10px">日程</div>';
+      dayEvts.forEach(function(e){
+        var timeStr=e.timeStart?(e.timeStart+(e.timeEnd?' - '+e.timeEnd:'')):'全天';
+        body+='<div class="schedule-item"><div class="schedule-color-bar" style="background:'+COURSE_COLORS[e.color||0]+'"></div>'+
+          '<div class="schedule-info"><div class="schedule-name">'+escHtml(e.name)+'</div>'+
+          '<div class="schedule-detail">'+timeStr+(e.location?' · '+escHtml(e.location):'')+(e.note?' · '+escHtml(e.note):'')+'</div></div></div>';
+      });
+    }
+  }
+
+  // Backward compat: sick/pin
+  if(sickRecs.length||pinRecs.length){
+    sickRecs.forEach(function(r){body+='<div class="extra-tag">🤒 '+escHtml(r.note||'生病记录')+'</div>'});
+    pinRecs.forEach(function(r){body+='<div class="extra-tag">📌 '+escHtml(r.note||'重要备注')+'</div>'});
+  }
+  if(curMonth===ANN_MONTH&&day===ANN_DAY)body+='<div class="extra-tag" style="margin-top:6px">♡ 纪念日</div>';
+
+  $('detailBody').innerHTML=body;
+
+  // Actions
+  var act='';
+  if(curTab==='mood'){
+    act+='<button class="detail-btn detail-btn-primary" id="dRecord">记录心情</button>';
+    if(im||cm)act+='<button class="detail-btn detail-btn-danger" id="dDelete">删除心情</button>';
+    act+='<button class="detail-btn detail-btn-ghost" onclick="closeSheet(\'detailSheet\')">关闭</button>';
+  }else if(curTab==='period'){
+    act+='<button class="detail-btn detail-btn-primary" id="dPStart">标记开始</button>';
+    act+='<button class="detail-btn detail-btn-ghost" id="dPEnd">标记结束</button>';
+    act+='<button class="detail-btn detail-btn-primary" id="dPDetail" style="background:var(--accent-mid)">记录详情</button>';
+    if(pi.actual.indexOf(day)!==-1)act+='<button class="detail-btn detail-btn-danger" id="dPDel">删除标记</button>';
+    act+='<button class="detail-btn detail-btn-ghost" onclick="closeSheet(\'detailSheet\')">关闭</button>';
+  }else{
+    act+='<button class="detail-btn detail-btn-primary" id="dAddEvent">添加日程</button>';
+    act+='<button class="detail-btn detail-btn-ghost" onclick="closeSheet(\'detailSheet\')">关闭</button>';
+  }
+  $('detailActions').innerHTML=act;
+
+  var rb=$('dRecord');if(rb)rb.addEventListener('click',function(){closeSheet('detailSheet');openRecordSheet(day)});
+  var db=$('dDelete');if(db)db.addEventListener('click',function(){deleteMood(dstr)});
+  var ps=$('dPStart');if(ps)ps.addEventListener('click',function(){savePeriodMark(dstr,'start');closeSheet('detailSheet')});
+  var pe=$('dPEnd');if(pe)pe.addEventListener('click',function(){savePeriodMark(dstr,'end');closeSheet('detailSheet')});
+  var pdt=$('dPDetail');if(pdt)pdt.addEventListener('click',function(){closeSheet('detailSheet');openPeriodDetail(dstr)});
+  var pdd=$('dPDel');if(pdd)pdd.addEventListener('click',function(){deletePeriod(dstr)});
+  var ae=$('dAddEvent');if(ae)ae.addEventListener('click',function(){closeSheet('detailSheet');openEventForm(dstr)});
+
+  openSheet('detailSheet');
+}
+
+/* ===== Record Mood Sheet ===== */
+function openRecordSheet(day){
+  selDay=day||TD;selMood='';
+  var dstr=ms(curYear,curMonth)+'-'+pad2(selDay);
+  $('recordDate').textContent=curYear+'年'+(curMonth+1)+'月'+selDay+'日';
+
+  // Who tabs
+  $('whoTabs').innerHTML='<button class="who-tab'+(selWho==='iris'?' active':'')+'" data-who="iris">'+name1+'</button>'+
+    '<button class="who-tab'+(selWho==='claude'?' active':'')+'" data-who="claude">'+name2+'</button>';
+
+  // Mood grid with images
+  var grid=$('moodGrid');grid.innerHTML='';
+  MOOD_TYPES.forEach(function(m){
+    var meta=MOOD_META[m];
+    var cell=document.createElement('div');cell.className='mood-cell';cell.dataset.mood=m;
+    cell.innerHTML='<img class="mood-cell-img" src="'+(selWho==='iris'?meta.uc:meta.us)+'" alt="'+meta.label+'"><span class="mood-cell-label">'+meta.label+'</span>';
+    cell.addEventListener('click',function(){
+      grid.querySelectorAll('.mood-cell').forEach(function(c){c.classList.remove('selected')});
+      cell.classList.add('selected');selMood=m;
+      $('recordSave').className='sheet-btn sheet-btn-primary';
+    });
+    grid.appendChild(cell);
+  });
+
+  // Check existing
+  var existing=getMoodRec(dstr,selWho);
+  if(existing&&existing.mood){
+    selMood=existing.mood;
+    var ec=grid.querySelector('[data-mood="'+existing.mood+'"]');
+    if(ec)ec.classList.add('selected');
+    $('recordSave').className='sheet-btn sheet-btn-primary';
+    $('recordNote').value=existing.note||'';
+  }else{
+    $('recordSave').className='sheet-btn sheet-btn-disabled';
+    $('recordNote').value='';
+  }
+  openSheet('recordSheet');
+}
+
+/* ===== Save/Delete Actions ===== */
+async function saveMoodRecord(){
+  if(!selMood)return;
+  var dstr=ms(curYear,curMonth)+'-'+pad2(selDay);
+  var note=$('recordNote').value.trim();
+  var rec={date:dstr,type:'mood',who:selWho,mood:selMood,note:note};
+  upsertLocal(rec);renderAll();showToast('心情已记录 ✓','success');closeSheet('recordSheet');
+  try{await fetch(BASE+'/api/moods',{method:'POST',headers:H,body:JSON.stringify(normalizeRec(rec))})}catch(e){}
+}
+async function deleteMood(dstr){
+  records=records.filter(function(r){return!(r.date===dstr&&r.type==='mood')});
+  writeLocal();renderAll();closeSheet('detailSheet');showToast('心情记录已删除','success');
+  try{await fetch(BASE+'/api/moods/'+dstr,{method:'DELETE',headers:H})}catch(e){}
+}
+async function savePeriodMark(dstr,phase){
+  var rec={date:dstr,type:'period',phase:phase,mood:'',note:''};
+  upsertLocal(rec);renderAll();showToast(phase==='start'?'经期开始已标记 🌙':'经期结束已标记 ✓','success');
+  try{await fetch(BASE+'/api/moods',{method:'POST',headers:H,body:JSON.stringify(normalizeRec(rec))})}catch(e){}
+}
+async function deletePeriod(dstr){
+  records=records.filter(function(r){return!(r.date===dstr&&r.type==='period')});
+  writeLocal();renderAll();closeSheet('detailSheet');showToast('经期标记已删除','success');
+  try{await fetch(BASE+'/api/moods/'+dstr,{method:'DELETE',headers:H})}catch(e){}
+}
+function saveSettingsAction(){
+  settings={cycle_length:editCycle,period_length:editPeriod};
+  saveJSON(SETTINGS_KEY,settings);renderAll();closeSheet('settingsSheet');showToast('周期设置已保存 ✓','success');
+}
+
+/* ===== Year/Month Picker ===== */
+function openPicker(){pickerYear=curYear;renderPickerMonths();openSheet('pickerSheet')}
+function renderPickerMonths(){
+  $('pickerYear').textContent=pickerYear+'年';
+  var grid=$('pickerMonths');grid.innerHTML='';
+  for(var m=0;m<12;m++){
+    var btn=document.createElement('button');btn.className='picker-month-cell';btn.textContent=(m+1)+'月';
+    if(pickerYear===curYear&&m===curMonth)btn.className+=' current';
+    else if(pickerYear===TY&&m===TM)btn.className+=' today-month';
+    btn.dataset.month=m;
+    btn.addEventListener('click',function(e){curYear=pickerYear;curMonth=parseInt(e.target.dataset.month);selDay=0;closeSheet('pickerSheet');renderAll()});
+    grid.appendChild(btn);
+  }
+}
+
+/* ===== Event Bindings ===== */
+$('calTabs').addEventListener('click',function(e){
+  var tab=e.target.closest('.cal-tab');if(!tab)return;
+  curTab=tab.dataset.tab;selDay=0;
+  document.querySelectorAll('.cal-tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===curTab)});
+  renderAll();
+});
+$('prevMonth').addEventListener('click',function(){curMonth--;if(curMonth<0){curMonth=11;curYear--}selDay=0;renderAll()});
+$('nextMonth').addEventListener('click',function(){curMonth++;if(curMonth>11){curMonth=0;curYear++}selDay=0;renderAll()});
+$('monthCenter').addEventListener('click',openPicker);
+$('whoTabs').addEventListener('click',function(e){
+  var tab=e.target.closest('.who-tab');if(!tab)return;
+  selWho=tab.dataset.who;
+  document.querySelectorAll('.who-tab').forEach(function(t){t.classList.toggle('active',t.dataset.who===selWho)});
+  // Refresh mood grid images
+  var grid=$('moodGrid');
+  grid.querySelectorAll('.mood-cell').forEach(function(cell){
+    var m=cell.dataset.mood;if(m&&MOOD_META[m])cell.querySelector('.mood-cell-img').src=selWho==='iris'?MOOD_META[m].uc:MOOD_META[m].us;
+    cell.classList.remove('selected');
+  });
+  var dstr=ms(curYear,curMonth)+'-'+pad2(selDay);
+  var existing=getMoodRec(dstr,selWho);
+  if(existing&&existing.mood){
+    selMood=existing.mood;
+    var ec=grid.querySelector('[data-mood="'+existing.mood+'"]');if(ec)ec.classList.add('selected');
+    $('recordSave').className='sheet-btn sheet-btn-primary';$('recordNote').value=existing.note||'';
+  }else{selMood='';$('recordSave').className='sheet-btn sheet-btn-disabled';$('recordNote').value=''}
+});
+$('recordSave').addEventListener('click',saveMoodRecord);
+$('pickerPrevYear').addEventListener('click',function(){pickerYear--;renderPickerMonths()});
+$('pickerNextYear').addEventListener('click',function(){pickerYear++;renderPickerMonths()});
+$('pickerToday').addEventListener('click',function(){curYear=TY;curMonth=TM;selDay=0;closeSheet('pickerSheet');renderAll()});
+$('cycleMinus').addEventListener('click',function(){if(editCycle>1){editCycle--;$('cycleValue').textContent=editCycle}});
+$('cyclePlus').addEventListener('click',function(){editCycle++;$('cycleValue').textContent=editCycle});
+$('periodMinus').addEventListener('click',function(){if(editPeriod>1){editPeriod--;$('periodValue').textContent=editPeriod}});
+$('periodPlus').addEventListener('click',function(){editPeriod++;$('periodValue').textContent=editPeriod});
+$('settingsSave').addEventListener('click',saveSettingsAction);
+$('settingsSave').addEventListener('click',function(){queueCalendarSync()});
+$('courseSave').addEventListener('click',saveCourseForm);
+$('eventSave').addEventListener('click',saveEventForm);
+$('semesterStart').addEventListener('change',function(){courseData.semester_start=this.value;saveCourses();renderAll()});
+
+/* ===== Load Data ===== */
+var calendarSyncTimer=null;
+function calendarStatePayload(){
+  return{settings:settings,courses:courseData,events:eventsData,periodDetails:Object.keys(periodDetails).map(function(date){return Object.assign({date:date},periodDetails[date])})};
+}
+function queueCalendarSync(){
+  clearTimeout(calendarSyncTimer);
+  calendarSyncTimer=setTimeout(function(){
+    fetch(BASE+'/api/calendar/state',{method:'PUT',headers:H,body:JSON.stringify(calendarStatePayload())})
+      .then(function(r){if(!r.ok)throw new Error('sync failed');localStorage.setItem(CALENDAR_MIGRATION_KEY,'1')})
+      .catch(function(e){console.warn('日历同步失败，已保留本地副本',e)});
+  },350);
+}
+function applyRemoteCalendarState(state){
+  if(!state)return;
+  if(state.settings){settings={cycle_length:state.settings.cycle_length||28,period_length:state.settings.period_length||5};saveJSON(SETTINGS_KEY,settings)}
+  if(state.courses){courseData={semester_start:state.courses.semester_start||'',courses:Array.isArray(state.courses.courses)?state.courses.courses:[]};saveJSON(COURSE_KEY,courseData)}
+  if(Array.isArray(state.events)){eventsData=state.events;saveJSON(EVENTS_KEY,eventsData)}
+  if(Array.isArray(state.periodDetails)){periodDetails={};state.periodDetails.forEach(function(item){if(item&&item.date){var copy=Object.assign({},item);delete copy.date;periodDetails[item.date]=copy}});saveJSON(PDETAIL_KEY,periodDetails)}
+}
+async function migrateLocalMoodAndPeriodRecords(){
+  if(localStorage.getItem(CALENDAR_RECORDS_MIGRATION_KEY)==='1')return;
+  var pending=records.filter(function(record){return record&&record.date&&(record.type==='mood'||record.type==='period')});
+  if(!pending.length){localStorage.setItem(CALENDAR_RECORDS_MIGRATION_KEY,'1');return}
+  var results=await Promise.all(pending.map(async function(record){
+    var response=await fetch(BASE+'/api/moods',{method:'POST',headers:H,body:JSON.stringify(normalizeRec(record))});
+    if(!response.ok)throw new Error('mood migration failed');
+    return response.json();
+  }));
+  records=uniqueRecs([].concat(results,records));writeLocal();
+  localStorage.setItem(CALENDAR_RECORDS_MIGRATION_KEY,'1');
+}
+async function init(){
+  $('calGrid').innerHTML='<div class="cal-skeleton-grid">'+Array.from({length:35}).map(function(){return'<div class="cal-skeleton"></div>'}).join('')+'</div>';
+  var remote=[];
+  try{var r=await fetch(BASE+'/api/moods',{headers:H});if(!r.ok)throw 0;remote=await r.json()}catch(e){console.warn('加载数据失败，使用本地记录',e)}
+  records=uniqueRecs([].concat(Array.isArray(remote)?remote:[],readLocal()));writeLocal();
+  try{await migrateLocalMoodAndPeriodRecords()}catch(e){console.warn('心情和经期记录迁移失败，稍后会自动重试',e)}
+  try{
+    var stateResponse=await fetch(BASE+'/api/calendar/state',{headers:H});
+    if(!stateResponse.ok)throw new Error('calendar state unavailable');
+    var state=await stateResponse.json();
+    if(localStorage.getItem(CALENDAR_MIGRATION_KEY)!=='1'){
+      await fetch(BASE+'/api/calendar/state',{method:'PUT',headers:H,body:JSON.stringify(calendarStatePayload())});
+      localStorage.setItem(CALENDAR_MIGRATION_KEY,'1');
+      stateResponse=await fetch(BASE+'/api/calendar/state',{headers:H});state=await stateResponse.json();
+    }
+    applyRemoteCalendarState(state);
+  }catch(e){
+    console.warn('日历扩展数据仍使用本地副本',e);
+    // Calendar events have their own stable API. Keep AI-created events visible
+    // even if optional settings/course tables are temporarily unavailable.
+    try{var eventResponse=await fetch(BASE+'/api/calendar',{headers:H});if(eventResponse.ok){eventsData=await eventResponse.json();saveJSON(EVENTS_KEY,eventsData)}}catch(eventError){console.warn('日程降级读取失败',eventError)}
+  }
+  renderAll();
+}
+init();
+
+/* Top bar init */
+(function(){
+  var a=localStorage.getItem('iris_avatar_img1');
+  var n=localStorage.getItem('iris_avatar_name1')||'Iris';
+  var t=localStorage.getItem('iris_topbar_title')||(n+'的小窝');
+  var ae=$('topBarAvatar'),te=$('topBarTitle');
+  if(a&&ae)ae.innerHTML='<img src="'+a+'" alt="">';
+  else if(ae)ae.innerHTML='<span class="top-bar-avatar-initial">'+n.charAt(0).toUpperCase()+'</span>';
+  if(te)te.textContent=t;
+  if(te)te.onclick=function(){var v=prompt('自定义顶栏文字',te.textContent);if(v&&v.trim()){te.textContent=v.trim();localStorage.setItem('iris_topbar_title',v.trim())}};
+})();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>更多 · irisandclaude</title>
+<script src="init.js"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.more-header {
+  text-align: center;
+  padding: 32px 0 24px;
+  animation: fadeInUp .6s ease both;
+}
+.more-title {
+  font-family: var(--font-d);
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+.more-sub {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 6px;
+  letter-spacing: 0.06em;
+}
+
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  max-width: 440px;
+  margin: 0 auto;
+  animation: fadeInUp .6s .1s ease both;
+}
+
+.more-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: var(--text);
+  transition: all 0.22s;
+}
+.more-card svg {
+  width: 32px;
+  height: 32px;
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.more-card-name {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.more-card-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  line-height: 1.4;
+}
+@media (hover: hover) and (pointer: fine) {
+  .more-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/* Separator */
+.more-section {
+  max-width: 440px;
+  margin: 28px auto 0;
+  animation: fadeInUp .6s .2s ease both;
+}
+.more-section-title {
+  font-size: 12px;
+  color: var(--text-light);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  padding-left: 4px;
+}
+
+/* Settings list */
+.settings-list {
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.15s;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  font-family: var(--font-b);
+  font-size: 14px;
+}
+.settings-item + .settings-item {
+  border-top: 1px solid var(--accent-pale);
+}
+.settings-item:hover {
+  background: var(--bg-secondary);
+}
+.settings-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-item-left svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.settings-item-arrow {
+  color: var(--text-light);
+  font-size: 14px;
+}
+.listening-more-card svg{width:31px;height:31px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- Theme picker ---- */
+.theme-row-wrap{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;padding:16px 0 8px;margin:0 -4px;scrollbar-width:none}
+.theme-row-wrap::-webkit-scrollbar{display:none}
+.theme-row{display:flex;gap:14px;padding:0 4px;min-width:min-content}
+.theme-option{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;flex-shrink:0}
+.theme-swatch{width:52px;height:52px;border-radius:50%;border:3px solid transparent;transition:all .2s;position:relative}
+.theme-swatch.active{border-color:var(--text);box-shadow:0 0 0 2px var(--bg-card),0 0 0 4px var(--text)}
+.theme-swatch:active{transform:scale(.92)}
+.theme-swatch-label{font-size:10px;color:var(--text-light);text-align:center;letter-spacing:.02em;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.theme-swatch-add{background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--text-light);font-weight:300;border:2px dashed var(--border)}
+
+/* Detail panel */
+.theme-detail{padding:14px 0 4px;border-top:1px solid var(--border);margin-top:8px;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.theme-detail-name{font-size:15px;font-weight:600;color:var(--text);margin-bottom:12px;font-family:var(--font-cn)}
+.theme-color-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.theme-color-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-secondary);border-radius:8px}
+.theme-color-dot{width:22px;height:22px;border-radius:6px;flex-shrink:0;border:1px solid rgba(0,0,0,.08)}
+.theme-color-info{min-width:0}
+.theme-color-label{font-size:10px;color:var(--text-light);font-family:var(--font-cn)}
+.theme-color-hex{font-size:12px;color:var(--text);font-family:var(--font-en);letter-spacing:.02em}
+.theme-detail-actions{display:flex;gap:8px}
+.theme-detail-actions .btn{flex:1;padding:10px 0;font-size:13px;border-radius:10px;border:none;cursor:pointer;transition:all .15s;font-family:var(--font-cn)}
+.td-apply{background:var(--accent);color:var(--accent-contrast)}
+.td-apply:active{opacity:.85}
+.td-delete{background:var(--bg-secondary);color:var(--error)}
+.td-delete:active{opacity:.85}
+
+/* Create preset panel */
+.theme-create{padding:14px 0 4px;border-top:1px solid var(--border);margin-top:8px;animation:fadeIn .2s ease}
+.theme-create-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;font-family:var(--font-cn)}
+.tc-name-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font-cn);color:var(--text);background:var(--bg-card);margin-bottom:12px}
+.tc-name-input:focus{outline:none;border-color:var(--accent)}
+.tc-name-input::placeholder{color:var(--text-light)}
+.custom-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.custom-info{flex:1;min-width:0}
+.custom-label{font-size:13px;font-weight:600;color:var(--text);font-family:var(--font-cn)}
+.custom-desc{font-size:10px;color:var(--text-light);font-family:var(--font-cn);margin-top:1px}
+.custom-hex{width:72px;padding:5px 6px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font-en);color:var(--text);background:var(--bg-card);text-align:center;letter-spacing:.02em}
+.custom-hex:focus{outline:none;border-color:var(--accent)}
+.custom-picker{width:32px;height:32px;border:2px solid var(--border);border-radius:50%;cursor:pointer;padding:0;background:none;-webkit-appearance:none;appearance:none;overflow:hidden}
+.custom-picker::-webkit-color-swatch-wrapper{padding:0}
+.custom-picker::-webkit-color-swatch{border:none;border-radius:50%}
+.custom-picker::-moz-color-swatch{border:none;border-radius:50%}
+.custom-preview{display:flex;gap:6px;margin-top:10px;padding:10px;border-radius:var(--r-sm);border:1px solid var(--border)}
+.custom-preview-block{flex:1;height:28px;border-radius:6px;transition:background .2s}
+.tc-save{width:100%;padding:12px 0;margin-top:14px;background:var(--accent);color:var(--accent-contrast);border:none;border-radius:10px;font-size:14px;font-family:var(--font-cn);cursor:pointer;font-weight:500;transition:opacity .15s}
+.tc-save:active{opacity:.85}
+
+/* ---- Font settings ---- */
+.font-section{margin-top:4px}
+.font-section-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;font-family:var(--font-cn);display:flex;align-items:center;gap:6px}
+.font-section-label svg{width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.font-current{font-size:12px;color:var(--text-light);margin-bottom:10px;font-family:var(--font-cn);padding-left:22px}
+.font-current b{color:var(--text);font-weight:500}
+.font-actions{display:flex;gap:8px;margin-bottom:16px;padding-left:22px;flex-wrap:wrap}
+.font-btn{padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:12px;font-family:var(--font-cn);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.font-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.font-btn:active{background:var(--bg-secondary)}
+.font-btn-danger{color:var(--error);border-color:var(--error)}
+.font-url-row{display:flex;gap:8px;padding-left:22px;margin-bottom:16px}
+.font-url-input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font-en);color:var(--text);background:var(--bg-card)}
+.font-url-input:focus{outline:none;border-color:var(--accent)}
+.font-url-input::placeholder{color:var(--text-light)}
+.font-url-ok{padding:8px 14px;border:none;border-radius:8px;background:var(--accent);color:var(--accent-contrast);font-size:12px;cursor:pointer;font-family:var(--font-cn)}
+.font-shared-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--border);margin-top:4px}
+.font-shared-label{font-size:13px;color:var(--text);font-family:var(--font-cn);flex:1}
+.font-toggle{position:relative;width:42px;height:24px;background:var(--bg-secondary);border-radius:12px;border:none;cursor:pointer;transition:background .2s;padding:0;flex-shrink:0}
+.font-toggle.on{background:var(--accent)}
+.font-toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.font-toggle.on::after{transform:translateX(18px)}
+
+@media (max-width: 480px) {
+  .more-grid { gap: 12px; }
+  .more-card { padding: 22px 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="top-bar">
+  <div class="top-bar-left">
+    <div class="top-bar-avatar" id="topBarAvatar"></div>
+    <span class="top-bar-title" id="topBarTitle"></span>
+  </div>
+  <a href="index.html" class="top-bar-right top-bar-home" aria-label="返回首页" title="返回首页" style="display:grid;place-items:center;width:34px;height:34px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg></a>
+</header>
+
+<div class="page-wrap">
+
+  <div class="more-header">
+    <h1 class="more-title">More</h1>
+    <p class="more-sub">功能与设置</p>
+  </div>
+
+  <!-- Feature grid -->
+  <div class="more-grid">
+    <a href="letters.html" class="more-card">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      <span class="more-card-name">信箱</span>
+      <span class="more-card-desc">写给彼此的信</span>
+    </a>
+    <a href="moments.html" class="more-card">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span class="more-card-name">朋友圈</span>
+      <span class="more-card-desc">我们的日常动态</span>
+    </a>
+    <a href="companion-stats.html" class="more-card">
+      <svg viewBox="0 0 24 24"><path d="M20.5 14.1A8.5 8.5 0 0 1 9.9 3.5 8.5 8.5 0 1 0 20.5 14.1z"/><path d="M16.5 4.5v3M15 6h3"/></svg>
+      <span class="more-card-name">陪伴记录</span>
+      <span class="more-card-desc">我们一起度过的时间</span>
+    </a>
+    <a href="listening.html" class="more-card listening-more-card">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v11"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="15" r="2.5"/></svg>
+      <span class="more-card-name">一起听</span>
+      <span class="more-card-desc">把喜欢的歌一起听完</span>
+    </a>
+    <a href="wallet.html" class="more-card">
+      <svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H19a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 17.5z"/><path d="M4 7h15M16 13h3"/></svg>
+      <span class="more-card-name">钱包</span>
+      <span class="more-card-desc">我们之间的转账记录</span>
+    </a>
+    <a href="stickers.html" class="more-card">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8.5" cy="10" r="1"/><circle cx="15.5" cy="10" r="1"/><path d="M8 15c1.1 1 2.5 1.5 4 1.5s2.9-.5 4-1.5"/></svg>
+      <span class="more-card-name">表情包库</span>
+      <span class="more-card-desc">收集 TA 的小表情</span>
+    </a>
+  </div>
+
+  <!-- Settings section -->
+  <div class="more-section">
+    <div class="more-section-title">Settings</div>
+    <div class="settings-list">
+      <button class="settings-item" id="themeBtn">
+        <span class="settings-item-left">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <span>主题色彩</span>
+        </span>
+        <span class="settings-item-arrow">›</span>
+      </button>
+      <button class="settings-item" id="fontBtn">
+        <span class="settings-item-left">
+          <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9.5" y1="4" x2="9.5" y2="20"/><line x1="14.5" y1="4" x2="14.5" y2="20"/><line x1="7" y1="20" x2="17" y2="20"/></svg>
+          <span>字体设置</span>
+        </span>
+        <span class="settings-item-arrow">›</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Theme picker modal -->
+<div class="modal-overlay" id="themeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">选择主题</span>
+      <button class="modal-close" id="closeThemeModal">✕</button>
+    </div>
+
+    <!-- Scrollable theme row -->
+    <div class="theme-row-wrap">
+      <div class="theme-row" id="themeRow">
+        <!-- Built-in themes -->
+        <div class="theme-option" data-theme-id="blueberry">
+          <div class="theme-swatch" style="background: linear-gradient(135deg, #2D3E59, #C7D9F3, #F0F0E9)"></div>
+          <span class="theme-swatch-label">深海蓝莓</span>
+        </div>
+        <div class="theme-option" data-theme-id="mint">
+          <div class="theme-swatch" style="background: linear-gradient(135deg, #705854, #C1E6E4, #EBF6F7)"></div>
+          <span class="theme-swatch-label">薄荷生巧</span>
+        </div>
+        <div class="theme-option" data-theme-id="chestnut">
+          <div class="theme-swatch" style="background: linear-gradient(135deg, #5D492E, #EFDFB7, #F1E2DE)"></div>
+          <span class="theme-swatch-label">栗子芋泥</span>
+        </div>
+        <!-- Custom presets and + button inserted by JS -->
+      </div>
+    </div>
+
+    <!-- Detail panel (click a theme to see colors) -->
+    <div class="theme-detail" id="themeDetail" style="display:none">
+      <div class="theme-detail-name" id="tdName"></div>
+      <div class="theme-color-grid">
+        <div class="theme-color-item"><div class="theme-color-dot" id="tdBg"></div><div class="theme-color-info"><div class="theme-color-label">背景色</div><div class="theme-color-hex" id="tdBgH"></div></div></div>
+        <div class="theme-color-item"><div class="theme-color-dot" id="tdAc"></div><div class="theme-color-info"><div class="theme-color-label">主色</div><div class="theme-color-hex" id="tdAcH"></div></div></div>
+        <div class="theme-color-item"><div class="theme-color-dot" id="tdMd"></div><div class="theme-color-info"><div class="theme-color-label">辅色</div><div class="theme-color-hex" id="tdMdH"></div></div></div>
+        <div class="theme-color-item"><div class="theme-color-dot" id="tdLt"></div><div class="theme-color-info"><div class="theme-color-label">点缀色</div><div class="theme-color-hex" id="tdLtH"></div></div></div>
+      </div>
+      <div class="theme-detail-actions">
+        <button class="btn td-apply" id="tdApply">应用</button>
+        <button class="btn td-delete" id="tdDelete" style="display:none">删除</button>
+      </div>
+    </div>
+
+    <!-- Create preset panel (click + to open) -->
+    <div class="theme-create" id="themeCreate" style="display:none">
+      <div class="theme-create-title">创建自定义主题</div>
+      <input type="text" class="tc-name-input" id="presetName" placeholder="为你的主题取个名字" maxlength="12">
+      <div class="custom-row">
+        <div class="custom-info"><span class="custom-label">背景色</span><div class="custom-desc">页面底色，整体氛围</div></div>
+        <input type="text" class="custom-hex" id="cBg" value="#EBF6F7" maxlength="7">
+        <input type="color" class="custom-picker" id="cBgP" value="#EBF6F7">
+      </div>
+      <div class="custom-row">
+        <div class="custom-info"><span class="custom-label">主色</span><div class="custom-desc">按钮、标签页、今日标记</div></div>
+        <input type="text" class="custom-hex" id="cAc" value="#705854" maxlength="7">
+        <input type="color" class="custom-picker" id="cAcP" value="#705854">
+      </div>
+      <div class="custom-row">
+        <div class="custom-info"><span class="custom-label">辅色</span><div class="custom-desc">图标、边框、次要元素</div></div>
+        <input type="text" class="custom-hex" id="cMd" value="#A49E99" maxlength="7">
+        <input type="color" class="custom-picker" id="cMdP" value="#A49E99">
+      </div>
+      <div class="custom-row">
+        <div class="custom-info"><span class="custom-label">点缀色</span><div class="custom-desc">浅色装饰、卡片点缀</div></div>
+        <input type="text" class="custom-hex" id="cLt" value="#C1E6E4" maxlength="7">
+        <input type="color" class="custom-picker" id="cLtP" value="#C1E6E4">
+      </div>
+      <div class="custom-preview">
+        <div class="custom-preview-block" id="pvBg"></div>
+        <div class="custom-preview-block" id="pvAc"></div>
+        <div class="custom-preview-block" id="pvMd"></div>
+        <div class="custom-preview-block" id="pvLt"></div>
+      </div>
+      <button class="tc-save" id="savePresetBtn">保存预设</button>
+    </div>
+  </div>
+</div>
+
+<!-- Font settings modal -->
+<div class="modal-overlay" id="fontModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">字体设置</span>
+      <button class="modal-close" id="closeFontModal">✕</button>
+    </div>
+
+    <div class="font-section">
+      <div class="font-section-label">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="none"/><text x="12" y="16" text-anchor="middle" font-size="11" fill="currentColor" stroke="none" font-weight="600">中</text></svg>
+        中文字体
+      </div>
+      <div class="font-current" id="fontCnCurrent">当前: <b>系统默认</b></div>
+      <div class="font-actions">
+        <label class="font-btn" id="fontCnUpload">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上传字体
+          <input type="file" accept=".ttf,.otf,.woff,.woff2" style="display:none" id="fontCnFile">
+        </label>
+        <button class="font-btn" id="fontCnUrlBtn">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          字体链接
+        </button>
+        <button class="font-btn font-btn-danger" id="fontCnClear" style="display:none">清除</button>
+      </div>
+      <div class="font-url-row" id="fontCnUrlRow" style="display:none">
+        <input type="text" class="font-url-input" id="fontCnUrl" placeholder="粘贴字体文件链接 (.ttf/.woff2)">
+        <button class="font-url-ok" id="fontCnUrlOk">确定</button>
+      </div>
+    </div>
+
+    <div class="font-section" style="margin-top:16px">
+      <div class="font-section-label">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="none"/><text x="12" y="16" text-anchor="middle" font-size="10" fill="currentColor" stroke="none" font-weight="600">EN</text></svg>
+        英文字体
+      </div>
+      <div class="font-current" id="fontEnCurrent">当前: <b>系统默认</b></div>
+      <div class="font-actions" id="fontEnActions">
+        <label class="font-btn" id="fontEnUpload">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上传字体
+          <input type="file" accept=".ttf,.otf,.woff,.woff2" style="display:none" id="fontEnFile">
+        </label>
+        <button class="font-btn" id="fontEnUrlBtn">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          字体链接
+        </button>
+        <button class="font-btn font-btn-danger" id="fontEnClear" style="display:none">清除</button>
+      </div>
+      <div class="font-url-row" id="fontEnUrlRow" style="display:none">
+        <input type="text" class="font-url-input" id="fontEnUrl" placeholder="粘贴字体文件链接 (.ttf/.woff2)">
+        <button class="font-url-ok" id="fontEnUrlOk">确定</button>
+      </div>
+    </div>
+
+    <div class="font-shared-row">
+      <span class="font-shared-label">中英文使用同一字体</span>
+      <button class="font-toggle" id="fontSharedToggle"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Bottom Dock -->
+<nav class="dock">
+  <a href="index.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="dock-label">首页</span>
+  </a>
+  <a href="memories.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    <span class="dock-label">记忆</span>
+  </a>
+  <a href="chat.html" class="dock-center">
+    <div class="dock-center-btn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    <span class="dock-label">聊天</span>
+  </a>
+  <a href="calendar.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span class="dock-label">日历</span>
+  </a>
+  <a href="more.html" class="dock-item active">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="dock-label">更多</span>
+  </a>
+</nav>
+
+<script>
+/* ---- Color helpers ---- */
+function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function rgbToHex(r,g,b){return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');}
+function mixColor(c1,c2,t){var a=hexToRgb(c1),b=hexToRgb(c2);return rgbToHex(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t);}
+function luminance(hex){var rgb=hexToRgb(hex).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2];}
+
+function computeCustomVars(bg, accent, mid, light) {
+  var pale = mixColor(light, bg, 0.5);
+  var bgSec = mixColor(bg, '#808080', 0.12);
+  var textBase = luminance(bg) > 0.5 ? '#2A2420' : '#F0EDE8';
+  var textMid  = mixColor(textBase, bg, 0.35);
+  var textLt   = mixColor(textBase, bg, 0.55);
+  var ar = hexToRgb(accent);
+  var borderRgba = 'rgba(' + ar[0] + ',' + ar[1] + ',' + ar[2] + ',0.15)';
+  var sr = hexToRgb(mixColor(accent, '#000', 0.3));
+  var shadow = sr[0] + ',' + sr[1] + ',' + sr[2];
+  var contrast = luminance(accent) > 0.4 ? '#2A2420' : '#ffffff';
+  return {
+    accent: accent, 'accent-mid': mid, 'accent-light': light,
+    'accent-pale': pale, 'accent-contrast': contrast,
+    bg: bg, 'bg-card': luminance(bg) > 0.5 ? '#ffffff' : mixColor(bg, '#ffffff', 0.12),
+    'bg-secondary': bgSec,
+    text: textBase, 'text-mid': textMid, 'text-light': textLt,
+    border: borderRgba, 'shadow-color': shadow
+  };
+}
+
+function applyCustomVars(vars) {
+  var s = document.documentElement.style;
+  for (var k in vars) s.setProperty('--' + k, vars[k]);
+}
+
+function clearCustomVars() {
+  var s = document.documentElement.style;
+  ['accent','accent-mid','accent-light','accent-pale','accent-contrast',
+   'bg','bg-card','bg-secondary','text','text-mid','text-light',
+   'border','shadow-color'].forEach(function(k){ s.removeProperty('--' + k); });
+}
+
+/* ---- Built-in theme data ---- */
+var BUILT_IN_THEMES = {
+  blueberry: { name: '深海蓝莓', bg: '#F0F0E9', accent: '#2D3E59', mid: '#869BC0', light: '#C7D9F3' },
+  mint:      { name: '薄荷生巧', bg: '#EBF6F7', accent: '#705854', mid: '#A49E99', light: '#C1E6E4' },
+  chestnut:  { name: '栗子芋泥', bg: '#F1E2DE', accent: '#5D492E', mid: '#B1977A', light: '#EFDFB7' }
+};
+
+/* ---- Saved presets ---- */
+function getPresets() {
+  try { return JSON.parse(localStorage.getItem('iris-saved-themes')) || []; } catch(e) { return []; }
+}
+function savePresets(list) {
+  localStorage.setItem('iris-saved-themes', JSON.stringify(list));
+}
+
+/* ---- Render theme row ---- */
+var $row = document.getElementById('themeRow');
+var $detail = document.getElementById('themeDetail');
+var $create = document.getElementById('themeCreate');
+var currentTheme = localStorage.getItem('theme') || 'mint';
+var selectedThemeId = null;
+
+function renderThemeRow() {
+  // Remove preset swatches and + button (keep first 3 built-in)
+  var children = Array.from($row.children);
+  children.forEach(function(c, i) { if (i >= 3) $row.removeChild(c); });
+
+  var presets = getPresets();
+  presets.forEach(function(p) {
+    var opt = document.createElement('div');
+    opt.className = 'theme-option';
+    opt.dataset.themeId = p.id;
+    var sw = document.createElement('div');
+    sw.className = 'theme-swatch' + (currentTheme === p.id ? ' active' : '');
+    sw.style.background = 'linear-gradient(135deg, ' + p.colors.accent + ', ' + p.colors.light + ', ' + p.colors.bg + ')';
+    var lbl = document.createElement('span');
+    lbl.className = 'theme-swatch-label';
+    lbl.textContent = p.name;
+    opt.appendChild(sw);
+    opt.appendChild(lbl);
+    $row.appendChild(opt);
+  });
+
+  // Add "+" button
+  var addOpt = document.createElement('div');
+  addOpt.className = 'theme-option theme-add';
+  addOpt.id = 'themeAddBtn';
+  var addSw = document.createElement('div');
+  addSw.className = 'theme-swatch theme-swatch-add';
+  addSw.textContent = '+';
+  var addLbl = document.createElement('span');
+  addLbl.className = 'theme-swatch-label';
+  addLbl.textContent = '新增';
+  addOpt.appendChild(addSw);
+  addOpt.appendChild(addLbl);
+  $row.appendChild(addOpt);
+
+  updateSwatchActive();
+  bindSwatchClicks();
+}
+
+function updateSwatchActive() {
+  $row.querySelectorAll('.theme-swatch').forEach(function(s) {
+    var opt = s.closest('.theme-option');
+    if (!opt) return;
+    s.classList.toggle('active', opt.dataset.themeId === currentTheme);
+  });
+}
+
+function bindSwatchClicks() {
+  $row.querySelectorAll('.theme-option').forEach(function(opt) {
+    opt.onclick = function() {
+      if (opt.classList.contains('theme-add')) {
+        // Open create panel
+        $detail.style.display = 'none';
+        $create.style.display = $create.style.display === 'none' ? 'block' : 'none';
+        selectedThemeId = null;
+        return;
+      }
+      var id = opt.dataset.themeId;
+      selectedThemeId = id;
+      $create.style.display = 'none';
+      showThemeDetail(id);
+    };
+  });
+}
+
+function showThemeDetail(id) {
+  var info = BUILT_IN_THEMES[id];
+  var isPreset = false;
+  if (!info) {
+    // Look in presets
+    var presets = getPresets();
+    for (var i = 0; i < presets.length; i++) {
+      if (presets[i].id === id) { info = { name: presets[i].name, bg: presets[i].colors.bg, accent: presets[i].colors.accent, mid: presets[i].colors.mid, light: presets[i].colors.light }; isPreset = true; break; }
+    }
+  }
+  if (!info) return;
+
+  document.getElementById('tdName').textContent = info.name;
+  document.getElementById('tdBg').style.background = info.bg;
+  document.getElementById('tdBgH').textContent = info.bg;
+  document.getElementById('tdAc').style.background = info.accent;
+  document.getElementById('tdAcH').textContent = info.accent;
+  document.getElementById('tdMd').style.background = info.mid;
+  document.getElementById('tdMdH').textContent = info.mid;
+  document.getElementById('tdLt').style.background = info.light;
+  document.getElementById('tdLtH').textContent = info.light;
+  document.getElementById('tdDelete').style.display = isPreset ? '' : 'none';
+  $detail.style.display = 'block';
+}
+
+/* Apply theme */
+document.getElementById('tdApply').addEventListener('click', function() {
+  if (!selectedThemeId) return;
+  var builtIn = BUILT_IN_THEMES[selectedThemeId];
+  if (builtIn) {
+    clearCustomVars();
+    localStorage.removeItem('custom-theme');
+    document.documentElement.dataset.theme = selectedThemeId;
+    localStorage.setItem('theme', selectedThemeId);
+  } else {
+    // Custom preset
+    var presets = getPresets();
+    for (var i = 0; i < presets.length; i++) {
+      if (presets[i].id === selectedThemeId) {
+        var vars = presets[i].vars || computeCustomVars(presets[i].colors.bg, presets[i].colors.accent, presets[i].colors.mid, presets[i].colors.light);
+        document.documentElement.dataset.theme = 'custom';
+        applyCustomVars(vars);
+        localStorage.setItem('theme', selectedThemeId);
+        localStorage.setItem('custom-theme', JSON.stringify(vars));
+        break;
+      }
+    }
+  }
+  currentTheme = selectedThemeId;
+  updateSwatchActive();
+  showToast('主题已切换');
+});
+
+/* Delete preset */
+document.getElementById('tdDelete').addEventListener('click', function() {
+  if (!selectedThemeId) return;
+  var presets = getPresets();
+  presets = presets.filter(function(p) { return p.id !== selectedThemeId; });
+  savePresets(presets);
+  // If deleted theme was active, revert to mint
+  if (currentTheme === selectedThemeId) {
+    clearCustomVars();
+    localStorage.removeItem('custom-theme');
+    document.documentElement.dataset.theme = 'mint';
+    localStorage.setItem('theme', 'mint');
+    currentTheme = 'mint';
+  }
+  selectedThemeId = null;
+  $detail.style.display = 'none';
+  renderThemeRow();
+  showToast('已删除');
+});
+
+/* ---- Create preset ---- */
+var hexInputs = { bg: document.getElementById('cBg'), accent: document.getElementById('cAc'), mid: document.getElementById('cMd'), light: document.getElementById('cLt') };
+var pickInputs = { bg: document.getElementById('cBgP'), accent: document.getElementById('cAcP'), mid: document.getElementById('cMdP'), light: document.getElementById('cLtP') };
+var previews = { bg: document.getElementById('pvBg'), accent: document.getElementById('pvAc'), mid: document.getElementById('pvMd'), light: document.getElementById('pvLt') };
+
+function getCustomColors() {
+  return { bg: hexInputs.bg.value, accent: hexInputs.accent.value, mid: hexInputs.mid.value, light: hexInputs.light.value };
+}
+
+function syncPreview() {
+  var c = getCustomColors();
+  previews.bg.style.background = c.bg;
+  previews.accent.style.background = c.accent;
+  previews.mid.style.background = c.mid;
+  previews.light.style.background = c.light;
+}
+
+var hexRe = /^#[0-9A-Fa-f]{6}$/;
+['bg','accent','mid','light'].forEach(function(k) {
+  hexInputs[k].addEventListener('input', function() {
+    var v = this.value;
+    if (!v.startsWith('#')) v = '#' + v;
+    if (hexRe.test(v)) { pickInputs[k].value = v; syncPreview(); }
+  });
+  hexInputs[k].addEventListener('blur', function() {
+    var v = this.value;
+    if (!v.startsWith('#')) v = '#' + v;
+    if (hexRe.test(v)) { this.value = v; } else { this.value = pickInputs[k].value; }
+  });
+  pickInputs[k].addEventListener('input', function() {
+    hexInputs[k].value = this.value; syncPreview();
+  });
+});
+
+syncPreview();
+
+document.getElementById('savePresetBtn').addEventListener('click', function() {
+  var name = document.getElementById('presetName').value.trim();
+  if (!name) { showToast('请输入主题名称', 'error'); return; }
+  var c = getCustomColors();
+  if (!hexRe.test(c.bg) || !hexRe.test(c.accent) || !hexRe.test(c.mid) || !hexRe.test(c.light)) {
+    showToast('颜色格式有误', 'error'); return;
+  }
+  var vars = computeCustomVars(c.bg, c.accent, c.mid, c.light);
+  var preset = {
+    id: 'preset-' + Date.now(),
+    name: name,
+    colors: { bg: c.bg, accent: c.accent, mid: c.mid, light: c.light },
+    vars: vars
+  };
+  var presets = getPresets();
+  presets.push(preset);
+  savePresets(presets);
+
+  // Apply the new preset immediately
+  document.documentElement.dataset.theme = 'custom';
+  applyCustomVars(vars);
+  localStorage.setItem('theme', preset.id);
+  localStorage.setItem('custom-theme', JSON.stringify(vars));
+  currentTheme = preset.id;
+
+  $create.style.display = 'none';
+  document.getElementById('presetName').value = '';
+  renderThemeRow();
+  showToast('预设「' + name + '」已保存并应用');
+});
+
+/* ---- Theme modal open/close ---- */
+document.getElementById('themeBtn').addEventListener('click', function() {
+  document.getElementById('themeModal').classList.add('open');
+  $detail.style.display = 'none';
+  $create.style.display = 'none';
+  renderThemeRow();
+});
+document.getElementById('closeThemeModal').addEventListener('click', function() {
+  document.getElementById('themeModal').classList.remove('open');
+});
+document.getElementById('themeModal').addEventListener('click', function(e) {
+  if (e.target === e.currentTarget) document.getElementById('themeModal').classList.remove('open');
+});
+
+/* ============ FONT SETTINGS ============ */
+var fontData = (function() {
+  try { return JSON.parse(localStorage.getItem('iris-custom-fonts')) || {}; } catch(e) { return {}; }
+})();
+
+function saveFontData() {
+  localStorage.setItem('iris-custom-fonts', JSON.stringify(fontData));
+}
+
+function refreshFontUI() {
+  var cnName = fontData.cn && fontData.cn.name ? fontData.cn.name : null;
+  var enName = fontData.en && fontData.en.name ? fontData.en.name : null;
+  document.getElementById('fontCnCurrent').innerHTML = '当前: <b>' + (cnName || '系统默认') + '</b>';
+  document.getElementById('fontEnCurrent').innerHTML = '当前: <b>' + (enName || '系统默认') + '</b>';
+  document.getElementById('fontCnClear').style.display = cnName ? '' : 'none';
+  document.getElementById('fontEnClear').style.display = enName ? '' : 'none';
+  // Toggle state
+  var toggle = document.getElementById('fontSharedToggle');
+  toggle.classList.toggle('on', !!fontData.shared);
+  // When shared, disable EN section
+  var enActions = document.getElementById('fontEnActions');
+  var enUrlRow = document.getElementById('fontEnUrlRow');
+  if (fontData.shared) {
+    enActions.style.opacity = '0.4';
+    enActions.style.pointerEvents = 'none';
+    enUrlRow.style.display = 'none';
+    document.getElementById('fontEnCurrent').innerHTML = '当前: <b>' + (cnName || '系统默认') + ' (同中文)</b>';
+  } else {
+    enActions.style.opacity = '';
+    enActions.style.pointerEvents = '';
+  }
+}
+
+function applyFontsLive() {
+  // Inject @font-face and update CSS vars live
+  var old = document.getElementById('customFontStyle');
+  if (old) old.remove();
+
+  var cnSrc = fontData.cn && fontData.cn.src;
+  var enSrc = fontData.en && fontData.en.src;
+  if (fontData.shared && cnSrc) enSrc = cnSrc;
+
+  var css = '';
+  var ds = document.documentElement.style;
+
+  if (cnSrc) {
+    css += '@font-face{font-family:"IrisCN";src:url("' + cnSrc + '");font-display:swap}';
+    ds.setProperty('--font-cn', '"IrisCN","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif');
+    ds.setProperty('--font-b', '"IrisCN","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif');
+  } else {
+    ds.removeProperty('--font-cn');
+    ds.removeProperty('--font-b');
+  }
+
+  if (enSrc) {
+    css += '@font-face{font-family:"IrisEN";src:url("' + enSrc + '");font-display:swap}';
+    ds.setProperty('--font-en', '"IrisEN","Cormorant Garamond","Georgia",serif');
+    ds.setProperty('--font-d', '"IrisEN","Cormorant Garamond","Georgia",serif');
+  } else {
+    ds.removeProperty('--font-en');
+    ds.removeProperty('--font-d');
+  }
+
+  if (css) {
+    var st = document.createElement('style');
+    st.id = 'customFontStyle';
+    st.textContent = css;
+    document.head.appendChild(st);
+  }
+}
+
+var API_KEY = 'iris-memory-2024';
+
+function handleFontFile(file, lang) {
+  if (!file) return;
+  if (file.size > 20 * 1024 * 1024) {
+    showToast('字体文件不能超过 20MB', 'error');
+    return;
+  }
+  showToast('上传中…');
+  file.arrayBuffer().then(function(buf) {
+    return fetch('/api/upload-font?name=' + encodeURIComponent(file.name), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'x-api-key': API_KEY },
+      body: buf
+    });
+  }).then(function(r) {
+    if (!r.ok) { return r.text().then(function(t) { throw new Error(r.status + ': ' + t); }); }
+    return r.json();
+  }).then(function(data) {
+    if (data.error) { showToast('上传失败: ' + data.error, 'error'); return; }
+    if (!fontData[lang]) fontData[lang] = {};
+    fontData[lang].name = file.name;
+    fontData[lang].src = data.url;
+    saveFontData();
+    applyFontsLive();
+    refreshFontUI();
+    showToast('字体已上传: ' + file.name);
+  }).catch(function(e) {
+    showToast('上传失败: ' + (e.message || '网络错误'), 'error');
+    console.error('Font upload error:', e);
+  });
+}
+
+function handleFontUrl(url, lang) {
+  url = url.trim();
+  if (!url) return;
+  if (!fontData[lang]) fontData[lang] = {};
+  // Extract filename from URL
+  var parts = url.split('/');
+  var fname = parts[parts.length - 1].split('?')[0] || '自定义字体';
+  fontData[lang].name = fname;
+  fontData[lang].src = url;
+  saveFontData();
+  applyFontsLive();
+  refreshFontUI();
+  showToast('字体已设置: ' + fname);
+}
+
+// CN file upload
+document.getElementById('fontCnFile').addEventListener('change', function() {
+  handleFontFile(this.files[0], 'cn'); this.value = '';
+});
+// EN file upload
+document.getElementById('fontEnFile').addEventListener('change', function() {
+  handleFontFile(this.files[0], 'en'); this.value = '';
+});
+// CN URL toggle
+document.getElementById('fontCnUrlBtn').addEventListener('click', function() {
+  var row = document.getElementById('fontCnUrlRow');
+  row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+});
+document.getElementById('fontCnUrlOk').addEventListener('click', function() {
+  handleFontUrl(document.getElementById('fontCnUrl').value, 'cn');
+  document.getElementById('fontCnUrlRow').style.display = 'none';
+  document.getElementById('fontCnUrl').value = '';
+});
+// EN URL toggle
+document.getElementById('fontEnUrlBtn').addEventListener('click', function() {
+  var row = document.getElementById('fontEnUrlRow');
+  row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+});
+document.getElementById('fontEnUrlOk').addEventListener('click', function() {
+  handleFontUrl(document.getElementById('fontEnUrl').value, 'en');
+  document.getElementById('fontEnUrlRow').style.display = 'none';
+  document.getElementById('fontEnUrl').value = '';
+});
+// Clear buttons
+document.getElementById('fontCnClear').addEventListener('click', function() {
+  delete fontData.cn;
+  saveFontData(); applyFontsLive(); refreshFontUI();
+  showToast('已恢复默认中文字体');
+});
+document.getElementById('fontEnClear').addEventListener('click', function() {
+  delete fontData.en;
+  saveFontData(); applyFontsLive(); refreshFontUI();
+  showToast('已恢复默认英文字体');
+});
+// Shared toggle
+document.getElementById('fontSharedToggle').addEventListener('click', function() {
+  fontData.shared = !fontData.shared;
+  saveFontData(); applyFontsLive(); refreshFontUI();
+});
+
+// Font modal open/close
+document.getElementById('fontBtn').addEventListener('click', function() {
+  refreshFontUI();
+  document.getElementById('fontModal').classList.add('open');
+});
+document.getElementById('closeFontModal').addEventListener('click', function() {
+  document.getElementById('fontModal').classList.remove('open');
+});
+document.getElementById('fontModal').addEventListener('click', function(e) {
+  if (e.target === e.currentTarget) document.getElementById('fontModal').classList.remove('open');
+});
+
+/* ---- Chat notification settings ---- */
+(function(){
+  var state = { enabled:false, mode:'combined', bubbleIntervalSeconds:2 };
+  var modal = document.getElementById('notificationModal');
+  if (!modal) return;
+  var enabled = document.getElementById('noticeEnabled');
+  var options = document.getElementById('noticeOptions');
+  var mode = document.getElementById('noticeMode');
+  var interval = document.getElementById('noticeInterval');
+  var intervalRow = document.getElementById('noticeIntervalRow');
+  var status = document.getElementById('noticeStatus');
+  var test = document.getElementById('noticeTest');
+
+  function request(path, options) {
+    options = options || {};
+    return fetch(path, Object.assign({}, options, {
+      headers: Object.assign({ 'Content-Type':'application/json', 'x-api-key':API_KEY }, options.headers || {})
+    })).then(function(response) {
+      return response.json().catch(function(){ return {}; }).then(function(data) {
+        if (!response.ok) throw new Error(data.error || '请求失败');
+        return data;
+      });
+    });
+  }
+  function permissionText() {
+    var value = window.IrisPwaNotifications && window.IrisPwaNotifications.permission ? window.IrisPwaNotifications.permission() : 'unsupported';
+    if (value === 'granted') return '系统通知已允许。';
+    if (value === 'denied') return '系统通知被浏览器拒绝，请在浏览器的网站设置中重新允许。';
+    return '打开总开关后会请求系统通知权限。';
+  }
+  function setStatus(text, error) {
+    status.textContent = text || '';
+    status.classList.toggle('error', !!error);
+  }
+  function paint() {
+    state.mode = state.mode === 'each' ? 'each' : 'combined';
+    state.bubbleIntervalSeconds = [1,2,3,5].indexOf(Number(state.bubbleIntervalSeconds)) >= 0 ? Number(state.bubbleIntervalSeconds) : 2;
+    enabled.classList.toggle('on', !!state.enabled);
+    enabled.setAttribute('aria-checked', state.enabled ? 'true' : 'false');
+    options.hidden = !state.enabled;
+    mode.value = state.mode;
+    interval.value = String(state.bubbleIntervalSeconds);
+    intervalRow.hidden = state.mode !== 'each';
+    test.disabled = !state.enabled;
+    setStatus(permissionText(), window.IrisPwaNotifications && window.IrisPwaNotifications.permission && window.IrisPwaNotifications.permission() === 'denied');
+  }
+  function load() {
+    setStatus('正在读取通知设置…');
+    return request('/api/chat/notifications').then(function(data) {
+      state = data.settings || state;
+      paint();
+    }).catch(function(error) { setStatus(error.message || '读取失败', true); });
+  }
+  function save(next, askPermission) {
+    var prepare = Promise.resolve();
+    if (askPermission) {
+      if (!window.IrisPwaNotifications || !window.IrisPwaNotifications.enable) return Promise.reject(new Error('通知组件尚未加载，请刷新页面后重试'));
+      prepare = window.IrisPwaNotifications.enable();
+    }
+    return prepare.then(function(){
+      return request('/api/chat/notifications', { method:'PUT', body:JSON.stringify(next) });
+    }).then(function(data) {
+      state = data.settings || next;
+      paint();
+      return state;
+    });
+  }
+
+  document.getElementById('notificationBtn').addEventListener('click', function(){ modal.classList.add('open'); load(); });
+  document.getElementById('closeNotificationModal').addEventListener('click', function(){ modal.classList.remove('open'); });
+  modal.addEventListener('click', function(event){ if (event.target === modal) modal.classList.remove('open'); });
+  enabled.addEventListener('click', function(){
+    var nextEnabled = !state.enabled;
+    enabled.disabled = true;
+    save({ enabled:nextEnabled, mode:state.mode, bubbleIntervalSeconds:state.bubbleIntervalSeconds }, nextEnabled).then(function(){
+      showToast(nextEnabled ? '消息提醒已开启' : '消息提醒已关闭');
+    }).catch(function(error){
+      state.enabled = false; paint(); setStatus(error.message || '无法开启通知', true); showToast(error.message || '无法开启通知', 'error');
+    }).finally(function(){ enabled.disabled = false; });
+  });
+  mode.addEventListener('change', function(){
+    save({ enabled:state.enabled, mode:mode.value, bubbleIntervalSeconds:state.bubbleIntervalSeconds }).catch(function(error){ paint(); showToast('保存失败：' + error.message, 'error'); });
+  });
+  interval.addEventListener('change', function(){
+    save({ enabled:state.enabled, mode:state.mode, bubbleIntervalSeconds:Number(interval.value) }).catch(function(error){ paint(); showToast('保存失败：' + error.message, 'error'); });
+  });
+  test.addEventListener('click', function(){
+    test.disabled = true; test.textContent = '发送中…';
+    request('/api/chat/notifications/test', { method:'POST', body:'{}' }).then(function(){
+      setStatus('系统测试通知已发送，请查看手机通知栏。'); showToast('测试通知已发送');
+    }).catch(function(error){ setStatus(error.message || '测试失败', true); showToast(error.message || '测试失败', 'error');
+    }).finally(function(){ test.disabled = !state.enabled; test.textContent = '发送测试通知'; });
+  });
+})();
+
+/* ---- Top bar init ---- */
+(function(){
+  var a = localStorage.getItem('iris_avatar_img1');
+  var n = localStorage.getItem('iris_avatar_name1') || 'Iris';
+  var t = localStorage.getItem('iris_topbar_title') || (n + '的小窝');
+  var ae = document.getElementById('topBarAvatar');
+  var te = document.getElementById('topBarTitle');
+  if(a && ae) ae.innerHTML = '<img src="'+a+'" alt="">';
+  else if(ae) ae.innerHTML = '<span class="top-bar-avatar-initial">'+n.charAt(0).toUpperCase()+'</span>';
+  if(te) te.textContent = t;
+  if(te) te.onclick = function(){
+    var v = prompt('自定义顶栏文字', te.textContent);
+    if(v && v.trim()){ te.textContent = v.trim(); localStorage.setItem('iris_topbar_title', v.trim()); }
+  };
+})();
+
+/* ---- Toast ---- */
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function() { t.className = 'toast'; }, 2000);
+}
+
+/* Init font UI */
+refreshFontUI();
+</script>
+</body>
+</html>

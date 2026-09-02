@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>朋友圈 · irisandclaude</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;background:#fff;color:#333;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+img{display:block}
+button{font-family:inherit}
+
+/* ---- Sticky Header ---- */
+.m-sticky-header{position:fixed;top:0;left:0;right:0;height:calc(44px + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px);background:#fff;border-bottom:.5px solid #e5e5e5;display:flex;align-items:center;z-index:100;transform:translateY(-100%);transition:transform .25s ease}
+.m-sticky-header.visible{transform:translateY(0)}
+.m-sh-back{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:#333;flex-shrink:0;margin-left:4px}
+.m-sh-back svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.m-sh-title{flex:1;text-align:center;font-size:16px;font-weight:600;color:#333}
+.m-sh-actions{display:flex;gap:6px;margin-right:10px}
+.m-sh-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:#333;position:relative;border-radius:50%}
+.m-sh-btn:active{background:#f0f0f0}
+.m-sh-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.m-sh-dot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#e74c3c;border:1.5px solid #fff}
+
+/* ---- Cover ---- */
+.m-cover{position:relative;height:320px;background:#2a2a3a;overflow:hidden}
+.m-cover-img{width:100%;height:100%;object-fit:cover;cursor:pointer}
+.m-cover-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#2a2a3a 0%,#3a4a5a 50%,#2a3a4a 100%)}
+.m-back{position:absolute;top:max(14px,env(safe-area-inset-top));left:14px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.3);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.m-back svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.m-top-actions{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;display:flex;gap:10px;z-index:5}
+.m-top-btn{width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.3);border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);position:relative}
+.m-top-btn svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.m-notif-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#e74c3c;border:1.5px solid rgba(0,0,0,.3)}
+
+/* ---- Profile row ---- */
+.m-profile-row{display:flex;align-items:flex-end;justify-content:flex-end;padding:0 16px;margin-top:-40px;position:relative;z-index:2}
+.m-profile-name{color:#fff;font-size:20px;font-weight:600;margin-right:14px;text-shadow:0 1px 6px rgba(0,0,0,.6);cursor:pointer;align-self:center;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-avatar-wrap{width:72px;height:72px;border-radius:10px;overflow:hidden;flex-shrink:0;cursor:pointer;background:#ddd;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.m-avatar-wrap img{width:100%;height:100%;object-fit:cover}
+.m-avatar-initial{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600;color:#fff;background:#a0b4c8}
+
+/* ---- Bio ---- */
+.m-bio{font-size:13px;color:#888;padding:10px 16px 8px;cursor:pointer;text-align:right;min-height:32px}
+
+/* ---- Notification bar ---- */
+.m-notif-bar{margin:8px 16px;background:#4c4c4c;border-radius:20px;padding:6px 12px 6px 6px;display:flex;align-items:center;gap:8px;cursor:pointer;color:#fff;width:fit-content;margin-left:auto;margin-right:16px}
+.m-notif-bar-av{width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#666}
+.m-notif-bar-text{flex:1;font-size:12px;white-space:nowrap}
+.m-notif-bar-initial{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;background:#7a8a9a;flex-shrink:0}
+.m-notif-bar-badge{min-width:16px;height:16px;border-radius:8px;background:#e74c3c;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0}
+
+/* ---- Pinned Section ---- */
+.m-pinned{margin:0 0 4px;padding:12px 0;border-bottom:.5px solid #eee;display:none}
+.m-pinned.show{display:block}
+.m-pinned-row{display:flex;align-items:center;gap:0;padding:0 16px;overflow:hidden}
+.m-pinned-label{font-size:14px;font-weight:600;color:#333;flex-shrink:0;margin-right:12px}
+.m-pinned-scroll{display:flex;gap:6px;overflow-x:auto;flex:1;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none}
+.m-pinned-scroll::-webkit-scrollbar{display:none}
+.m-pinned-item{width:60px;height:60px;border-radius:6px;overflow:hidden;flex-shrink:0;cursor:pointer;background:#f0f0f0;position:relative}
+.m-pinned-item img{width:100%;height:100%;object-fit:cover}
+.m-pinned-item-text{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:4px;font-size:10px;color:#666;text-align:center;line-height:1.3;overflow:hidden;background:#f5f5f5}
+.m-pinned-arrow{flex-shrink:0;color:#ccc;font-size:18px;margin-left:6px;cursor:pointer}
+
+/* ---- Feed ---- */
+.m-feed{padding-bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+.m-empty{text-align:center;padding:60px 20px;color:#b2b2b2;font-size:14px}
+
+/* ---- Post ---- */
+.m-post{padding:14px 16px 10px;border-bottom:.5px solid #eee}
+.m-post-head{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start}
+.m-post-av{width:42px;height:42px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#eee}
+.m-post-author{font-size:15px;font-weight:600;color:#576b95;line-height:1.3}
+.m-post-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
+.m-post-badge.private{background:#f0f0f0;color:#999}
+.m-post-badge.scheduled{background:#fff3e0;color:#e67e22}
+.m-post-text{font-size:15px;line-height:1.6;color:#333;margin-bottom:4px;white-space:pre-wrap;word-break:break-word}
+
+/* Image grid */
+.m-post-imgs{display:grid;gap:4px;margin:6px 0;max-width:280px}
+.m-post-imgs.cols-1{grid-template-columns:1fr;max-width:200px}
+.m-post-imgs.cols-2{grid-template-columns:1fr 1fr}
+.m-post-imgs.cols-3{grid-template-columns:1fr 1fr 1fr}
+.m-post-img-wrap{aspect-ratio:1;overflow:hidden;border-radius:4px;cursor:pointer;background:#f0f0f0}
+.m-post-img-wrap img{width:100%;height:100%;object-fit:cover}
+
+/* Footer */
+.m-post-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.m-post-meta{display:flex;gap:8px;align-items:center;flex:1;min-width:0}
+.m-post-time{font-size:12px;color:#b2b2b2}
+.m-post-loc{font-size:12px;color:#576b95}
+
+/* Three-dot menu */
+.m-post-menu-wrap{position:relative;flex-shrink:0}
+.m-post-dots{display:flex;align-items:center;justify-content:center;gap:3px;padding:5px 10px;background:#f0f0f0;border:none;border-radius:10px;cursor:pointer}
+.m-post-dots:active{background:#e5e5e5}
+.m-post-dot{width:4px;height:4px;background:#888;border-radius:50%}
+
+/* Popup */
+.m-post-popup{position:absolute;right:42px;top:50%;transform:translateY(-50%);background:#4c4c4c;border-radius:6px;display:flex;align-items:stretch;opacity:0;pointer-events:none;transition:opacity .15s;z-index:20;white-space:nowrap}
+.m-post-popup.open{opacity:1;pointer-events:auto}
+.m-post-popup::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:0;height:0;border:5px solid transparent;border-left-color:#4c4c4c;border-right:0}
+.m-popup-item{display:flex;align-items:center;gap:5px;padding:10px 14px;color:#fff;font-size:13px;cursor:pointer;transition:background .1s}
+.m-popup-item:active{background:rgba(255,255,255,.12)}
+.m-popup-item+.m-popup-item{border-left:.5px solid rgba(255,255,255,.18)}
+.m-popup-item svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.m-popup-item.liked svg{fill:#e74c3c;stroke:#e74c3c}
+
+/* Interactions area */
+.m-interact{background:#f7f7f7;border-radius:4px;margin-top:8px;overflow:hidden;font-size:13px}
+.m-likes{padding:5px 8px;display:flex;flex-wrap:wrap;gap:2px 4px;align-items:center;color:#576b95;line-height:1.5}
+.m-likes svg{width:13px;height:13px;fill:#e74c3c;stroke:none;flex-shrink:0;margin-right:2px}
+.m-likes+.m-comments{border-top:1px solid #e5e5e5}
+.m-comments{padding:2px 0}
+.m-comment{padding:3px 8px;line-height:1.5;cursor:pointer}
+.m-comment:active{background:#eee}
+.m-c-name{color:#576b95;font-weight:600}
+.m-c-reply{color:#576b95;font-weight:600}
+.m-c-text{color:#333}
+
+/* ---- Comment bar ---- */
+.m-comment-bar{position:fixed;bottom:calc(60px + env(safe-area-inset-bottom,0px));left:0;right:0;background:#f7f7f7;border-top:1px solid #ddd;padding:8px 12px;display:flex;gap:8px;z-index:50;transform:translateY(100%);transition:transform .25s}
+.m-comment-bar.open{transform:translateY(0)}
+.m-comment-input{flex:1;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:14px;outline:none;background:#fff;font-family:inherit}
+.m-comment-input:focus{border-color:#576b95}
+.m-comment-send{background:#576b95;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:14px;cursor:pointer;flex-shrink:0}
+.m-comment-send:active{opacity:.8}
+
+/* ---- Bottom Dock ---- */
+.m-dock{position:fixed;bottom:0;left:0;right:0;height:calc(56px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:#fff;border-top:.5px solid #e0e0e0;display:flex;align-items:stretch;justify-content:space-around;z-index:90}
+.m-dock-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex:1;background:none;border:none;cursor:pointer;color:#999;-webkit-tap-highlight-color:transparent;padding:6px 0 4px;transition:color .2s}
+.m-dock-item svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+.m-dock-label{font-size:10px;letter-spacing:.02em;line-height:1}
+.m-dock-item.active{color:#576b95}
+
+/* ---- Bottom sheet ---- */
+.m-sheet{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.m-sheet.open{opacity:1;pointer-events:auto}
+.m-sheet-card{width:100%;max-width:440px;background:#fff;border-radius:14px 14px 0 0;padding:0 0 max(16px,env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,.24,1.02)}
+.m-sheet.open .m-sheet-card{transform:translateY(0)}
+.m-sheet-handle{width:36px;height:4px;border-radius:2px;background:#ddd;margin:10px auto 6px}
+.m-sheet-option{padding:16px 20px;font-size:16px;text-align:center;cursor:pointer;color:#333;border-bottom:1px solid #f0f0f0;transition:background .15s}
+.m-sheet-option:active{background:#f7f7f7}
+.m-sheet-option.cancel{color:#999;border-bottom:none;margin-top:6px}
+
+/* ---- Compose overlay ---- */
+.m-compose{position:fixed;inset:0;background:#fff;z-index:120;transform:translateX(100%);transition:transform .3s ease;overflow-y:auto}
+.m-compose.open{transform:translateX(0)}
+.m-compose-bar{display:flex;justify-content:space-between;align-items:center;padding:max(12px,env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid #f0f0f0;position:sticky;top:0;background:#fff;z-index:2}
+.m-compose-cancel{background:none;border:none;font-size:15px;color:#333;cursor:pointer;padding:4px 8px}
+.m-compose-title{font-size:15px;font-weight:600;color:#333}
+.m-compose-submit{background:#576b95;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:14px;cursor:pointer;font-weight:600}
+.m-compose-submit:disabled{opacity:.4;cursor:default}
+.m-compose-submit:not(:disabled):active{opacity:.8}
+.m-compose-body{padding:16px}
+.m-compose-text{width:100%;min-height:120px;border:none;outline:none;font-size:16px;line-height:1.6;resize:none;color:#333;font-family:inherit}
+.m-compose-text::placeholder{color:#bbb}
+
+/* Compose images */
+.m-compose-imgs{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.m-compose-img-wrap{width:80px;height:80px;border-radius:6px;overflow:hidden;position:relative;background:#f0f0f0}
+.m-compose-img-wrap img{width:100%;height:100%;object-fit:cover}
+.m-compose-img-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.m-compose-add{width:80px;height:80px;border-radius:6px;border:1px dashed #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ccc;font-size:32px;background:none;transition:border-color .15s}
+.m-compose-add:active{border-color:#999;color:#999}
+
+/* Compose settings */
+.m-compose-settings{margin-top:20px;border-top:1px solid #f0f0f0;padding-top:12px}
+.m-compose-row{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid #f5f5f5;cursor:pointer;gap:10px}
+.m-compose-row svg{width:18px;height:18px;fill:none;stroke:#666;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.m-compose-row-label{flex:1;font-size:14px;color:#333}
+.m-compose-row-value{font-size:13px;color:#999}
+.m-compose-row-arrow{color:#ccc;font-size:14px}
+.m-compose-gps{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;border:none;border-radius:50%;cursor:pointer;flex-shrink:0;color:#576b95;transition:background .15s}
+.m-compose-gps:active{background:#e8e8e8}
+.m-compose-gps svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Visibility options */
+.m-vis-options{padding:8px 0 0 28px;display:none}
+.m-vis-options.open{display:block}
+.m-vis-option{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;color:#666;cursor:pointer}
+.m-vis-radio{width:16px;height:16px;border-radius:50%;border:2px solid #ccc;flex-shrink:0;position:relative;transition:border-color .15s}
+.m-vis-radio.checked{border-color:#576b95}
+.m-vis-radio.checked::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#576b95}
+.m-vis-datetime{margin-left:24px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;color:#333;display:none}
+.m-vis-datetime.show{display:block}
+
+/* ---- Notification sheet ---- */
+.m-notif-list{max-height:60vh;overflow-y:auto;padding:0 16px}
+.m-notif-empty{text-align:center;padding:30px;color:#b2b2b2;font-size:14px}
+.m-notif-item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid #f0f0f0;align-items:flex-start}
+.m-notif-av{width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#eee}
+.m-notif-body{flex:1;min-width:0}
+.m-notif-text{font-size:13px;color:#333;line-height:1.5}
+.m-notif-text b{color:#576b95;font-weight:600}
+.m-notif-time{font-size:11px;color:#b2b2b2;margin-top:2px}
+.m-notif-title{font-size:16px;font-weight:600;text-align:center;padding:14px 0 10px;color:#333}
+.m-notif-clear{text-align:center;padding:10px;font-size:13px;color:#576b95;cursor:pointer}
+
+/* ---- Lightbox ---- */
+.m-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.m-lightbox.open{opacity:1;pointer-events:auto}
+.m-lightbox img{max-width:100%;max-height:90vh;object-fit:contain}
+.m-lightbox-close{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.m-lightbox-close svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- Toast ---- */
+.m-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);background:rgba(0,0,0,.75);color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;z-index:300;opacity:0;transition:all .25s;pointer-events:none}
+.m-toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* ---- Responsive ---- */
+@media(max-width:380px){
+  .m-cover{height:260px}
+  .m-avatar-wrap{width:64px;height:64px}
+  .m-profile-name{font-size:18px}
+  .m-post-imgs{max-width:240px}
+  .m-post-imgs.cols-1{max-width:180px}
+}
+</style>
+</head>
+<body>
+
+<!-- Sticky Header (appears on scroll) -->
+<div class="m-sticky-header" id="stickyHeader">
+  <button class="m-sh-back" onclick="location.href='more.html'">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="m-sh-title">朋友圈</span>
+  <div class="m-sh-actions">
+    <button class="m-sh-btn" id="shCameraBtn">
+      <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </button>
+    <button class="m-sh-btn" id="shBellBtn">
+      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="m-sh-dot" id="shNotifDot" style="display:none"></span>
+    </button>
+  </div>
+</div>
+
+<!-- Cover & Profile -->
+<div class="m-cover" id="mCover">
+  <div class="m-cover-placeholder" id="mCoverPlaceholder"></div>
+  <img class="m-cover-img" id="mCoverImg" style="display:none" alt="">
+  <button class="m-back" onclick="location.href='more.html'">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div class="m-top-actions">
+    <button class="m-top-btn" id="mCameraBtn" title="发布">
+      <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </button>
+    <button class="m-top-btn" id="mBellBtn" title="通知">
+      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="m-notif-dot" id="mNotifDot" style="display:none"></span>
+    </button>
+  </div>
+</div>
+<div class="m-profile-row">
+  <span class="m-profile-name" id="mName"></span>
+  <div class="m-avatar-wrap" id="mAvatarWrap">
+    <div class="m-avatar-initial" id="mAvatarInitial"></div>
+    <img id="mAvatarImg" style="display:none" alt="">
+  </div>
+</div>
+<div class="m-bio" id="mBio"></div>
+
+<!-- Notification bar -->
+<div class="m-notif-bar" id="mNotifBar" style="display:none">
+  <div class="m-notif-bar-initial" id="notifBarAv"></div>
+  <span class="m-notif-bar-text">朋友的互动消息</span>
+  <span class="m-notif-bar-badge" id="notifBarBadge">0</span>
+</div>
+
+<!-- Pinned Section -->
+<div class="m-pinned" id="mPinned">
+  <div class="m-pinned-row">
+    <span class="m-pinned-label">置顶</span>
+    <div class="m-pinned-scroll" id="mPinnedScroll"></div>
+    <span class="m-pinned-arrow">›</span>
+  </div>
+</div>
+
+<!-- Feed -->
+<div class="m-feed" id="mFeed"></div>
+
+<!-- Bottom Dock -->
+<div class="m-dock" id="mDock">
+  <button class="m-dock-item active" data-tab="moments">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
+    <span class="m-dock-label">动态</span>
+  </button>
+  <button class="m-dock-item" data-tab="mine">
+    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span class="m-dock-label">我的</span>
+  </button>
+  <button class="m-dock-item" data-tab="ta">
+    <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    <span class="m-dock-label">TA</span>
+  </button>
+</div>
+
+<!-- Compose type sheet -->
+<div class="m-sheet" id="composeTypeSheet">
+  <div class="m-sheet-card">
+    <div class="m-sheet-handle"></div>
+    <div class="m-sheet-option" id="optText">发表文字</div>
+    <div class="m-sheet-option" id="optPhoto">发表图文</div>
+    <div class="m-sheet-option cancel" onclick="closeSheet('composeTypeSheet')">取消</div>
+  </div>
+</div>
+
+<!-- Notification sheet -->
+<div class="m-sheet" id="notifSheet">
+  <div class="m-sheet-card" style="max-height:80vh">
+    <div class="m-sheet-handle"></div>
+    <div class="m-notif-title">互动消息</div>
+    <div class="m-notif-list" id="notifList"></div>
+    <div class="m-notif-clear" id="notifClear">清空所有通知</div>
+  </div>
+</div>
+
+<!-- Compose overlay -->
+<div class="m-compose" id="composeOverlay">
+  <div class="m-compose-bar">
+    <button class="m-compose-cancel" id="composeCancel">取消</button>
+    <span class="m-compose-title" id="composeTitle">发表文字</span>
+    <button class="m-compose-submit" id="composeSubmit" disabled>发布</button>
+  </div>
+  <div class="m-compose-body">
+    <textarea class="m-compose-text" id="composeText" placeholder="这一刻的想法…"></textarea>
+    <div class="m-compose-imgs" id="composeImgs" style="display:none">
+      <button class="m-compose-add" id="composeAddImg">+</button>
+    </div>
+    <div class="m-compose-settings">
+      <div class="m-compose-row" id="composeLocRow">
+        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span class="m-compose-row-label">所在位置</span>
+        <span class="m-compose-row-value" id="composeLocValue">未选择</span>
+        <button class="m-compose-gps" id="composeGps" title="获取当前位置">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        </button>
+        <span class="m-compose-row-arrow">›</span>
+      </div>
+      <div class="m-compose-row" id="composeVisRow">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="m-compose-row-label">发布设置</span>
+        <span class="m-compose-row-value" id="composeVisValue">立即公开</span>
+        <span class="m-compose-row-arrow">›</span>
+      </div>
+      <div class="m-vis-options" id="visOptions">
+        <div class="m-vis-option" data-vis="public">
+          <div class="m-vis-radio checked" id="visPublic"></div>
+          <span>立即公开</span>
+        </div>
+        <div class="m-vis-option" data-vis="scheduled">
+          <div class="m-vis-radio" id="visScheduled"></div>
+          <span>定时公开</span>
+        </div>
+        <input type="datetime-local" class="m-vis-datetime" id="visDatetime">
+        <div class="m-vis-option" data-vis="private">
+          <div class="m-vis-radio" id="visPrivate"></div>
+          <span>仅自己可见</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Comment bar -->
+<div class="m-comment-bar" id="commentBar">
+  <input class="m-comment-input" id="commentInput" placeholder="评论…" maxlength="200">
+  <button class="m-comment-send" id="commentSend">发送</button>
+</div>
+
+<!-- Lightbox -->
+<div class="m-lightbox" id="lightbox">
+  <button class="m-lightbox-close" onclick="closeLightbox()">
+    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- Hidden inputs -->
+<input type="file" id="coverInput" accept="image/*" style="display:none">
+<input type="file" id="avatarInput" accept="image/*" style="display:none">
+<input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+
+<div class="m-toast" id="mToast"></div>
+
+<script>
+(function(){'use strict';
+
+/* ===== Constants & State ===== */
+var POSTS_KEY='iris-moments-posts';
+var PROF_U_KEY='iris-moments-profile-user';
+var PROF_A_KEY='iris-moments-profile-ai';
+var NOTIF_KEY='iris-moments-notifications';
+var MOMENTS_MIGRATION_KEY='iris-moments-supabase-migrated-v1';
+
+var posts=loadJ(POSTS_KEY)||[];
+var profUser=loadJ(PROF_U_KEY)||defUserProf();
+var profAi=loadJ(PROF_A_KEY)||defAiProf();
+var notifs=loadJ(NOTIF_KEY)||[];
+var curTab='moments';
+var composeMode='text';
+var composeImages=[];
+var commentPostId=null;
+var commentReplyId=null;
+var commentReplyName='';
+var curVis='public';
+var activePopup=null;
+
+function defUserProf(){return{name:localStorage.getItem('iris_avatar_name1')||'Iris',avatar:localStorage.getItem('iris_avatar_img1')||'',cover:'',bio:'点击设置个性签名'}}
+function defAiProf(){return{name:localStorage.getItem('iris_avatar_name2')||'Rei',avatar:'',cover:'',bio:'点击设置个性签名'}}
+
+/* ===== Utils ===== */
+function $(id){return document.getElementById(id)}
+function loadJ(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function saveJ(k,v){try{localStorage.setItem(k,JSON.stringify(v));if(k===POSTS_KEY||k===PROF_U_KEY||k===PROF_A_KEY||k===NOTIF_KEY)queueMomentsSync()}catch(e){showToast('存储空间不足，请删除旧动态')}}
+function escH(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+function openSheet(id){$(id).classList.add('open');document.body.style.overflow='hidden'}
+function closeSheet(id){$(id).classList.remove('open');document.body.style.overflow=''}
+window.closeSheet=closeSheet;
+
+var toastT;
+function showToast(msg){var t=$('mToast');t.textContent=msg;t.className='m-toast show';clearTimeout(toastT);toastT=setTimeout(function(){t.className='m-toast'},2000)}
+
+function timeAgo(d){
+  var now=Date.now(),then=new Date(d).getTime(),s=Math.floor((now-then)/1000);
+  if(s<60)return'刚刚';if(s<3600)return Math.floor(s/60)+'分钟前';
+  if(s<86400)return Math.floor(s/3600)+'小时前';if(s<172800)return'昨天';
+  if(s<604800)return Math.floor(s/86400)+'天前';
+  var dt=new Date(d);return dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日';
+}
+
+/* ===== Image Processing ===== */
+function processImage(file,cb){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement('canvas'),max=800,w=img.width,h=img.height;
+      if(w>max||h>max){if(w>h){h=h*max/w;w=max}else{w=w*max/h;h=max}}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.7));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function processCoverAvatar(file,cb){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement('canvas'),max=600,w=img.width,h=img.height;
+      if(w>max||h>max){if(w>h){h=h*max/w;w=max}else{w=w*max/h;h=max}}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.75));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ===== Sticky Header ===== */
+function handleScroll(){
+  var coverRect=$('mCover').getBoundingClientRect();
+  var sh=$('stickyHeader');
+  if(coverRect.bottom<=0){sh.classList.add('visible')}else{sh.classList.remove('visible')}
+}
+window.addEventListener('scroll',handleScroll,{passive:true});
+
+/* Sticky header buttons */
+$('shCameraBtn').addEventListener('click',function(e){e.stopPropagation();openSheet('composeTypeSheet')});
+$('shBellBtn').addEventListener('click',function(e){e.stopPropagation();renderNotifs();openSheet('notifSheet')});
+
+/* ===== Profile ===== */
+function getCurProf(){return curTab==='ta'?profAi:profUser}
+function getCurProfKey(){return curTab==='ta'?PROF_A_KEY:PROF_U_KEY}
+function getAuthorProf(author){return author==='ai'?profAi:profUser}
+
+function renderProfile(){
+  var p=getCurProf();
+  $('mName').textContent=p.name;
+  if(p.avatar){$('mAvatarImg').src=p.avatar;$('mAvatarImg').style.display='block';$('mAvatarInitial').style.display='none'}
+  else{$('mAvatarInitial').textContent=p.name.charAt(0).toUpperCase();$('mAvatarInitial').style.display='flex';$('mAvatarImg').style.display='none'}
+  if(p.cover){$('mCoverImg').src=p.cover;$('mCoverImg').style.display='block';$('mCoverPlaceholder').style.display='none'}
+  else{$('mCoverPlaceholder').style.display='block';$('mCoverImg').style.display='none'}
+  $('mBio').textContent=p.bio||'点击设置个性签名';
+}
+
+function saveProf(){
+  if(curTab==='ta'){profAi=getCurProf();saveJ(PROF_A_KEY,profAi)}
+  else{profUser=getCurProf();saveJ(PROF_U_KEY,profUser)}
+}
+
+/* Edit name */
+$('mName').addEventListener('click',function(){
+  var p=getCurProf();var v=prompt('修改昵称',p.name);
+  if(v&&v.trim()){p.name=v.trim();saveProf();renderProfile();renderFeed();showToast('昵称已修改')}
+});
+/* Edit bio */
+$('mBio').addEventListener('click',function(){
+  var p=getCurProf();var v=prompt('编辑个性签名',p.bio==='点击设置个性签名'?'':p.bio);
+  if(v!==null){p.bio=v.trim()||'点击设置个性签名';saveProf();renderProfile();showToast('签名已更新')}
+});
+/* Edit cover */
+$('mCover').addEventListener('click',function(e){
+  if(e.target.closest('.m-back')||e.target.closest('.m-top-actions'))return;
+  $('coverInput').click();
+});
+$('coverInput').addEventListener('change',function(){
+  if(!this.files[0])return;
+  processCoverAvatar(this.files[0],function(data){
+    var p=getCurProf();p.cover=data;saveProf();renderProfile();showToast('背景已更新');
+  });this.value='';
+});
+/* Edit avatar */
+$('mAvatarWrap').addEventListener('click',function(e){
+  e.stopPropagation();$('avatarInput').click();
+});
+$('avatarInput').addEventListener('change',function(){
+  if(!this.files[0])return;
+  processCoverAvatar(this.files[0],function(data){
+    var p=getCurProf();p.avatar=data;saveProf();renderProfile();renderFeed();showToast('头像已更新');
+  });this.value='';
+});
+
+/* ===== Tabs (Dock) ===== */
+$('mDock').addEventListener('click',function(e){
+  var item=e.target.closest('.m-dock-item');if(!item)return;
+  curTab=item.dataset.tab;
+  document.querySelectorAll('.m-dock-item').forEach(function(t){t.classList.toggle('active',t.dataset.tab===curTab)});
+  renderProfile();renderNotifBar();renderPinned();renderFeed();
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+/* ===== Notification Bar ===== */
+function renderNotifBar(){
+  var bar=$('mNotifBar');
+  var unread=notifs.filter(function(n){return!n.read}).length;
+  if(unread===0){bar.style.display='none';return}
+  bar.style.display='flex';
+  $('notifBarBadge').textContent=unread>99?'99+':unread;
+  var lastUnread=notifs.find(function(n){return!n.read});
+  if(lastUnread){
+    var p=getAuthorProf(lastUnread.from);
+    var avEl=$('notifBarAv');
+    if(p.avatar){
+      avEl.outerHTML='<img class="m-notif-bar-av" id="notifBarAv" src="'+p.avatar+'" alt="">';
+    }else{
+      avEl.outerHTML='<div class="m-notif-bar-initial" id="notifBarAv">'+p.name.charAt(0).toUpperCase()+'</div>';
+    }
+  }
+}
+$('mNotifBar').addEventListener('click',function(){
+  renderNotifs();openSheet('notifSheet');
+  /* After closing notif sheet, hide bar since all are now read */
+  var observer=new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      if(!$('notifSheet').classList.contains('open')){
+        renderNotifBar();observer.disconnect();
+      }
+    });
+  });
+  observer.observe($('notifSheet'),{attributes:true,attributeFilter:['class']});
+});
+
+/* ===== Pinned Section ===== */
+function getPinnedPosts(){
+  var author=curTab==='mine'?'user':curTab==='ta'?'ai':null;
+  if(!author)return[];
+  return posts.filter(function(p){return p.pinned&&p.author===author});
+}
+
+function renderPinned(){
+  var pinned=getPinnedPosts();
+  var section=$('mPinned');
+  if(curTab==='moments'||pinned.length===0){section.classList.remove('show');return}
+  section.classList.add('show');
+  var scroll=$('mPinnedScroll');
+  scroll.innerHTML=pinned.map(function(p){
+    if(p.images&&p.images.length>0){
+      return'<div class="m-pinned-item" onclick="scrollToPost(\''+p.id+'\')"><img src="'+p.images[0]+'" alt=""></div>';
+    }else{
+      var preview=(p.text||'').substring(0,20);
+      return'<div class="m-pinned-item" onclick="scrollToPost(\''+p.id+'\')"><div class="m-pinned-item-text">'+escH(preview)+'</div></div>';
+    }
+  }).join('');
+}
+
+window.scrollToPost=function(pid){
+  var el=document.querySelector('.m-post[data-id="'+pid+'"]');
+  if(el){el.scrollIntoView({behavior:'smooth',block:'center'})}
+};
+
+/* ===== Feed Rendering ===== */
+function getVisiblePosts(){
+  var now=Date.now();
+  if(curTab==='moments'){
+    return posts.filter(function(p){return!p.isPrivate&&(!p.publishAt||new Date(p.publishAt).getTime()<=now)}).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt)});
+  }else if(curTab==='mine'){
+    return posts.filter(function(p){return p.author==='user'}).sort(function(a,b){
+      if(a.pinned&&!b.pinned)return-1;if(!a.pinned&&b.pinned)return 1;
+      return new Date(b.createdAt)-new Date(a.createdAt);
+    });
+  }else{
+    return posts.filter(function(p){return p.author==='ai'}).sort(function(a,b){
+      if(a.pinned&&!b.pinned)return-1;if(!a.pinned&&b.pinned)return 1;
+      return new Date(b.createdAt)-new Date(a.createdAt);
+    });
+  }
+}
+
+/* SVG icon strings */
+var IC_HEART='<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+var IC_COMMENT='<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+var IC_PIN='<svg viewBox="0 0 24 24"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1V4H8v2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/></svg>';
+var IC_TRASH='<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+function renderFeed(){
+  var feed=$('mFeed');
+  var visible=getVisiblePosts();
+  if(visible.length===0){feed.innerHTML='<div class="m-empty">还没有动态，快来发布第一条吧~</div>';return}
+  var now=Date.now();
+  var isPersonal=curTab==='mine'||curTab==='ta';
+  feed.innerHTML=visible.map(function(p){
+    var prof=getAuthorProf(p.author);
+    var avHtml=prof.avatar?'<img class="m-post-av" src="'+prof.avatar+'" alt="">':'<div class="m-post-av" style="display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;background:#a0b4c8">'+prof.name.charAt(0).toUpperCase()+'</div>';
+
+    var badge='';
+    if(p.isPrivate)badge='<span class="m-post-badge private">私密</span>';
+    else if(p.publishAt&&new Date(p.publishAt).getTime()>now)badge='<span class="m-post-badge scheduled">定时</span>';
+
+    var imgHtml='';
+    if(p.images&&p.images.length>0){
+      var cols=p.images.length===1?'cols-1':p.images.length<=3?'cols-'+p.images.length:'cols-3';
+      imgHtml='<div class="m-post-imgs '+cols+'">'+p.images.map(function(src,i){
+        return'<div class="m-post-img-wrap" onclick="openLightbox(\''+p.id+'\','+i+')"><img src="'+src+'" alt=""></div>';
+      }).join('')+'</div>';
+    }
+
+    /* Build popup items */
+    var who=curTab==='ta'?'ai':'user';
+    var isLiked=p.likes&&p.likes.indexOf(who)!==-1;
+    var popupItems='';
+    popupItems+='<div class="m-popup-item'+(isLiked?' liked':'')+'" onclick="toggleLike(\''+p.id+'\')">'+IC_HEART+'<span>'+(isLiked?'取消':'赞')+'</span></div>';
+    popupItems+='<div class="m-popup-item" onclick="openComment(\''+p.id+'\')">'+IC_COMMENT+'<span>评论</span></div>';
+    if(isPersonal){
+      popupItems+='<div class="m-popup-item" onclick="togglePin(\''+p.id+'\')">'+IC_PIN+'<span>'+(p.pinned?'取消置顶':'置顶')+'</span></div>';
+      popupItems+='<div class="m-popup-item" onclick="delPost(\''+p.id+'\')">'+IC_TRASH+'<span>删除</span></div>';
+    }
+
+    /* Interaction area */
+    var interactHtml='';
+    var hasLikes=p.likes&&p.likes.length>0;
+    var hasComments=p.comments&&p.comments.length>0;
+    if(hasLikes||hasComments){
+      interactHtml='<div class="m-interact">';
+      if(hasLikes){
+        interactHtml+='<div class="m-likes"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+        interactHtml+=p.likes.map(function(l){return'<span>'+getAuthorProf(l==='ai'?'ai':'user').name+'</span>'}).join('，');
+        interactHtml+='</div>';
+      }
+      if(hasComments){
+        interactHtml+='<div class="m-comments">';
+        interactHtml+=p.comments.map(function(c){
+          var cProf=getAuthorProf(c.author);
+          var replyHtml='';
+          if(c.replyTo){
+            var rc=p.comments.find(function(x){return x.id===c.replyTo});
+            if(rc)replyHtml=' 回复 <span class="m-c-reply">'+getAuthorProf(rc.author).name+'</span>';
+          }
+          return'<div class="m-comment" onclick="startReply(\''+p.id+'\',\''+c.id+'\',\''+cProf.name+'\')"><span class="m-c-name">'+cProf.name+'</span>'+replyHtml+'：<span class="m-c-text">'+escH(c.text)+'</span></div>';
+        }).join('');
+        interactHtml+='</div>';
+      }
+      interactHtml+='</div>';
+    }
+
+    return'<div class="m-post" data-id="'+p.id+'">'+
+      '<div class="m-post-head">'+avHtml+'<div><div class="m-post-author">'+escH(prof.name)+badge+'</div></div></div>'+
+      (p.text?'<div class="m-post-text">'+escH(p.text)+'</div>':'')+
+      imgHtml+
+      '<div class="m-post-foot"><div class="m-post-meta"><span class="m-post-time">'+timeAgo(p.createdAt)+'</span>'+(p.location?'<span class="m-post-loc">'+escH(p.location)+'</span>':'')+'</div>'+
+      '<div class="m-post-menu-wrap"><button class="m-post-dots" onclick="toggleMenu(event,\''+p.id+'\')"><span class="m-post-dot"></span><span class="m-post-dot"></span></button>'+
+      '<div class="m-post-popup" id="popup-'+p.id+'">'+popupItems+'</div></div></div>'+
+      interactHtml+
+      '</div>';
+  }).join('');
+}
+
+/* ===== Post Menu ===== */
+window.toggleMenu=function(e,pid){
+  e.stopPropagation();
+  var popup=$('popup-'+pid);if(!popup)return;
+  if(activePopup&&activePopup!==popup){activePopup.classList.remove('open')}
+  popup.classList.toggle('open');
+  activePopup=popup.classList.contains('open')?popup:null;
+};
+document.addEventListener('click',function(e){
+  if(activePopup&&!e.target.closest('.m-post-menu-wrap')){activePopup.classList.remove('open');activePopup=null}
+});
+
+/* ===== Like ===== */
+window.toggleLike=function(pid){
+  var p=posts.find(function(x){return x.id===pid});if(!p)return;
+  if(!p.likes)p.likes=[];
+  var who=curTab==='ta'?'ai':'user';
+  var idx=p.likes.indexOf(who);
+  if(idx===-1){
+    p.likes.push(who);
+    addNotif(who,p.author==='user'?'ai':'user','like',p);
+  }else{
+    p.likes.splice(idx,1);
+  }
+  saveJ(POSTS_KEY,posts);
+  if(activePopup){activePopup.classList.remove('open');activePopup=null}
+  renderFeed();
+};
+
+/* ===== Pin ===== */
+window.togglePin=function(pid){
+  var p=posts.find(function(x){return x.id===pid});if(!p)return;
+  p.pinned=!p.pinned;
+  saveJ(POSTS_KEY,posts);
+  if(activePopup){activePopup.classList.remove('open');activePopup=null}
+  renderPinned();renderFeed();
+  showToast(p.pinned?'已置顶':'已取消置顶');
+};
+
+/* ===== Comment ===== */
+window.openComment=function(pid){
+  if(activePopup){activePopup.classList.remove('open');activePopup=null}
+  commentPostId=pid;commentReplyId=null;commentReplyName='';
+  $('commentInput').placeholder='评论…';
+  $('commentBar').classList.add('open');
+  $('commentInput').focus();
+};
+window.startReply=function(pid,cid,cname){
+  commentPostId=pid;commentReplyId=cid;commentReplyName=cname;
+  $('commentInput').placeholder='回复 '+cname+'…';
+  $('commentBar').classList.add('open');
+  $('commentInput').focus();
+};
+function closeCommentBar(){$('commentBar').classList.remove('open');commentPostId=null;commentReplyId=null}
+
+$('commentSend').addEventListener('click',function(){
+  var text=$('commentInput').value.trim();if(!text||!commentPostId)return;
+  var p=posts.find(function(x){return x.id===commentPostId});if(!p)return;
+  if(!p.comments)p.comments=[];
+  var who=curTab==='ta'?'ai':'user';
+  var c={id:'c'+Date.now(),author:who,text:text,replyTo:commentReplyId||null,createdAt:new Date().toISOString()};
+  p.comments.push(c);
+  addNotif(who,p.author==='user'?'ai':'user','comment',p,text);
+  saveJ(POSTS_KEY,posts);$('commentInput').value='';closeCommentBar();renderFeed();
+});
+
+document.addEventListener('click',function(e){
+  if($('commentBar').classList.contains('open')&&!e.target.closest('.m-comment-bar')&&!e.target.closest('.m-popup-item')&&!e.target.closest('.m-comment'))closeCommentBar();
+});
+
+/* ===== Delete Post ===== */
+window.delPost=function(pid){
+  if(activePopup){activePopup.classList.remove('open');activePopup=null}
+  if(!confirm('确定删除这条动态吗？'))return;
+  posts=posts.filter(function(p){return p.id!==pid});
+  saveJ(POSTS_KEY,posts);renderPinned();renderFeed();showToast('已删除');
+};
+
+/* ===== Compose ===== */
+$('mCameraBtn').addEventListener('click',function(e){e.stopPropagation();openSheet('composeTypeSheet')});
+$('optText').addEventListener('click',function(){closeSheet('composeTypeSheet');openCompose('text')});
+$('optPhoto').addEventListener('click',function(){closeSheet('composeTypeSheet');openCompose('photo')});
+
+function openCompose(mode){
+  composeMode=mode;composeImages=[];
+  $('composeTitle').textContent=mode==='text'?'发表文字':'发表图文';
+  $('composeText').value='';
+  $('composeImgs').style.display=mode==='photo'?'flex':'none';
+  renderComposeImgs();
+  curVis='public';updateVisUI();
+  $('composeLocValue').textContent='未选择';
+  $('composeSubmit').disabled=true;
+  $('visOptions').classList.remove('open');
+  $('composeOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  setTimeout(function(){$('composeText').focus()},300);
+}
+function closeCompose(){
+  $('composeOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+$('composeCancel').addEventListener('click',function(){
+  if($('composeText').value.trim()||composeImages.length>0){if(!confirm('放弃编辑？'))return}
+  closeCompose();
+});
+
+$('composeText').addEventListener('input',function(){
+  $('composeSubmit').disabled=!this.value.trim()&&composeImages.length===0;
+});
+
+/* Image handling */
+$('composeAddImg').addEventListener('click',function(){$('photoInput').click()});
+$('photoInput').addEventListener('change',function(){
+  var files=Array.from(this.files);
+  var pending=files.length,done=0;
+  files.forEach(function(f){
+    processImage(f,function(data){
+      composeImages.push(data);done++;
+      if(done===pending){renderComposeImgs();$('composeSubmit').disabled=!$('composeText').value.trim()&&composeImages.length===0}
+    });
+  });
+  this.value='';
+});
+function renderComposeImgs(){
+  var wrap=$('composeImgs');
+  var html=composeImages.map(function(src,i){
+    return'<div class="m-compose-img-wrap"><img src="'+src+'" alt=""><button class="m-compose-img-del" onclick="removeComposeImg('+i+')">&#10005;</button></div>';
+  }).join('');
+  html+='<button class="m-compose-add" id="composeAddImg2">+</button>';
+  wrap.innerHTML=html;
+  var addBtn=document.getElementById('composeAddImg2');
+  if(addBtn)addBtn.addEventListener('click',function(){$('photoInput').click()});
+}
+window.removeComposeImg=function(i){
+  composeImages.splice(i,1);renderComposeImgs();
+  $('composeSubmit').disabled=!$('composeText').value.trim()&&composeImages.length===0;
+};
+
+/* Location - manual input on row click */
+$('composeLocRow').addEventListener('click',function(e){
+  if(e.target.closest('.m-compose-gps'))return;
+  var v=prompt('输入所在位置',$('composeLocValue').textContent==='未选择'?'':$('composeLocValue').textContent);
+  if(v!==null)$('composeLocValue').textContent=v.trim()||'未选择';
+});
+
+/* Location - GPS button */
+$('composeGps').addEventListener('click',function(e){
+  e.stopPropagation();
+  if(!('geolocation' in navigator)){showToast('浏览器不支持定位');return}
+  showToast('正在获取位置…');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat=pos.coords.latitude,lon=pos.coords.longitude;
+    /* Try reverse geocoding via Nominatim */
+    fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lon+'&zoom=16&accept-language=zh')
+      .then(function(r){return r.json()})
+      .then(function(data){
+        var addr='';
+        if(data.address){
+          var a=data.address;
+          addr=(a.city||a.town||a.county||'');
+          var detail=a.road||a.suburb||a.neighbourhood||a.hamlet||'';
+          if(detail)addr+=' · '+detail;
+        }
+        if(!addr)addr=data.display_name||(lat.toFixed(4)+', '+lon.toFixed(4));
+        $('composeLocValue').textContent=addr;
+        showToast('位置已获取');
+      })
+      .catch(function(){
+        $('composeLocValue').textContent=lat.toFixed(4)+', '+lon.toFixed(4);
+        showToast('位置已获取（坐标）');
+      });
+  },function(err){
+    var msgs={1:'位置权限被拒绝',2:'无法获取位置',3:'获取位置超时'};
+    showToast(msgs[err.code]||'无法获取位置，请手动输入');
+  },{enableHighAccuracy:true,timeout:10000});
+});
+
+/* Visibility */
+$('composeVisRow').addEventListener('click',function(){$('visOptions').classList.toggle('open')});
+$('visOptions').addEventListener('click',function(e){
+  var opt=e.target.closest('.m-vis-option');if(!opt)return;
+  curVis=opt.dataset.vis;updateVisUI();
+});
+function updateVisUI(){
+  ['visPublic','visScheduled','visPrivate'].forEach(function(id){
+    $(id).className='m-vis-radio'+(id==='vis'+curVis.charAt(0).toUpperCase()+curVis.slice(1)?' checked':'');
+  });
+  $('visDatetime').className='m-vis-datetime'+(curVis==='scheduled'?' show':'');
+  var labels={public:'立即公开',scheduled:'定时公开',private:'仅自己可见'};
+  $('composeVisValue').textContent=labels[curVis];
+}
+
+/* Submit */
+$('composeSubmit').addEventListener('click',function(){
+  var text=$('composeText').value.trim();
+  if(!text&&composeImages.length===0)return;
+  var loc=$('composeLocValue').textContent;if(loc==='未选择')loc='';
+  var publishAt=null,isPrivate=false;
+  if(curVis==='scheduled'){
+    var dt=$('visDatetime').value;
+    if(!dt){showToast('请选择定时发布时间');return}
+    publishAt=new Date(dt).toISOString();
+  }else if(curVis==='private'){
+    isPrivate=true;
+  }
+  var author=curTab==='ta'?'ai':'user';
+  var post={
+    id:'p'+Date.now(),author:author,text:text,
+    images:composeImages.length>0?composeImages:[],
+    location:loc,createdAt:new Date().toISOString(),
+    publishAt:publishAt,isPrivate:isPrivate,
+    pinned:false,likes:[],comments:[]
+  };
+  posts.unshift(post);saveJ(POSTS_KEY,posts);
+  closeCompose();renderPinned();renderFeed();showToast('发布成功');
+});
+
+/* ===== Notifications ===== */
+function addNotif(from,to,type,post,text){
+  if(from===to)return;
+  var n={id:'n'+Date.now(),from:from,to:to,type:type,postId:post.id,text:text||'',createdAt:new Date().toISOString(),read:false};
+  notifs.unshift(n);saveJ(NOTIF_KEY,notifs);updateNotifDot();renderNotifBar();
+}
+function updateNotifDot(){
+  var unread=notifs.filter(function(n){return!n.read}).length;
+  var show=unread>0;
+  $('mNotifDot').style.display=show?'block':'none';
+  $('shNotifDot').style.display=show?'block':'none';
+}
+function renderNotifs(){
+  var list=$('notifList');
+  if(notifs.length===0){list.innerHTML='<div class="m-notif-empty">暂无互动消息</div>';return}
+  list.innerHTML=notifs.map(function(n){
+    var fromProf=getAuthorProf(n.from);
+    var avHtml=fromProf.avatar?'<img class="m-notif-av" src="'+fromProf.avatar+'" alt="">':'<div class="m-notif-av" style="display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;background:#a0b4c8">'+fromProf.name.charAt(0).toUpperCase()+'</div>';
+    var action=n.type==='like'?'赞了你的动态':'评论了你的动态'+(n.text?'：'+escH(n.text):'');
+    return'<div class="m-notif-item">'+avHtml+'<div class="m-notif-body"><div class="m-notif-text"><b>'+escH(fromProf.name)+'</b> '+action+'</div><div class="m-notif-time">'+timeAgo(n.createdAt)+'</div></div></div>';
+  }).join('');
+  notifs.forEach(function(n){n.read=true});saveJ(NOTIF_KEY,notifs);updateNotifDot();
+}
+$('mBellBtn').addEventListener('click',function(e){e.stopPropagation();renderNotifs();openSheet('notifSheet')});
+$('notifClear').addEventListener('click',function(){notifs=[];saveJ(NOTIF_KEY,notifs);updateNotifDot();renderNotifBar();renderNotifs();showToast('已清空')});
+
+/* ===== Lightbox ===== */
+window.openLightbox=function(pid,idx){
+  var p=posts.find(function(x){return x.id===pid});
+  if(p&&p.images&&p.images[idx]){$('lightboxImg').src=p.images[idx];$('lightbox').classList.add('open');document.body.style.overflow='hidden'}
+};
+window.closeLightbox=function(){$('lightbox').classList.remove('open');document.body.style.overflow=''};
+$('lightbox').addEventListener('click',function(e){if(e.target===this)closeLightbox()});
+
+/* ===== Sheet backdrop close ===== */
+document.querySelectorAll('.m-sheet').forEach(function(s){
+  s.addEventListener('click',function(e){if(e.target===s)closeSheet(s.id)});
+});
+
+/* ===== Supabase sync and one-time local migration ===== */
+var momentsSyncTimer=null;
+function momentsPayload(){return{posts:posts,profiles:{user:profUser,ai:profAi},notifications:notifs}}
+function queueMomentsSync(){
+  clearTimeout(momentsSyncTimer);
+  momentsSyncTimer=setTimeout(function(){
+    fetch('/api/moments/state',{method:'PUT',headers:{'x-api-key':'iris-memory-2024','Content-Type':'application/json'},body:JSON.stringify(momentsPayload())})
+      .then(function(r){if(!r.ok)throw new Error('sync failed');localStorage.setItem(MOMENTS_MIGRATION_KEY,'1')})
+      .catch(function(e){console.warn('朋友圈同步失败，已保留本地副本',e)});
+  },350);
+}
+async function loadMomentsFromServer(){
+  try{
+    var r=await fetch('/api/moments/state',{headers:{'x-api-key':'iris-memory-2024'}});
+    if(!r.ok)throw new Error('moments state unavailable');
+    var state=await r.json();
+    if(localStorage.getItem(MOMENTS_MIGRATION_KEY)!=='1'){
+      var uploaded=await fetch('/api/moments/state',{method:'PUT',headers:{'x-api-key':'iris-memory-2024','Content-Type':'application/json'},body:JSON.stringify(momentsPayload())});
+      if(!uploaded.ok)throw new Error('migration failed');
+      localStorage.setItem(MOMENTS_MIGRATION_KEY,'1');
+      r=await fetch('/api/moments/state',{headers:{'x-api-key':'iris-memory-2024'}});state=await r.json();
+    }
+    posts=Array.isArray(state.posts)?state.posts:posts;
+    if(state.profiles&&state.profiles.user)profUser=state.profiles.user;
+    if(state.profiles&&state.profiles.ai)profAi=state.profiles.ai;
+    notifs=Array.isArray(state.notifications)?state.notifications:notifs;
+    localStorage.setItem(POSTS_KEY,JSON.stringify(posts));localStorage.setItem(PROF_U_KEY,JSON.stringify(profUser));localStorage.setItem(PROF_A_KEY,JSON.stringify(profAi));localStorage.setItem(NOTIF_KEY,JSON.stringify(notifs));
+    renderProfile();renderNotifBar();renderPinned();renderFeed();updateNotifDot();
+  }catch(e){console.warn('朋友圈仍使用本地副本',e)}
+}
+
+/* ===== Init ===== */
+renderProfile();renderNotifBar();renderPinned();renderFeed();updateNotifDot();handleScroll();loadMomentsFromServer();
+
+})();
+</script>
+</body>
+</html>

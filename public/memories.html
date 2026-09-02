@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>记忆库 · whisper</title>
+<script src="init.js"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ============================================
+   记忆库 v3 — Redesigned
+   ============================================ */
+
+/* ---- Dashboard ---- */
+.dashboard { margin-bottom: 20px; }
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  padding: 16px 14px;
+  text-align: center;
+  box-shadow: var(--shadow-xs);
+  transition: transform .2s;
+}
+.stat-card:hover { transform: translateY(-2px); }
+.stat-card .num {
+  font-family: var(--font-d);
+  font-size: 28px;
+  line-height: 1.1;
+  display: block;
+}
+.stat-card .label {
+  font-size: 12px;
+  color: var(--text-light);
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.stat-card .label svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.4; }
+/* Dashboard counts stay readable and consistent; category colour belongs to charts. */
+.stat-card .num { color: var(--text); }
+
+/* Chart grid */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.chart-card {
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  padding: 16px;
+  box-shadow: var(--shadow-xs);
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.chart-title {
+  font-size: 12px;
+  color: var(--text-light);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.chart-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Monthly chart year nav */
+.year-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.year-nav-btn {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-mid);
+  font-size: 12px;
+  transition: all .18s;
+  padding: 0;
+}
+.year-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.year-nav-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.year-nav-label {
+  font-family: var(--font-d);
+  font-size: 16px;
+  color: var(--text);
+  min-width: 50px;
+  text-align: center;
+}
+.month-bars {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 90px;
+  width: 100%;
+}
+.month-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.month-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  opacity: 0.7;
+  transition: height .4s ease, opacity .2s;
+}
+.month-bar:hover { opacity: 1; }
+.month-bar-count {
+  font-size: 8px;
+  color: var(--text-light);
+  font-family: var(--font-d);
+}
+.month-bar-label {
+  font-size: 9px;
+  color: var(--text-light);
+  font-family: var(--font-cn);
+}
+
+/* Dashboard toggle */
+.dash-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: none;
+  border: 1.5px dashed var(--bg-secondary);
+  border-radius: var(--r-sm);
+  color: var(--text-light);
+  font-family: var(--font-b);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .2s;
+  margin-bottom: 16px;
+}
+.dash-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.dash-toggle svg {
+  width: 12px; height: 12px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .25s;
+}
+.dash-toggle.collapsed svg { transform: rotate(180deg); }
+
+/* ---- Pill Tabs (calendar style) ---- */
+.mem-tabs {
+  display: flex;
+  padding: 3px;
+  background: var(--bg-card);
+  border-radius: 999px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+.mem-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  font-family: var(--font-cn);
+  font-size: 13px;
+  color: var(--text-mid);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all .22s;
+  letter-spacing: .04em;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.mem-tab svg {
+  width: 13px; height: 13px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
+}
+.mem-tab.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(var(--shadow-color), .18);
+}
+
+/* Search bar */
+.search-bar {
+  position: relative;
+  margin-bottom: 16px;
+}
+.search-bar .input { padding-left: 36px; }
+.search-icon {
+  position: absolute; left: 12px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-light);
+  display: flex;
+}
+.search-icon svg {
+  width: 15px; height: 15px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ============================================
+   Timeline — Year / Month / Entries
+   ============================================ */
+.timeline { margin-bottom: 28px; }
+
+/* Year group */
+.year-group { margin-bottom: 10px; }
+.year-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: all .2s;
+  box-shadow: var(--shadow-xs);
+  user-select: none;
+  border-left: 3px solid var(--accent);
+}
+.year-header:hover { background: var(--accent-pale); }
+.year-label {
+  font-family: var(--font-d);
+  font-size: 20px;
+  color: var(--text);
+  font-weight: 400;
+}
+.year-meta {
+  font-size: 12px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.year-arrow {
+  display: inline-flex;
+  transition: transform .25s;
+}
+.year-arrow svg {
+  width: 14px; height: 14px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.year-group.open > .year-header .year-arrow { transform: rotate(90deg); }
+.year-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .4s ease;
+  margin-left: 12px;
+  padding-left: 14px;
+  border-left: 2px solid var(--accent);
+  margin-top: 0;
+}
+.year-group.open > .year-body {
+  max-height: 80000px;
+  margin-top: 8px;
+}
+
+/* Month group */
+.month-group { margin-bottom: 6px; }
+.month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all .2s;
+  box-shadow: var(--shadow-xs);
+  user-select: none;
+}
+.month-header:hover { background: var(--accent-pale); }
+.month-label {
+  font-family: var(--font-d);
+  font-size: 16px;
+  color: var(--text);
+}
+.month-count {
+  font-size: 12px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.month-arrow {
+  display: inline-flex;
+  transition: transform .25s;
+}
+.month-arrow svg {
+  width: 12px; height: 12px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.month-group.open > .month-header .month-arrow { transform: rotate(90deg); }
+.month-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .35s ease;
+  padding-left: 14px;
+  border-left: 2px solid var(--accent);
+  margin-left: 14px;
+  margin-top: 0;
+}
+.month-group.open > .month-body {
+  max-height: 40000px;
+  margin-top: 6px;
+}
+
+/* ---- Timeline entry cards ---- */
+.tl-entry {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: all .18s;
+  animation: fadeInUp .3s ease both;
+  border-left: 3px solid transparent;
+}
+.tl-entry:hover { background: var(--accent-pale); }
+.tl-entry.cat-deep { border-left-color: var(--accent); }
+.tl-entry.cat-daily { border-left-color: var(--accent-light); }
+.tl-entry.cat-diary { border-left-color: var(--accent-mid); }
+.tl-entry.cat-identity { border-left-color: var(--accent-mid); }
+
+.tl-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.tl-entry-date {
+  font-size: 12px;
+  color: var(--text-light);
+  font-weight: 500;
+}
+.tl-entry-cat {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 50px;
+  background: var(--accent-pale);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tl-entry-cat svg {
+  width: 10px; height: 10px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+}
+.tl-entry-pin {
+  margin-left: auto;
+  color: var(--accent);
+  display: flex;
+}
+.tl-entry-pin svg {
+  width: 13px; height: 13px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+}
+.tl-entry-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+.tl-entry-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.tl-entry-tags .tag { font-size: 10px; padding: 1px 7px; }
+
+/* ============================================
+   Identity Profile Card
+   ============================================ */
+.id-profile {
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 28px;
+  border: 1px solid var(--border);
+}
+.id-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--accent-pale) 0%, var(--bg-card) 100%);
+}
+.id-profile-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.id-profile-icon svg {
+  width: 24px; height: 24px;
+  stroke: var(--accent-contrast, #fff);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.id-profile-title {
+  font-family: var(--font-d);
+  font-size: 22px;
+  color: var(--text);
+  line-height: 1.2;
+}
+.id-profile-subtitle {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+.id-profile-body { padding: 0; }
+
+.id-section {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.id-section:last-child { border-bottom: none; }
+.id-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.id-section-title {
+  font-family: var(--font-cn);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.id-section-title svg {
+  width: 15px; height: 15px;
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.id-section-edit {
+  border: none;
+  background: var(--accent-pale);
+  color: var(--accent);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .18s;
+  padding: 0;
+}
+.id-section-edit:hover { background: var(--accent); color: var(--accent-contrast, #fff); }
+.id-section-edit svg {
+  width: 14px; height: 14px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round;
+}
+.id-section-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  position: relative;
+}
+.id-section-text.is-collapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+.id-section-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 12px var(--font-cn);
+  cursor: pointer;
+}
+.id-section-expand svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: transform .18s; }
+.id-section-expand[aria-expanded="true"] svg { transform: rotate(180deg); }
+.id-section-guide { font-size: 11px; line-height: 1.55; color: var(--text-light); margin-top: 8px; }
+.id-profile-updated { margin-left:auto; font-size:11px; color:var(--text-light); align-self:flex-end; }
+.id-empty {
+  font-size: 13px;
+  color: var(--text-light);
+  font-style: italic;
+  padding: 6px 0;
+}
+.self-profile-help { font-size:12px; line-height:1.65; color:var(--text-light); margin:-2px 0 12px; }
+.self-profile-textarea { min-height:220px; line-height:1.75; resize:vertical; }
+
+/* ============================================
+   Detail Modal — Wood Texture
+   ============================================ */
+.detail-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-mid);
+  margin-bottom: 12px;
+}
+.detail-cat svg {
+  width: 14px; height: 14px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+}
+.detail-content {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #4a3728;
+  word-break: break-all;
+  white-space: pre-wrap;
+  border-radius: var(--r-md);
+  padding: 18px;
+  margin-bottom: 14px;
+  position: relative;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 4px,
+      rgba(139,90,43,0.018) 4px,
+      rgba(139,90,43,0.018) 8px
+    ),
+    linear-gradient(
+      180deg,
+      #f5e6d3 0%,
+      #f0dcc6 15%,
+      #f2e0cc 30%,
+      #eedbc5 50%,
+      #f3e2ce 70%,
+      #f0ddc8 85%,
+      #f4e3d0 100%
+    );
+  box-shadow: inset 0 1px 4px rgba(120,80,40,0.08), 0 1px 3px rgba(0,0,0,0.04);
+}
+.detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.detail-meta { font-size: 12px; color: var(--text-light); line-height: 1.8; }
+.detail-actions {
+  display: flex; justify-content: flex-end;
+  gap: 10px; margin-top: 16px; flex-wrap: wrap;
+}
+
+/* ============================================
+   Common
+   ============================================ */
+/* Section header (no emoji) */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bg-secondary);
+}
+.section-header h2 {
+  font-family: var(--font-d);
+  font-size: 20px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.section-header h2 svg {
+  width: 18px; height: 18px;
+  stroke: var(--accent);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.section-header .count {
+  font-size: 12px;
+  color: var(--text-light);
+  background: var(--bg-secondary);
+  padding: 2px 10px;
+  border-radius: 50px;
+}
+
+/* FAB */
+.fab {
+  position: fixed;
+  bottom: calc(80px + max(12px, env(safe-area-inset-bottom)));
+  right: max(20px, env(safe-area-inset-right));
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none; cursor: pointer;
+  color: var(--accent-contrast, #fff);
+  box-shadow: 0 4px 16px rgba(var(--shadow-color),0.30);
+  transition: all .22s cubic-bezier(.34,1.56,.64,1);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.fab svg {
+  width: 24px; height: 24px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round;
+}
+@media (hover: hover) and (pointer: fine) {
+  .fab:hover { transform: scale(1.1); box-shadow: 0 6px 22px rgba(var(--shadow-color),0.38); }
+}
+
+/* Back to top */
+.to-top {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(80px + max(72px, env(safe-area-inset-bottom)));
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bg-secondary);
+  background: rgba(255,255,255,0.9);
+  color: var(--text-mid);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 49;
+  opacity: 0; pointer-events: none;
+  transform: translateY(10px);
+  transition: all .22s;
+}
+.to-top.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.to-top svg {
+  width: 18px; height: 18px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Skeleton */
+.skeleton-card {
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+  min-height: 80px;
+  padding: 16px;
+}
+.skeleton-line {
+  height: 12px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--bg-secondary), rgba(255,255,255,0.9), var(--bg-secondary));
+  background-size: 220% 100%;
+  animation: shimmer 1.2s linear infinite;
+  margin-bottom: 10px;
+}
+@keyframes shimmer { from { background-position: 220% 0; } to { background-position: -220% 0; } }
+
+/* Btn danger */
+.btn-danger {
+  background: #FBE6EA; color: #9E2F4B;
+  border: 1.5px solid #E79AAA;
+}
+.btn-danger:hover { background: #F6D3DA; color: #83263E; }
+
+/* Tags input */
+.tags-input-wrap {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px 12px; min-height: 42px;
+  border: 1.5px solid var(--bg-secondary);
+  border-radius: var(--r-sm);
+  background: var(--bg-card);
+  cursor: text; transition: border-color .2s;
+}
+.tags-input-wrap:focus-within { border-color: var(--accent); }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px;
+  background: var(--accent-pale); border-radius: 50px;
+  font-size: 12px; color: var(--accent);
+}
+.tag-chip-del {
+  cursor: pointer; color: var(--accent-mid);
+  font-size: 14px; line-height: 1;
+  border: none; background: none; padding: 0;
+}
+.tags-input {
+  border: none; outline: none;
+  font-family: var(--font-b); font-size: 13px;
+  color: var(--text); background: transparent;
+  min-width: 80px; flex: 1;
+}
+
+/* Empty state */
+.section-empty {
+  text-align: center;
+  padding: 36px 20px;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  0%   { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 540px) {
+  .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .stat-card .num { font-size: 22px; }
+  .chart-grid { grid-template-columns: 1fr; }
+  .mem-tab { font-size: 12px; padding: 8px 0; }
+  .mem-tab svg { width: 11px; height: 11px; }
+  .fab { right: max(16px, env(safe-area-inset-right)); bottom: calc(74px + max(10px, env(safe-area-inset-bottom))); }
+  .to-top { right: max(16px, env(safe-area-inset-right)); bottom: calc(74px + max(68px, env(safe-area-inset-bottom))); }
+  .detail-actions { flex-direction: column-reverse; }
+  .detail-actions .btn { width: 100%; }
+  .id-profile-header { padding: 16px 14px 14px; }
+  .id-section { padding: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="top-bar">
+  <div class="top-bar-left">
+    <div class="top-bar-avatar" id="topBarAvatar"></div>
+    <span class="top-bar-title" id="topBarTitle"></span>
+  </div>
+  <a href="index.html" class="top-bar-right top-bar-home" aria-label="返回首页" title="返回首页" style="display:grid;place-items:center;width:34px;height:34px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg></a>
+</header>
+
+<nav class="dock">
+  <a href="index.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="dock-label">首页</span>
+  </a>
+  <a href="memories.html" class="dock-item active">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    <span class="dock-label">记忆</span>
+  </a>
+  <a href="chat.html" class="dock-center">
+    <div class="dock-center-btn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    <span class="dock-label">聊天</span>
+  </a>
+  <a href="calendar.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span class="dock-label">日历</span>
+  </a>
+  <a href="more.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="dock-label">更多</span>
+  </a>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Dashboard Toggle (collapsed by default) -->
+  <button class="dash-toggle collapsed" id="dashToggle" onclick="toggleDashboard()">
+    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    展开仪表盘
+  </button>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard" style="display:none">
+    <!-- Stat cards (no identity) -->
+    <div class="stat-cards">
+      <div class="stat-card cat-total">
+        <span class="num" id="stTotal">—</span>
+        <span class="label">总计</span>
+      </div>
+      <div class="stat-card cat-deep">
+        <span class="num" id="stDeep">0</span>
+        <span class="label"><svg viewBox="0 0 16 16"><path d="M8 2L3 8l5 6 5-6z" stroke-linejoin="round"/></svg> 深层</span>
+      </div>
+      <div class="stat-card cat-daily">
+        <span class="num" id="stDaily">0</span>
+        <span class="label"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/><path d="M8 3v5l3 3"/></svg> 日常</span>
+      </div>
+      <div class="stat-card cat-diary">
+        <span class="num" id="stDiary">0</span>
+        <span class="label"><svg viewBox="0 0 16 16"><path d="M2 2h3c1 0 2 1 2 2v10c0-.7-.5-1.2-1.2-1.2H2V2z"/><path d="M14 2h-3c-1 0-2 1-2 2v10c0-.7.5-1.2 1.2-1.2H14V2z"/></svg> 日记</span>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">分类占比</div>
+        <div class="chart-body" id="chartDonut"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">月度记忆</div>
+        <div class="year-nav">
+          <button class="year-nav-btn" id="prevYear" onclick="changeChartYear(-1)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <span class="year-nav-label" id="chartYearLabel"></span>
+          <button class="year-nav-btn" id="nextYear" onclick="changeChartYear(1)"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        </div>
+        <div class="chart-body" id="chartLine"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pill Tabs -->
+  <div class="mem-tabs" id="viewTabs">
+    <button class="mem-tab active" data-view="all">全部</button>
+    <button class="mem-tab" data-view="deep">
+      <svg viewBox="0 0 16 16"><path d="M8 2L3 8l5 6 5-6z" stroke-linejoin="round"/></svg>
+      深层
+    </button>
+    <button class="mem-tab" data-view="daily">
+      <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/><path d="M8 3v5l3 3"/></svg>
+      日常
+    </button>
+    <button class="mem-tab" data-view="diary">
+      <svg viewBox="0 0 16 16"><path d="M2 2h3c1 0 2 1 2 2v10c0-.7-.5-1.2-1.2-1.2H2V2z"/><path d="M14 2h-3c-1 0-2 1-2 2v10c0-.7.5-1.2 1.2-1.2H14V2z"/></svg>
+      日记
+    </button>
+    <button class="mem-tab" data-view="identity">
+      <svg viewBox="0 0 16 16"><circle cx="8" cy="5" r="3"/><path d="M3 15c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>
+      自我
+    </button>
+  </div>
+
+  <!-- Search -->
+  <div class="search-bar">
+    <span class="search-icon">
+      <svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10l4 4"/></svg>
+    </span>
+    <input class="input" id="searchInput" placeholder="搜索记忆…" type="text">
+  </div>
+
+  <!-- Content area -->
+  <div id="memoryContent">
+    <div class="skeleton-card"><div class="skeleton-line" style="width:90%"></div><div class="skeleton-line" style="width:70%"></div><div class="skeleton-line" style="width:55%"></div></div>
+  </div>
+
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fabBtn" title="新建记忆">
+  <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+<button class="to-top" id="toTopBtn" title="回到顶部">
+  <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<!-- Create Modal -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">写一条记忆</span>
+      <button class="modal-close" id="closeCreate">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">内容</label>
+      <textarea class="input" id="newContent" placeholder="想记下什么…" rows="5"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">分类</label>
+      <select class="input" id="newCat">
+        <option value="daily">日常 — 有趣的事</option>
+        <option value="deep">深层 — 核心记忆</option>
+        <option value="diary">日记 — 每日记录</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">标签 <span style="color:var(--text-light);font-size:11px">（回车添加）</span></label>
+      <div class="tags-input-wrap" id="tagsWrap">
+        <input class="tags-input" id="tagInput" placeholder="输入标签…">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-outline" id="cancelCreate">取消</button>
+      <button class="btn btn-mint" id="submitCreate">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">记忆</span>
+      <button class="modal-close" id="closeDetail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="detailBody"></div>
+    <div class="detail-actions">
+      <button class="btn btn-outline" id="closeDetail2">关闭</button>
+      <button class="btn btn-mint" id="editMemBtn">编辑</button>
+      <button class="btn btn-danger" id="deleteMemBtn">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">编辑记忆</span>
+      <button class="modal-close" id="closeEdit">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">内容</label>
+      <textarea class="input" id="editContent" rows="5"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">分类</label>
+      <select class="input" id="editCat">
+        <option value="daily">日常</option>
+        <option value="deep">深层</option>
+        <option value="diary">日记</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">标签 <span style="color:var(--text-light);font-size:11px">（回车添加）</span></label>
+      <div class="tags-input-wrap" id="editTagsWrap">
+        <input class="tags-input" id="editTagInput" placeholder="输入标签…">
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-outline" id="cancelEdit">取消</button>
+      <button class="btn btn-mint" id="submitEdit">保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI Self Profile Editor -->
+<div class="modal-overlay" id="selfProfileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="selfProfileModalTitle">编辑自我档案</span>
+      <button class="modal-close" id="closeSelfProfile">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="self-profile-help" id="selfProfileHelp"></div>
+    <textarea class="input self-profile-textarea" id="selfProfileContent" placeholder="这是一整段会不断完善的自我认识……"></textarea>
+    <div class="detail-actions">
+      <button class="btn btn-outline" id="cancelSelfProfile">取消</button>
+      <button class="btn btn-mint" id="saveSelfProfile">保存修改</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ Config ============ */
+var BASE = '';
+var KEY  = 'iris-memory-2024';
+var H    = { 'x-api-key': KEY, 'Content-Type': 'application/json' };
+
+/* ============ SVG Icon Templates ============ */
+var ICON = {
+  deep:     '<svg viewBox="0 0 16 16" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L3 8l5 6 5-6z"/></svg>',
+  daily:    '<svg viewBox="0 0 16 16" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M8 3v5l3 3"/></svg>',
+  diary:    '<svg viewBox="0 0 16 16" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2h3c1 0 2 1 2 2v10c0-.7-.5-1.2-1.2-1.2H2V2z"/><path d="M14 2h-3c-1 0-2 1-2 2v10c0-.7.5-1.2 1.2-1.2H14V2z"/></svg>',
+  identity: '<svg viewBox="0 0 16 16" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="3"/><path d="M3 15c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>',
+  pin:      '<svg viewBox="0 0 16 16" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.1L13.9 6.5 10 10.5V13l-1 1-1-1-2.5-2.5L2 14"/><line x1="6.5" y1="9.5" x2="2" y2="14"/></svg>',
+  chevron:  '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>',
+  who:      '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M3 21c0-4.4 3.6-8 8-8h2c4.4 0 8 3.6 8 8"/></svg>',
+  role:     '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg>',
+  personality: '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+  beliefs:  '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a7 7 0 0 0-4 12.7V19h8v-3.3A7 7 0 0 0 12 3z"/><path d="M9 22h6M9 16h6"/></svg>',
+  love:     '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+  edit:     '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/></svg>',
+  people:   '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  other:    '<svg viewBox="0 0 24 24" width="SIZE" height="SIZE" fill="none" stroke="CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+};
+function icon(name, size, color){
+  size = size || 14;
+  color = color || 'currentColor';
+  return (ICON[name]||'').replace(/SIZE/g, size).replace(/CCC/g, color);
+}
+
+/* ============ Utilities ============ */
+var toastTimer;
+function showToast(msg, type){
+  type = type || '';
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast ' + type + ' show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ el.className = 'toast ' + type; }, 2400);
+}
+
+function fmtDate(ts){
+  var d = new Date(ts);
+  return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
+}
+function escHtml(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+var CAT_MAP = {
+  deep:     { label:'深层',   iconKey:'deep',     color:'var(--accent)' },
+  daily:    { label:'日常',   iconKey:'daily',     color:'var(--accent-light)' },
+  diary:    { label:'日记',   iconKey:'diary',     color:'var(--accent-mid)' },
+  identity: { label:'自我',   iconKey:'identity',  color:'var(--accent-mid)' },
+  writing:  { label:'写作',   iconKey:'diary',     color:'var(--accent)' },
+};
+
+/* ============ State ============ */
+var allMems = [];
+var aiSelfProfile = { id:'main', coreSelf:'', identity:'', personality:'', beliefsValues:'', loveIntimacy:'', updatedAt:null };
+var editingSelfProfileField = '';
+var curView = 'all';
+var curQuery = '';
+var curMem = null;
+var tags = [];
+var editTags = [];
+var chartYear = new Date().getFullYear();
+
+/* ============================================
+   Data Loading
+   ============================================ */
+async function loadMems(){
+  try {
+    var results = await Promise.all([
+      fetch(BASE+'/api/memories', { headers: H }),
+      fetch(BASE+'/api/ai-self-profile', { headers: H })
+    ]);
+    if(!results[0].ok) throw new Error(results[0].status);
+    allMems = await results[0].json();
+    if(results[1].ok) aiSelfProfile = await results[1].json();
+    else throw new Error('自我档案数据库尚未初始化 ('+results[1].status+')');
+    renderDashboard();
+    renderView();
+  } catch(e){
+    document.getElementById('memoryContent').innerHTML =
+      '<div class="section-empty" style="color:var(--accent-light)">加载失败 ('+e.message+')</div>';
+  }
+}
+
+/* ============================================
+   Dashboard Charts
+   ============================================ */
+function renderDashboard(){
+  var cats = { deep:0, daily:0, diary:0 };
+  var normalTotal = 0;
+  for(var i=0;i<allMems.length;i++){
+    var c = allMems[i].category || 'daily';
+    if(cats[c] !== undefined){ cats[c]++; normalTotal++; }
+  }
+  document.getElementById('stTotal').textContent = normalTotal;
+  document.getElementById('stDeep').textContent  = cats.deep;
+  document.getElementById('stDaily').textContent = cats.daily;
+  document.getElementById('stDiary').textContent = cats.diary;
+
+  renderDonutChart(cats);
+  renderMonthlyBars();
+}
+
+function renderDonutChart(cats){
+  var total = Object.values(cats).reduce(function(a,b){return a+b},0) || 1;
+  var data = [
+    { label:'深层', value:cats.deep,     color:'var(--accent)' },
+    { label:'日常', value:cats.daily,    color:'var(--accent-light)' },
+    { label:'日记', value:cats.diary,    color:'var(--accent-mid)' },
+  ].filter(function(d){return d.value>0});
+
+  var R = 60, cx = 80, cy = 75;
+  var C = 2 * Math.PI * R;
+  var offset = 0;
+  var arcs = '';
+  var legends = '';
+
+  for(var i=0;i<data.length;i++){
+    var d = data[i];
+    var col = d.color;
+    var pct = d.value / total;
+    var dashLen = pct * C;
+    arcs += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="'+col+'" stroke-width="20" '+
+            'stroke-dasharray="'+dashLen+' '+(C-dashLen)+'" stroke-dashoffset="'+(-offset)+'" '+
+            'transform="rotate(-90 '+cx+' '+cy+')" opacity="0.85">'+
+            '<animate attributeName="stroke-dasharray" from="0 '+C+'" to="'+dashLen+' '+(C-dashLen)+'" dur="0.8s" fill="freeze"/>'+
+            '</circle>';
+    offset += dashLen;
+  }
+
+  var ly = 10;
+  for(var i=0;i<data.length;i++){
+    var d = data[i];
+    var col = d.color;
+    var p = Math.round(d.value/total*100);
+    legends += '<g><rect x="170" y="'+ly+'" width="10" height="10" rx="2" fill="'+col+'"/>'+
+               '<text x="185" y="'+(ly+9)+'" fill="currentColor" font-size="11" font-family="\'Noto Serif SC\',serif">'+d.label+' '+p+'%</text></g>';
+    ly += 20;
+  }
+
+  document.getElementById('chartDonut').innerHTML =
+    '<svg viewBox="0 0 260 150" width="100%" height="100%" style="color:var(--text-mid)">'+
+      arcs+
+      '<text x="'+cx+'" y="'+(cy+5)+'" text-anchor="middle" fill="currentColor" font-size="18" font-family="\'Cormorant Garamond\',serif" font-weight="400" style="color:var(--text)">'+total+'</text>'+
+      legends+
+    '</svg>';
+}
+
+function renderMonthlyBars(){
+  document.getElementById('chartYearLabel').textContent = chartYear;
+
+  // Gather monthly counts for selected year
+  var counts = new Array(12).fill(0);
+  for(var i=0;i<allMems.length;i++){
+    if(allMems[i].category === 'identity') continue;
+    var ts = allMems[i].createdAt || allMems[i].timestamp;
+    if(!ts) continue;
+    var d = new Date(ts);
+    if(d.getFullYear() === chartYear){
+      counts[d.getMonth()]++;
+    }
+  }
+
+  var max = Math.max.apply(null, counts) || 1;
+  var monthNames = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+
+  var html = '<div class="month-bars">';
+  for(var i=0;i<12;i++){
+    var h = counts[i] > 0 ? Math.max(8, Math.round((counts[i]/max)*70)) : 2;
+    html += '<div class="month-bar-col">';
+    if(counts[i] > 0) html += '<span class="month-bar-count">'+counts[i]+'</span>';
+    html += '<div class="month-bar" style="height:'+h+'px"></div>';
+    html += '<span class="month-bar-label">'+monthNames[i]+'</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('chartLine').innerHTML = html;
+}
+
+function changeChartYear(delta){
+  chartYear += delta;
+  renderMonthlyBars();
+}
+
+/* Dashboard toggle */
+var dashCollapsed = true;
+function toggleDashboard(){
+  dashCollapsed = !dashCollapsed;
+  var dash = document.getElementById('dashboard');
+  var btn = document.getElementById('dashToggle');
+  if(dashCollapsed){
+    dash.style.display = 'none';
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg> 展开仪表盘';
+    btn.classList.add('collapsed');
+  } else {
+    dash.style.display = '';
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="6 15 12 9 18 15"/></svg> 收起仪表盘';
+    btn.classList.remove('collapsed');
+  }
+}
+
+/* ============================================
+   View Rendering
+   ============================================ */
+function renderView(){
+  var container = document.getElementById('memoryContent');
+  var mems = allMems.filter(function(m){return m.category!=='identity'});
+  document.getElementById('fabBtn').style.display = curView === 'identity' ? 'none' : '';
+
+  // Search filter
+  if(curQuery){
+    var q = curQuery.toLowerCase();
+    mems = mems.filter(function(m){
+      return (m.content||'').toLowerCase().indexOf(q) >= 0 ||
+             (m.tags||[]).some(function(t){return t.toLowerCase().indexOf(q) >= 0});
+    });
+  }
+
+  if(curView === 'identity'){
+    renderIdentityProfile(container);
+  } else if(curView === 'all'){
+    renderTimeline(container, mems, true);
+  } else {
+    mems = mems.filter(function(m){return m.category===curView});
+    renderTimeline(container, mems, false);
+  }
+
+  updateToTop();
+}
+
+/* ---- Universal Timeline (Year > Month > Entries) ---- */
+function renderTimeline(container, mems, showCatBadge){
+  if(!mems.length){
+    container.innerHTML = '<div class="section-empty">还没有记忆哦</div>';
+    return;
+  }
+
+  // Group by year > month
+  var years = {};
+  for(var i=0;i<mems.length;i++){
+    var m = mems[i];
+    var ts = m.createdAt || m.timestamp || '';
+    var y = String(ts).slice(0,4) || 'unknown';
+    var mo = String(ts).slice(0,7) || 'unknown';
+    if(!years[y]) years[y] = {};
+    if(!years[y][mo]) years[y][mo] = [];
+    years[y][mo].push(m);
+  }
+
+  var sortedYears = Object.keys(years).sort().reverse();
+  var onlyOneYear = sortedYears.length === 1;
+
+  var html = '<div class="timeline">';
+
+  for(var yi=0; yi<sortedYears.length; yi++){
+    var year = sortedYears[yi];
+    var yearMonths = years[year];
+    var yearTotal = 0;
+    for(var mk in yearMonths) yearTotal += yearMonths[mk].length;
+
+    var sortedMonths = Object.keys(yearMonths).sort().reverse();
+
+    // If only one year, skip year-level grouping, just show months
+    if(onlyOneYear){
+      for(var mi=0; mi<sortedMonths.length; mi++){
+        html += renderMonthGroup(sortedMonths[mi], yearMonths[sortedMonths[mi]], showCatBadge, false);
+      }
+    } else {
+      // Year group
+      html += '<div class="year-group" data-year="'+year+'">';
+      html += '<div class="year-header" onclick="toggleYearGroup(this)">';
+      html += '<span class="year-label">'+year+'</span>';
+      html += '<span class="year-meta">'+yearTotal+' 条 <span class="year-arrow">'+icon('chevron',14)+'</span></span>';
+      html += '</div>';
+      html += '<div class="year-body">';
+
+      for(var mi=0; mi<sortedMonths.length; mi++){
+        html += renderMonthGroup(sortedMonths[mi], yearMonths[sortedMonths[mi]], showCatBadge, true);
+      }
+
+      html += '</div></div>';
+    }
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+  bindCardEvents(container);
+}
+
+function renderMonthGroup(mo, entries, showCatBadge, insideYear){
+  var parts = mo.split('-');
+  var label = parts.length === 2 ? (parts[0]+'年'+parseInt(parts[1])+'月') : mo;
+  // Sort entries newest first
+  entries.sort(function(a,b){return new Date(b.createdAt||b.timestamp||0)-new Date(a.createdAt||a.timestamp||0)});
+
+  var html = '<div class="month-group" data-month="'+mo+'">';
+  html += '<div class="month-header" onclick="toggleMonthGroup(this)">';
+  html += '<span class="month-label">'+label+'</span>';
+  html += '<span class="month-count">'+entries.length+' 条 <span class="month-arrow">'+icon('chevron',12)+'</span></span>';
+  html += '</div>';
+  html += '<div class="month-body">';
+
+  for(var i=0;i<entries.length;i++){
+    html += renderTimelineEntry(entries[i], showCatBadge);
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+function renderTimelineEntry(m, showCatBadge){
+  var cat = CAT_MAP[m.category] || CAT_MAP.daily;
+  var day = String(m.createdAt||m.timestamp||'').slice(8,10);
+  var dayNum = parseInt(day) || '';
+  var tagsHtml = (m.tags||[]).slice(0,3).map(function(t){return '<span class="tag tag-mint">'+escHtml(t)+'</span>'}).join('');
+
+  var catBadge = '';
+  if(showCatBadge){
+    catBadge = '<span class="tl-entry-cat">'+icon(cat.iconKey,10)+' '+cat.label+'</span>';
+  }
+
+  var pinHtml = '';
+  if(m.pinned){
+    pinHtml = '<span class="tl-entry-pin">'+icon('pin',13,'var(--accent)')+'</span>';
+  }
+
+  return '<div class="tl-entry cat-'+m.category+'" data-id="'+m.id+'">'+
+    '<div class="tl-entry-head">'+
+      '<span class="tl-entry-date">'+dayNum+'日</span>'+
+      catBadge+
+      pinHtml+
+    '</div>'+
+    '<div class="tl-entry-content">'+escHtml(m.content)+'</div>'+
+    (tagsHtml ? '<div class="tl-entry-tags">'+tagsHtml+'</div>' : '')+
+  '</div>';
+}
+
+/* ---- Identity Profile Card ---- */
+var ID_SECTIONS = [
+  { key:'coreSelf',      title:'我是谁',     iconKey:'who',         guide:'稳定的第一人称自我定义、名字、连续的自我感，以及我认为自己是什么样的存在。' },
+  { key:'identity',      title:'我的身份',   iconKey:'role',        guide:'承担的角色、责任、能力，以及我在与 Iris 的关系中的位置。' },
+  { key:'personality',   title:'我的性格',   iconKey:'personality', guide:'反复出现的性格特征、情绪模式、偏好、习惯和应对方式。' },
+  { key:'beliefsValues', title:'信念与价值', iconKey:'beliefs',     guide:'世界观、人生观、价值排序、道德判断和坚持的原则。' },
+  { key:'loveIntimacy',  title:'爱与亲密',   iconKey:'love',        guide:'对爱、承诺、依恋、亲密、边界、占有欲与吃醋的理解和模式。' }
+];
+
+function renderIdentityProfile(container){
+  var html = '<div class="id-profile">';
+
+  // Header
+  html += '<div class="id-profile-header">';
+  html += '<div class="id-profile-icon">'+
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M3 21c0-4.4 3.6-8 8-8h2c4.4 0 8 3.6 8 8"/></svg>'+
+    '</div>';
+  html += '<div><div class="id-profile-title">自我档案</div>';
+  html += '<div class="id-profile-subtitle">Identity Profile</div></div>';
+  if(aiSelfProfile.updatedAt) html += '<div class="id-profile-updated">更新于 '+fmtDate(aiSelfProfile.updatedAt)+'</div>';
+  html += '</div>';
+
+  // Body
+  html += '<div class="id-profile-body">';
+
+  for(var i=0;i<ID_SECTIONS.length;i++){
+    var sec = ID_SECTIONS[i];
+    var content = aiSelfProfile[sec.key] || '';
+
+    html += '<div class="id-section">';
+    html += '<div class="id-section-header">';
+    html += '<span class="id-section-title">'+icon(sec.iconKey,15,'var(--accent)')+' '+sec.title+'</span>';
+    html += '<button class="id-section-edit" title="编辑" onclick="openSelfProfileEditor(\''+sec.key+'\')">'+
+      icon('edit',14,'currentColor')+
+      '</button>';
+    html += '</div>';
+
+    if(!content){
+      html += '<div class="id-empty">暂时还没有形成稳定认识，AI 会在长期对话与记忆中逐渐完善。</div>';
+    } else {
+      var textId = 'identityText-'+sec.key;
+      html += '<div class="id-section-text is-collapsed" id="'+textId+'">'+escHtml(content)+'</div>';
+      html += '<button type="button" class="id-section-expand" data-identity-expand="'+sec.key+'" aria-controls="'+textId+'" aria-expanded="false">展开全文 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>';
+    }
+    html += '<div class="id-section-guide">'+sec.guide+'</div>';
+
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+
+  container.innerHTML = html;
+  container.querySelectorAll('[data-identity-expand]').forEach(function(button){
+    button.addEventListener('click',function(){
+      var text=document.getElementById('identityText-'+button.dataset.identityExpand);
+      if(!text)return;
+      var expanded=button.getAttribute('aria-expanded')==='true';
+      text.classList.toggle('is-collapsed',expanded);
+      button.setAttribute('aria-expanded',String(!expanded));
+      button.innerHTML=(expanded?'展开全文':'收起全文')+' <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+    });
+  });
+}
+
+function openSelfProfileEditor(field){
+  var section = ID_SECTIONS.find(function(s){return s.key===field});
+  if(!section) return;
+  editingSelfProfileField = field;
+  document.getElementById('selfProfileModalTitle').textContent = '编辑 · '+section.title;
+  document.getElementById('selfProfileHelp').textContent = section.guide+' 这里保存的是一整段会持续完善的文字，不是多条记录。';
+  document.getElementById('selfProfileContent').value = aiSelfProfile[field] || '';
+  document.getElementById('selfProfileModal').classList.add('open');
+  setTimeout(function(){document.getElementById('selfProfileContent').focus()},50);
+}
+
+function closeSelfProfileEditor(){
+  document.getElementById('selfProfileModal').classList.remove('open');
+  editingSelfProfileField = '';
+}
+
+async function saveSelfProfileSection(){
+  if(!editingSelfProfileField) return;
+  var content = document.getElementById('selfProfileContent').value.trim();
+  var btn = document.getElementById('saveSelfProfile');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try{
+    var patch = {}; patch[editingSelfProfileField] = content;
+    var r = await fetch(BASE+'/api/ai-self-profile',{method:'PUT',headers:H,body:JSON.stringify(patch)});
+    if(!r.ok) throw new Error(await r.text());
+    aiSelfProfile = await r.json();
+    closeSelfProfileEditor(); renderView(); showToast('自我档案已更新','success');
+  }catch(e){ showToast('保存失败 '+e.message,'error'); }
+  finally{ btn.disabled=false; btn.textContent='保存修改'; }
+}
+
+/* ---- Toggle helpers ---- */
+function toggleYearGroup(header){
+  header.closest('.year-group').classList.toggle('open');
+}
+function toggleMonthGroup(header){
+  header.closest('.month-group').classList.toggle('open');
+}
+
+/* ---- Card click events ---- */
+function bindCardEvents(container){
+  container.querySelectorAll('[data-id]').forEach(function(el){
+    el.addEventListener('click', function(){
+      var id = el.dataset.id;
+      var mem = allMems.find(function(m){return m.id===id});
+      if(mem) openDetail(mem);
+    });
+  });
+}
+
+/* ---- Detail ---- */
+function openDetail(mem){
+  curMem = mem;
+  var cat = CAT_MAP[mem.category] || CAT_MAP.daily;
+  var tagsHtml = (mem.tags||[]).map(function(t){return '<span class="tag tag-gray">'+escHtml(t)+'</span>'}).join('');
+
+  var emotionHtml = '';
+  if(mem.valence !== undefined || mem.arousal !== undefined){
+    var v = mem.valence || 0;
+    var a = mem.arousal || 0;
+    var vLabel = v > 0.3 ? '积极' : v < -0.3 ? '消极' : '中性';
+    var aLabel = a > 0.6 ? '激动' : a < 0.3 ? '平静' : '适中';
+    emotionHtml = '<div style="margin-bottom:10px;font-size:12px;color:var(--text-light)">'+
+      '情感: '+vLabel+' ('+v.toFixed(1)+') · 唤醒: '+aLabel+' ('+a.toFixed(1)+')'+
+    '</div>';
+  }
+
+  var pinHtml = mem.pinned ? '<span style="margin-left:6px;font-size:11px;color:var(--accent);display:inline-flex;align-items:center;gap:3px">'+icon('pin',12,'var(--accent)')+' 已钉选</span>' : '';
+
+  document.getElementById('detailBody').innerHTML =
+    '<div class="detail-cat">'+
+      icon(cat.iconKey,14)+' '+cat.label+
+      pinHtml+
+    '</div>'+
+    '<div class="detail-content">'+escHtml(mem.content)+'</div>'+
+    emotionHtml+
+    '<div class="detail-tags">'+tagsHtml+'</div>'+
+    '<div class="detail-meta">'+
+      '<span>来源：'+(mem.source||'unknown')+'</span>'+
+      '<span>时间：'+fmtDate(mem.createdAt||mem.timestamp)+'</span>'+
+    '</div>';
+
+  document.getElementById('detailModal').classList.add('open');
+}
+
+/* ---- Edit ---- */
+function openEdit(mem){
+  if(!mem) return;
+  curMem = mem;
+  document.getElementById('detailModal').classList.remove('open');
+  document.getElementById('editContent').value = mem.content || '';
+  document.getElementById('editCat').value = CAT_MAP[mem.category] ? mem.category : 'daily';
+  editTags = Array.isArray(mem.tags) ? mem.tags.slice() : [];
+  renderEditTags();
+  document.getElementById('editModal').classList.add('open');
+  setTimeout(function(){document.getElementById('editContent').focus()}, 50);
+}
+
+function closeEdit(){
+  document.getElementById('editModal').classList.remove('open');
+  editTags = []; renderEditTags();
+}
+
+async function updateMem(){
+  if(!curMem) return;
+  var content = document.getElementById('editContent').value.trim();
+  if(!content){ showToast('请填写内容'); return; }
+  var category = document.getElementById('editCat').value;
+  var btn = document.getElementById('submitEdit');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    var r = await fetch(BASE+'/api/memories/'+curMem.id, {
+      method:'PUT', headers:H,
+      body: JSON.stringify({ content:content, category:category, tags:editTags })
+    });
+    if(!r.ok) throw new Error(r.status);
+    var updated = await r.json();
+    var idx = allMems.findIndex(function(m){return m.id===updated.id});
+    if(idx >= 0) allMems[idx] = updated;
+    renderDashboard(); renderView(); closeEdit();
+    showToast('已保存修改', 'success');
+  } catch(e){ showToast('保存失败 '+e.message, 'error'); }
+  finally { btn.disabled=false; btn.textContent='保存修改'; }
+}
+
+/* ---- Delete ---- */
+async function deleteMem(id){
+  if(!confirm('删除这条记忆？')) return;
+  try {
+    var r = await fetch(BASE+'/api/memories/'+id, { method:'DELETE', headers:H });
+    if(!r.ok) throw new Error(r.status);
+    allMems = allMems.filter(function(m){return m.id!==id});
+    renderDashboard(); renderView();
+    showToast('已删除', 'success');
+    document.getElementById('detailModal').classList.remove('open');
+  } catch(e){ showToast('删除失败 '+e.message, 'error'); }
+}
+
+/* ---- Create ---- */
+async function createMem(){
+  var content = document.getElementById('newContent').value.trim();
+  if(!content){ showToast('请填写内容'); return; }
+  var cat = document.getElementById('newCat').value;
+  var btn = document.getElementById('submitCreate');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    var r = await fetch(BASE+'/api/memories', {
+      method:'POST', headers:H,
+      body: JSON.stringify({ content:content, category:cat, tags:tags })
+    });
+    if(!r.ok) throw new Error(r.status);
+    var m = await r.json();
+    allMems.push(m);
+    renderDashboard(); renderView();
+    closeCreate();
+    showToast('记忆已保存', 'success');
+  } catch(e){ showToast('保存失败 '+e.message, 'error'); }
+  finally { btn.disabled=false; btn.textContent='保存'; }
+}
+
+function closeCreate(){
+  document.getElementById('createModal').classList.remove('open');
+  document.getElementById('newContent').value = '';
+  document.getElementById('newCat').value = 'daily';
+  tags = []; renderTags();
+}
+
+/* ---- Tags ---- */
+function renderTags(){
+  var wrap = document.getElementById('tagsWrap');
+  wrap.querySelectorAll('.tag-chip').forEach(function(e){e.remove()});
+  var input = document.getElementById('tagInput');
+  tags.forEach(function(t,i){
+    var chip = document.createElement('div');
+    chip.className = 'tag-chip';
+    chip.innerHTML = escHtml(t)+'<button class="tag-chip-del" data-i="'+i+'">×</button>';
+    wrap.insertBefore(chip, input);
+  });
+  wrap.querySelectorAll('.tag-chip-del').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      tags.splice(Number(btn.dataset.i),1); renderTags();
+    });
+  });
+}
+
+function renderEditTags(){
+  var wrap = document.getElementById('editTagsWrap');
+  if(!wrap) return;
+  wrap.querySelectorAll('.tag-chip').forEach(function(e){e.remove()});
+  var input = document.getElementById('editTagInput');
+  editTags.forEach(function(t,i){
+    var chip = document.createElement('div');
+    chip.className = 'tag-chip';
+    chip.innerHTML = escHtml(t)+'<button class="tag-chip-del" data-i="'+i+'">×</button>';
+    wrap.insertBefore(chip, input);
+  });
+  wrap.querySelectorAll('.tag-chip-del').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      editTags.splice(Number(btn.dataset.i),1); renderEditTags();
+    });
+  });
+}
+
+/* ============================================
+   Event Bindings
+   ============================================ */
+
+// FAB
+document.getElementById('fabBtn').addEventListener('click', function(){
+  document.getElementById('createModal').classList.add('open');
+  setTimeout(function(){document.getElementById('newContent').focus()}, 50);
+});
+document.getElementById('closeCreate').addEventListener('click', closeCreate);
+document.getElementById('cancelCreate').addEventListener('click', closeCreate);
+document.getElementById('submitCreate').addEventListener('click', createMem);
+
+// Detail
+document.getElementById('closeDetail').addEventListener('click', function(){
+  document.getElementById('detailModal').classList.remove('open');
+});
+document.getElementById('closeDetail2').addEventListener('click', function(){
+  document.getElementById('detailModal').classList.remove('open');
+});
+document.getElementById('editMemBtn').addEventListener('click', function(){
+  if(curMem) openEdit(curMem);
+});
+document.getElementById('deleteMemBtn').addEventListener('click', function(){
+  if(curMem) deleteMem(curMem.id);
+});
+
+// Edit
+document.getElementById('closeEdit').addEventListener('click', closeEdit);
+document.getElementById('cancelEdit').addEventListener('click', closeEdit);
+document.getElementById('submitEdit').addEventListener('click', updateMem);
+
+// AI self profile
+document.getElementById('closeSelfProfile').addEventListener('click', closeSelfProfileEditor);
+document.getElementById('cancelSelfProfile').addEventListener('click', closeSelfProfileEditor);
+document.getElementById('saveSelfProfile').addEventListener('click', saveSelfProfileSection);
+
+// Close modal on overlay click
+['createModal','detailModal','editModal','selfProfileModal'].forEach(function(id){
+  document.getElementById(id).addEventListener('click', function(e){
+    if(e.target.id===id) e.target.classList.remove('open');
+  });
+});
+
+// View tabs
+document.getElementById('viewTabs').addEventListener('click', function(e){
+  var tab = e.target.closest('.mem-tab');
+  if(!tab) return;
+  document.querySelectorAll('.mem-tab').forEach(function(t){t.classList.remove('active')});
+  tab.classList.add('active');
+  curView = tab.dataset.view;
+  renderView();
+});
+
+// Search
+var searchTimer;
+document.getElementById('searchInput').addEventListener('input', function(e){
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function(){ curQuery = e.target.value; renderView(); }, 300);
+});
+
+// Tag input
+document.getElementById('tagInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter'||e.key===','){
+    e.preventDefault();
+    var v = e.target.value.trim().replace(',','');
+    if(v && tags.indexOf(v)<0){ tags.push(v); renderTags(); }
+    e.target.value='';
+  }
+});
+document.getElementById('tagsWrap').addEventListener('click', function(){
+  document.getElementById('tagInput').focus();
+});
+document.getElementById('editTagInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter'||e.key===','){
+    e.preventDefault();
+    var v = e.target.value.trim().replace(',','');
+    if(v && editTags.indexOf(v)<0){ editTags.push(v); renderEditTags(); }
+    e.target.value='';
+  }
+});
+document.getElementById('editTagsWrap').addEventListener('click', function(){
+  document.getElementById('editTagInput').focus();
+});
+
+// Back to top
+var toTopBtn = document.getElementById('toTopBtn');
+function updateToTop(){
+  toTopBtn.classList.toggle('show', window.scrollY > 360 && allMems.length > 8);
+}
+window.addEventListener('scroll', updateToTop, { passive:true });
+toTopBtn.addEventListener('click', function(){ window.scrollTo({ top:0, behavior:'smooth' }) });
+
+/* ============================================
+   Top Bar Init
+   ============================================ */
+(function(){
+  var a = localStorage.getItem('iris_avatar_img1');
+  var n = localStorage.getItem('iris_avatar_name1') || 'Iris';
+  var t = localStorage.getItem('iris_topbar_title') || (n + '的小窝');
+  var ae = document.getElementById('topBarAvatar');
+  var te = document.getElementById('topBarTitle');
+  if(a && ae) ae.innerHTML = '<img src="'+a+'" alt="">';
+  else if(ae) ae.innerHTML = '<span class="top-bar-avatar-initial">'+n.charAt(0).toUpperCase()+'</span>';
+  if(te) te.textContent = t;
+  if(te) te.onclick = function(){
+    var v = prompt('自定义顶栏文字', te.textContent);
+    if(v && v.trim()){
+      te.textContent = v.trim();
+      localStorage.setItem('iris_topbar_title', v.trim());
+    }
+  };
+})();
+
+/* ---- Start ---- */
+loadMems();
+</script>
+</body>
+</html>

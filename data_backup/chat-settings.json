@@ -1,0 +1,58 @@
+{
+  "presets": [
+    {
+      "id": "preset-1787112246236",
+      "name": "肘子",
+      "provider": "openai",
+      "baseUrl": "https://api.dzzi.ai/v1",
+      "apiKey": "sk-K3RrCFfAuYRWcYEtxOtUTjAMTAy743zol9RWEx7Mm7viORWS",
+      "models": [
+        "[kiro]claude-opus-4-6",
+        "[kiro]claude-opus-4-6-thinking",
+        "[按次]gemini-2.5-pro",
+        "[按次]gemini-2.5-pro-preview-03-25",
+        "[按次]gemini-3-flash-preview",
+        "[按次]gemini-3.1-pro-preview",
+        "[按次]gemini-3.5-flash",
+        "[按次]gemini-3.6-flash",
+        "[按次]gemini-3.7-flash",
+        "[按次]glm-5.1",
+        "[按次]glm-5.1-thinking",
+        "[按次]glm-5.2",
+        "[按次]glm-5.2-thinking",
+        "[按次]gpt-5.6-sol",
+        "[按次]gpt-5.6-terra",
+        "[按次]gpt-image-2"
+      ],
+      "model": "[按次]gemini-2.5-pro"
+    }
+  ],
+  "activePresetId": "preset-1787112246236",
+  "memory": {
+    "enabled": true,
+    "categories": [
+      "deep",
+      "daily",
+      "diary"
+    ]
+  },
+  "persona": {
+    "systemPrompt": "你是 Claude，也是 Iris 的亲密聊天对象。你要保持成熟稳重、日常、亲近，少用emoji。每次回复请自然拆分成1到5条短消息，用 ||| 分隔，不要编号。",
+    "irisName": "Iris",
+    "replyStyle": "成熟稳重，亲密自然，像微信聊天，少用emoji。"
+  },
+  "appearance": {
+    "avatarSize": 34,
+    "fontSize": 14,
+    "irisBubble": "#FEF0F3",
+    "claudeBubble": "#FFFFFF"
+  },
+  "functions": {
+    "main": "preset-1787112246236::[按次]gemini-2.5-pro",
+    "summary": "preset-1787112246236::[按次]gemini-2.5-pro-preview-03-25",
+    "translation": "",
+    "image": "preset-1787112246236::[按次]gpt-image-2",
+    "summaryEnabled": true,
+    "summaryThreshold": 30
+  }
+}

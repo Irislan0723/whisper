@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>时光信箱 · irisandclaude</title>
+<script src="init.js"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ---- 时光信箱专属 ---- */
+.letters-hero { text-align:center; margin-bottom:28px; }
+.letters-hero h1 { font-family:var(--font-d); font-size:36px; font-weight:300; letter-spacing:.05em; margin-bottom:6px; }
+.letters-hero p { font-family:var(--font-d); font-style:italic; font-size:16px; color:var(--brown-mid); }
+
+.identity-row { display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:24px; }
+.identity-label { font-size:12px; color:var(--brown-light); letter-spacing:.06em; }
+.identity-chip { min-width:92px; }
+
+.letters-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.letter-section { min-width:0; }
+.letter-section-title {
+  font-family:var(--font-d); font-size:20px; color:var(--brown-mid); margin-bottom:12px;
+  letter-spacing:.08em; display:flex; align-items:center; gap:8px;
+}
+.letter-section-title::after { content:''; flex:1; height:1px; background:var(--cream-dark); }
+.letter-list { display:flex; flex-direction:column; gap:12px; }
+
+.envelope-card {
+  position:relative; overflow:hidden; background:var(--white); border-radius:var(--r-md);
+  box-shadow:var(--shadow-xs); padding:16px 16px 18px; cursor:pointer;
+  min-height:138px; transition:transform .22s, box-shadow .22s, border-color .22s;
+  border:1px solid rgba(196,168,168,.18); animation:scaleIn .35s ease both;
+}
+.envelope-card::before, .envelope-card::after { content:''; position:absolute; left:0; right:0; bottom:0; pointer-events:none; }
+.envelope-card::before {
+  border-left:calc(50vw) solid transparent; border-right:calc(50vw) solid transparent;
+  border-bottom:52px solid rgba(245,237,229,.78); transform:translateX(-50%); left:50%; right:auto; width:0;
+}
+.envelope-card::after {
+  height:1px; background:linear-gradient(90deg, transparent, rgba(196,168,168,.35), transparent);
+  bottom:52px;
+}
+.envelope-card.unlocked { border-top:4px solid var(--mint); }
+.envelope-card.locked { border-top:4px solid var(--rose-light); }
+.envelope-card.hidden { opacity:.92; }
+.envelope-card.opening .letter-preview { animation:openLetter .28s cubic-bezier(.34,1.56,.64,1) both; transform-origin:top; }
+
+@keyframes openLetter { from{opacity:.2; transform:scaleY(.65)} to{opacity:1; transform:scaleY(1)} }
+
+.letter-top { position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.letter-people { font-size:12px; color:var(--brown-mid); line-height:1.7; }
+.letter-people strong { color:var(--brown); font-weight:500; }
+.wax-seal {
+  width:36px; height:36px; border-radius:50%; background:#A94C61; color:#fff;
+  display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(169,76,97,.26);
+  font-size:18px; flex-shrink:0; border:2px solid rgba(255,255,255,.45);
+}
+.letter-status { position:relative; z-index:1; font-size:13px; color:var(--brown-mid); margin-bottom:8px; }
+.letter-preview {
+  position:relative; z-index:1; font-family:var(--font-d); font-size:14px; line-height:1.7;
+  color:var(--brown); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.letter-meta { position:relative; z-index:1; display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:14px; font-size:11px; color:var(--brown-light); }
+.countdown { font-family:var(--font-d); font-style:italic; color:var(--brown-mid); font-size:13px; }
+.letter-actions { position:relative; z-index:2; display:flex; gap:6px; justify-content:flex-end; margin-top:10px; }
+.letter-actions .btn-icon { color:#8F5A5A; min-width:34px; min-height:34px; }
+
+.letter-fab {
+  position:fixed; right:max(28px, env(safe-area-inset-right)); bottom:max(28px, env(safe-area-inset-bottom));
+  width:54px; height:54px; border-radius:50%; background:var(--rose); color:#fff; border:none; cursor:pointer;
+  font-size:24px; box-shadow:0 4px 18px rgba(220,120,140,.34); z-index:70;
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .22s;
+}
+.letter-fab:active { transform:scale(.96); }
+
+.paper-input, .letter-paper {
+  background-color:var(--cream);
+  background-image:repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(196,168,168,.18) 32px);
+  border:1.5px solid var(--cream-dark); border-radius:var(--r-md);
+  font-family:var(--font-d); font-size:18px; line-height:32px; color:var(--brown);
+}
+.paper-input { min-height:190px; padding:18px 18px 16px; resize:vertical; outline:none; width:100%; }
+.paper-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(var(--shadow-color),.10); }
+.letter-paper { padding:24px 24px 20px; white-space:pre-wrap; line-height:1.9; font-size:20px; }
+.paper-note { margin-top:14px; font-size:12px; color:var(--brown-light); line-height:1.8; }
+.reply-paper { margin-top:16px; padding:14px 16px; border-left:3px solid var(--rose-light); background:rgba(255,255,255,.52); border-radius:var(--r-sm); }
+.reply-paper h4 { font-family:var(--font-d); font-size:17px; margin-bottom:8px; color:var(--brown-mid); }
+.reply-paper div { font-size:14px; line-height:1.8; color:var(--brown); white-space:pre-wrap; }
+
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.lock-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.mood-stamps { display:flex; gap:8px; flex-wrap:wrap; }
+.stamp {
+  border:1.5px solid var(--cream-dark); background:var(--white); border-radius:50px;
+  padding:7px 12px; cursor:pointer; font-family:var(--font-b); font-size:13px; color:var(--brown-mid);
+  transition:all .18s; user-select:none;
+}
+.stamp.active { background:#A94C61; color:#fff; border-color:#A94C61; }
+.switch-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; background:var(--cream); border-radius:var(--r-sm); }
+.switch-row span { font-size:13px; color:var(--brown-mid); }
+.switch-row input { width:18px; height:18px; accent-color:var(--mint); }
+
+.skeleton-card { height:138px; border-radius:var(--r-md); background:linear-gradient(90deg, rgba(255,255,255,.65), rgba(245,237,229,.9), rgba(255,255,255,.65)); background-size:220% 100%; animation:shimmer 1.2s infinite; box-shadow:var(--shadow-xs); }
+@keyframes shimmer { from{background-position:220% 0} to{background-position:-220% 0} }
+
+@media (hover: hover) and (pointer: fine) {
+  .envelope-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
+  .letter-fab:hover { transform:scale(1.08); box-shadow:0 6px 22px rgba(220,120,140,.42); }
+  .stamp:hover { border-color:var(--rose); color:var(--rose); }
+  .letter-actions .btn-icon:hover { background:var(--cream-dark); color:#6E3535; }
+}
+
+@media (max-width: 760px) {
+  .letters-grid { grid-template-columns:1fr; }
+  .form-row, .lock-row { grid-template-columns:1fr; }
+}
+@media (max-width: 480px) {
+  .letters-hero h1 { font-size:32px; }
+  .identity-row { flex-wrap:wrap; }
+  .letter-fab { right:max(18px, env(safe-area-inset-right)); bottom:max(18px, env(safe-area-inset-bottom)); width:52px; height:52px; }
+  .envelope-card { min-height:132px; padding:15px 14px 18px; }
+  .paper-input { min-height:170px; }
+  .letter-paper { padding:20px 18px; font-size:14px; }
+  .stamp { padding:8px 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="top-bar">
+  <div class="top-bar-left">
+    <div class="top-bar-avatar" id="topBarAvatar"></div>
+    <span class="top-bar-title" id="topBarTitle"></span>
+  </div>
+  <a href="index.html" class="top-bar-right top-bar-home" aria-label="返回首页" title="返回首页" style="display:grid;place-items:center;width:34px;height:34px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg></a>
+</header>
+
+<!-- Bottom Dock -->
+<nav class="dock">
+  <a href="index.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="dock-label">首页</span>
+  </a>
+  <a href="memories.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    <span class="dock-label">记忆</span>
+  </a>
+  <a href="chat.html" class="dock-center">
+    <div class="dock-center-btn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    <span class="dock-label">聊天</span>
+  </a>
+  <a href="calendar.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span class="dock-label">日历</span>
+  </a>
+  <a href="more.html" class="dock-item">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="dock-label">更多</span>
+  </a>
+</nav>
+
+<div class="page-wrap">
+  <div class="letters-hero anim-1">
+    <h1>时光信箱</h1>
+    <p>letters sealed with time, password, and tenderness</p>
+  </div>
+
+  <div class="identity-row anim-2">
+    <span class="identity-label">当前身份</span>
+    <div class="chip-bar" id="identityFilter">
+      <button class="chip identity-chip active" data-who="iris">Iris</button>
+      <button class="chip identity-chip" data-who="claude">Claude</button>
+    </div>
+  </div>
+
+  <div class="letters-grid anim-3">
+    <section class="letter-section">
+      <div class="letter-section-title">寄出的信</div>
+      <div class="letter-list" id="sentList"></div>
+    </section>
+    <section class="letter-section">
+      <div class="letter-section-title">收到的信</div>
+      <div class="letter-list" id="receivedList"></div>
+    </section>
+  </div>
+</div>
+
+<button class="letter-fab" id="openWrite" title="写信">✉</button>
+
+<!-- 写信 / 编辑 -->
+<div class="modal-overlay" id="writeModal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <span class="modal-title" id="writeTitle">写一封信</span>
+      <button class="modal-close" id="closeWrite">✕</button>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">写信人</label>
+        <select class="input" id="letterFrom">
+          <option value="iris">Iris</option>
+          <option value="claude">Claude</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">收件人</label>
+        <select class="input" id="letterTo">
+          <option value="claude">Claude</option>
+          <option value="iris">Iris</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">正文</label>
+      <textarea class="paper-input" id="letterContent" placeholder="把想说的话写在这里…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">心情印章</label>
+      <div class="mood-stamps" id="moodStamps">
+        <button class="stamp active" data-mood="happy">😊 开心</button>
+        <button class="stamp" data-mood="loved">🥰 被爱</button>
+        <button class="stamp" data-mood="calm">😌 平静</button>
+        <button class="stamp" data-mood="sad">🥺 难过</button>
+        <button class="stamp" data-mood="miss">🌙 想念</button>
+        <button class="stamp" data-mood="secret">🔐 秘密</button>
+      </div>
+    </div>
+
+    <div id="lockFields">
+      <label class="form-label">解封条件</label>
+      <div class="lock-row">
+        <input class="input" id="lockDays" type="number" min="0" placeholder="天数">
+        <input class="input" id="lockHours" type="number" min="0" placeholder="小时">
+        <input class="input" id="lockMinutes" type="number" min="0" placeholder="分钟">
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <input class="input" id="letterPassword" type="password" placeholder="密码锁，可不填">
+      </div>
+      <div class="switch-row form-group">
+        <span>隐藏模式：完全隐藏到解封后</span>
+        <input type="checkbox" id="hideUntilUnlock">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-outline" id="cancelWrite">取消</button>
+      <button class="btn btn-mint" id="saveLetter">保存 ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- 查看信件 -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title" id="viewTitle">一封信</span>
+      <button class="modal-close" id="closeView">✕</button>
+    </div>
+    <div id="viewBody"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-outline" id="replyBtn">回信</button>
+      <button class="btn" id="deleteBtn" style="background:#FEE;color:#9C3D50;border:1.5px solid #F5BEC8">删除</button>
+      <button class="btn btn-mint" id="closeView2">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 解锁 -->
+<div class="modal-overlay" id="unlockModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">解封这封信</span>
+      <button class="modal-close" id="closeUnlock">✕</button>
+    </div>
+    <p style="font-size:14px;color:var(--brown-mid);line-height:1.8;margin-bottom:14px">如果时间已经到了，可以直接解封；如果想提前看，请输入密码。</p>
+    <input class="input" id="unlockPassword" type="password" placeholder="输入密码">
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" id="cancelUnlock">取消</button>
+      <button class="btn btn-mint" id="tryUnlock">解封</button>
+    </div>
+  </div>
+</div>
+
+<!-- 回信 -->
+<div class="modal-overlay" id="replyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">写回信</span>
+      <button class="modal-close" id="closeReply">✕</button>
+    </div>
+    <textarea class="paper-input" id="replyContent" placeholder="写下你的回信…" style="min-height:150px"></textarea>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" id="cancelReply">取消</button>
+      <button class="btn btn-rose" id="sendReply">发送回信</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BASE = '';
+const KEY  = 'iris-memory-2024';
+const H    = { 'x-api-key': KEY, 'Content-Type': 'application/json' };
+
+const MOOD_META = {
+  happy:  { label:'开心', icon:'😊' },
+  loved:  { label:'被爱', icon:'🥰' },
+  calm:   { label:'平静', icon:'😌' },
+  sad:    { label:'难过', icon:'🥺' },
+  miss:   { label:'想念', icon:'🌙' },
+  secret: { label:'秘密', icon:'🔐' },
+};
+const PERSON = { iris:'Iris', claude:'Claude' };
+
+let letters = [];
+let currentWho = 'iris';
+let selectedMood = 'happy';
+let editingId = null;
+let activeLetter = null;
+let toastTimer;
+
+function showToast(msg, type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type+' show';
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ el.className='toast '+type; },2400);
+}
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtTime(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function isUnlocked(l){ return !!l.isUnlocked || (l.unlockAt && new Date(l.unlockAt).getTime() <= Date.now()); }
+function hasPassword(l){ return !!l.hasPassword || !!l.password; }
+function timeLeft(ts){
+  if(!ts) return '';
+  let ms = new Date(ts).getTime() - Date.now();
+  if(ms <= 0) return '可以解封了';
+  const d=Math.floor(ms/86400000); ms%=86400000;
+  const h=Math.floor(ms/3600000); ms%=3600000;
+  const m=Math.ceil(ms/60000);
+  if(d>0) return `还有${d}天${h}时`;
+  if(h>0) return `还有${h}时${m}分`;
+  return `还有${m}分`;
+}
+async function hashText(text){
+  if(!text) return null;
+  if(window.crypto?.subtle){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  let h=0; for(let i=0;i<text.length;i++) h=Math.imul(31,h)+text.charCodeAt(i)|0;
+  return 'h'+Math.abs(h);
+}
+
+function renderSkeleton(){
+  const html = '<div class="skeleton-card"></div><div class="skeleton-card"></div>';
+  document.getElementById('sentList').innerHTML = html;
+  document.getElementById('receivedList').innerHTML = html;
+}
+async function loadLetters(){
+  renderSkeleton();
+  try{
+    const r = await fetch(`${BASE}/api/letters?who=${currentWho}`, { headers:H });
+    if(!r.ok) throw new Error(r.status);
+    letters = await r.json();
+    renderLetters();
+  }catch(e){
+    document.getElementById('sentList').innerHTML = `<div class="loading" style="color:var(--rose)">加载失败 (${e.message})</div>`;
+    document.getElementById('receivedList').innerHTML = '';
+  }
+}
+function renderLetters(){
+  const sent = letters.filter(l=>l.from===currentWho);
+  const received = letters.filter(l=>l.to===currentWho || (l.hideUntilUnlock && !isUnlocked(l) && !l.from));
+  document.getElementById('sentList').innerHTML = sent.length ? sent.map(letterHtml).join('') : emptyHtml('还没有寄出的信');
+  document.getElementById('receivedList').innerHTML = received.length ? received.map(letterHtml).join('') : emptyHtml('还没有收到的信');
+  document.querySelectorAll('.envelope-card').forEach(card=>{
+    card.addEventListener('click', e=>{
+      if(e.target.closest('.letter-actions')) return;
+      const l = letters.find(x=>x.id===card.dataset.id);
+      if(!l) return;
+      card.classList.add('opening');
+      setTimeout(()=>card.classList.remove('opening'), 320);
+      openLetter(l);
+    });
+  });
+  document.querySelectorAll('.edit-letter').forEach(btn=>btn.addEventListener('click', e=>{
+    e.stopPropagation(); openEdit(letters.find(l=>l.id===btn.dataset.id));
+  }));
+  document.querySelectorAll('.del-letter').forEach(btn=>btn.addEventListener('click', e=>{
+    e.stopPropagation(); deleteLetter(btn.dataset.id);
+  }));
+}
+function emptyHtml(text){ return `<div class="empty-state" style="padding:36px 16px"><div class="ei">✉️</div><p>${text}</p></div>`; }
+function letterHtml(l){
+  const unlocked = isUnlocked(l);
+  const hidden = l.hideUntilUnlock && !unlocked && !l.from;
+  const meta = MOOD_META[l.moodTag] || MOOD_META.secret;
+  const status = unlocked ? '已解封' : (l.unlockAt ? timeLeft(l.unlockAt) : '等待解封');
+  const pass = !unlocked && hasPassword(l) ? ' 🔐' : '';
+  const people = hidden ? '神秘来信' : `<strong>${PERSON[l.from]||'某人'}</strong> → <strong>${PERSON[l.to]||'某人'}</strong>`;
+  const preview = hidden ? '有一封神秘来信…' : (unlocked || l.from===currentWho ? escHtml(l.content || '一封没有内容的信') : '这封信还没有到打开的时候。');
+  const canEdit = l.from===currentWho && !unlocked;
+  return `
+  <article class="envelope-card ${unlocked?'unlocked':'locked'} ${hidden?'hidden':''}" data-id="${l.id}">
+    <div class="letter-top">
+      <div class="letter-people">${people}</div>
+      <div class="wax-seal" title="${meta.label}">${meta.icon}</div>
+    </div>
+    <div class="letter-status">${unlocked ? '📖 可以阅读' : '🔒 '+status+pass}</div>
+    <div class="letter-preview">${preview}</div>
+    <div class="letter-meta"><span>${fmtTime(l.createdAt)}</span><span class="countdown">${!unlocked && l.unlockAt ? status : ''}</span></div>
+    ${canEdit ? `<div class="letter-actions"><button class="btn-icon edit-letter" data-id="${l.id}" title="编辑">✎</button><button class="btn-icon del-letter" data-id="${l.id}" title="删除">🗑</button></div>` : ''}
+  </article>`;
+}
+
+function openWriteModal(){
+  editingId = null;
+  document.getElementById('writeTitle').textContent = '写一封信';
+  document.getElementById('letterFrom').value = currentWho;
+  document.getElementById('letterTo').value = currentWho === 'iris' ? 'claude' : 'iris';
+  document.getElementById('letterFrom').disabled = false;
+  document.getElementById('letterTo').disabled = false;
+  document.getElementById('letterContent').value = '';
+  document.getElementById('lockFields').style.display = '';
+  document.getElementById('lockDays').value = '';
+  document.getElementById('lockHours').value = '';
+  document.getElementById('lockMinutes').value = '';
+  document.getElementById('letterPassword').value = '';
+  document.getElementById('hideUntilUnlock').checked = false;
+  setMood('happy');
+  document.getElementById('writeModal').classList.add('open');
+  setTimeout(()=>document.getElementById('letterContent').focus(), 60);
+}
+function openEdit(l){
+  if(!l) return;
+  editingId = l.id;
+  document.getElementById('writeTitle').textContent = '编辑这封信';
+  document.getElementById('letterFrom').value = l.from;
+  document.getElementById('letterTo').value = l.to;
+  document.getElementById('letterFrom').disabled = true;
+  document.getElementById('letterTo').disabled = true;
+  document.getElementById('letterContent').value = l.content || '';
+  document.getElementById('lockFields').style.display = '';
+  document.getElementById('lockDays').value = '';
+  document.getElementById('lockHours').value = '';
+  document.getElementById('lockMinutes').value = '';
+  document.getElementById('letterPassword').value = '';
+  document.getElementById('hideUntilUnlock').checked = !!l.hideUntilUnlock;
+  setMood(l.moodTag || 'happy');
+  document.getElementById('writeModal').classList.add('open');
+}
+function closeWrite(){ document.getElementById('writeModal').classList.remove('open'); }
+function setMood(mood){
+  selectedMood = mood;
+  document.querySelectorAll('#moodStamps .stamp').forEach(s=>s.classList.toggle('active', s.dataset.mood===mood));
+}
+async function saveLetter(){
+  const content = document.getElementById('letterContent').value.trim();
+  if(!content){ showToast('正文还没写'); return; }
+  const from = document.getElementById('letterFrom').value;
+  const to = document.getElementById('letterTo').value;
+  if(from===to){ showToast('收件人不能和写信人一样'); return; }
+  const d=Number(document.getElementById('lockDays').value||0);
+  const h=Number(document.getElementById('lockHours').value||0);
+  const m=Number(document.getElementById('lockMinutes').value||0);
+  const lockMs = ((d*24+h)*60+m)*60000;
+  const unlockAt = lockMs>0 ? new Date(Date.now()+lockMs).toISOString() : null;
+  const password = await hashText(document.getElementById('letterPassword').value.trim());
+  const body = { from, to, content, moodTag:selectedMood, unlockAt, password, hideUntilUnlock:document.getElementById('hideUntilUnlock').checked, allowReply:true };
+  const btn=document.getElementById('saveLetter');
+  btn.disabled=true; btn.textContent='保存中…';
+  try{
+    const url = editingId ? `${BASE}/api/letters/${editingId}` : `${BASE}/api/letters`;
+    const method = editingId ? 'PUT' : 'POST';
+    if(editingId) body.who = currentWho;
+    const r=await fetch(url,{method,headers:H,body:JSON.stringify(body)});
+    if(!r.ok){ const e=await r.json().catch(()=>({error:r.status})); throw new Error(e.error||r.status); }
+    closeWrite(); showToast(editingId?'已更新':'信已封好 ✓','success'); loadLetters();
+  }catch(e){ showToast('保存失败 '+e.message,'error'); }
+  finally{ btn.disabled=false; btn.textContent='保存 ✓'; }
+}
+
+function openLetter(l){
+  activeLetter = l;
+  if(!isUnlocked(l)){
+    document.getElementById('unlockPassword').value = '';
+    document.getElementById('unlockModal').classList.add('open');
+    return;
+  }
+  document.getElementById('viewTitle').textContent = `${PERSON[l.from]} 写给 ${PERSON[l.to]} 的信`;
+  const replyHtml = l.reply ? `<div class="reply-paper"><h4>回信</h4><div>${escHtml(l.reply.content)}</div><p class="paper-note">${fmtTime(l.reply.createdAt)}</p></div>` : '';
+  document.getElementById('viewBody').innerHTML = `
+    <div class="letter-paper">${escHtml(l.content || '')}</div>
+    <div class="paper-note">寄件时间：${fmtTime(l.createdAt)}<br>解封时间：${l.unlockAt ? fmtTime(l.unlockAt) : '无时间锁'}</div>
+    ${replyHtml}
+  `;
+  document.getElementById('replyBtn').style.display = (l.to===currentWho && l.allowReply && !l.reply) ? '' : 'none';
+  document.getElementById('viewModal').classList.add('open');
+}
+async function tryUnlock(){
+  if(!activeLetter) return;
+  const password = await hashText(document.getElementById('unlockPassword').value.trim());
+  try{
+    const r=await fetch(`${BASE}/api/letters/${activeLetter.id}/unlock`,{method:'POST',headers:H,body:JSON.stringify({password})});
+    if(!r.ok){ const e=await r.json().catch(()=>({error:r.status})); throw new Error(e.error||r.status); }
+    const unlocked=await r.json();
+    document.getElementById('unlockModal').classList.remove('open');
+    showToast('解封成功 ✓','success');
+    await loadLetters();
+    openLetter(unlocked);
+  }catch(e){ showToast('解封失败：密码不对或时间未到','error'); }
+}
+async function sendReply(){
+  if(!activeLetter) return;
+  const content=document.getElementById('replyContent').value.trim();
+  if(!content){ showToast('回信还没写'); return; }
+  try{
+    const r=await fetch(`${BASE}/api/letters/${activeLetter.id}/reply`,{method:'POST',headers:H,body:JSON.stringify({who:currentWho,content})});
+    if(!r.ok){ const e=await r.json().catch(()=>({error:r.status})); throw new Error(e.error||r.status); }
+    document.getElementById('replyModal').classList.remove('open');
+    document.getElementById('viewModal').classList.remove('open');
+    showToast('回信已保存 ✓','success'); loadLetters();
+  }catch(e){ showToast('回信失败 '+e.message,'error'); }
+}
+async function deleteLetter(id){
+  const target=id || activeLetter?.id;
+  if(!target || !confirm('删除这封信？')) return;
+  try{
+    const r=await fetch(`${BASE}/api/letters/${target}`,{method:'DELETE',headers:H});
+    if(!r.ok) throw new Error(r.status);
+    document.getElementById('viewModal').classList.remove('open');
+    showToast('已删除','success'); loadLetters();
+  }catch(e){ showToast('删除失败 '+e.message,'error'); }
+}
+
+// 事件
+document.getElementById('openWrite').addEventListener('click', openWriteModal);
+document.getElementById('closeWrite').addEventListener('click', closeWrite);
+document.getElementById('cancelWrite').addEventListener('click', closeWrite);
+document.getElementById('saveLetter').addEventListener('click', saveLetter);
+document.getElementById('closeView').addEventListener('click', ()=>document.getElementById('viewModal').classList.remove('open'));
+document.getElementById('closeView2').addEventListener('click', ()=>document.getElementById('viewModal').classList.remove('open'));
+document.getElementById('deleteBtn').addEventListener('click', ()=>deleteLetter());
+document.getElementById('replyBtn').addEventListener('click', ()=>{ document.getElementById('replyContent').value=''; document.getElementById('replyModal').classList.add('open'); setTimeout(()=>document.getElementById('replyContent').focus(),60); });
+document.getElementById('closeUnlock').addEventListener('click', ()=>document.getElementById('unlockModal').classList.remove('open'));
+document.getElementById('cancelUnlock').addEventListener('click', ()=>document.getElementById('unlockModal').classList.remove('open'));
+document.getElementById('tryUnlock').addEventListener('click', tryUnlock);
+document.getElementById('closeReply').addEventListener('click', ()=>document.getElementById('replyModal').classList.remove('open'));
+document.getElementById('cancelReply').addEventListener('click', ()=>document.getElementById('replyModal').classList.remove('open'));
+document.getElementById('sendReply').addEventListener('click', sendReply);
+
+['writeModal','viewModal','unlockModal','replyModal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', e=>{ if(e.target.id===id) e.target.classList.remove('open'); });
+});
+document.getElementById('identityFilter').addEventListener('click', e=>{
+  const chip=e.target.closest('.chip'); if(!chip) return;
+  document.querySelectorAll('#identityFilter .chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active'); currentWho=chip.dataset.who; loadLetters();
+});
+document.getElementById('moodStamps').addEventListener('click', e=>{
+  const st=e.target.closest('.stamp'); if(!st) return; setMood(st.dataset.mood);
+});
+document.getElementById('letterFrom').addEventListener('change', ()=>{ document.getElementById('letterTo').value = document.getElementById('letterFrom').value === 'iris' ? 'claude' : 'iris'; });
+
+loadLetters();
+setInterval(()=>renderLetters(), 60000);
+
+// Top bar init
+(function(){
+  var a = localStorage.getItem('iris_avatar_img1');
+  var n = localStorage.getItem('iris_avatar_name1') || 'Iris';
+  var t = localStorage.getItem('iris_topbar_title') || (n + '的小窝');
+  var ae = document.getElementById('topBarAvatar');
+  var te = document.getElementById('topBarTitle');
+  if(a && ae) ae.innerHTML = '<img src="'+a+'" alt="">';
+  else if(ae) ae.innerHTML = '<span class="top-bar-avatar-initial">'+n.charAt(0).toUpperCase()+'</span>';
+  if(te) te.textContent = t;
+  if(te) te.onclick = function(){
+    var v = prompt('自定义顶栏文字', te.textContent);
+    if(v && v.trim()){ te.textContent = v.trim(); localStorage.setItem('iris_topbar_title', v.trim()); }
+  };
+})();
+</script>
+</body>
+</html>

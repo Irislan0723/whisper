@@ -1,0 +1,22 @@
+[
+  {
+    "id": "msv4m72guhq8i5gix7i",
+    "role": "iris",
+    "content": "你好",
+    "image": null,
+    "quote": null,
+    "favorite": false,
+    "createdAt": "2026-08-16T01:28:41.032Z",
+    "updatedAt": "2026-08-16T01:28:41.032Z"
+  },
+  {
+    "id": "msylvsmhqh6s2dg3fzi",
+    "role": "iris",
+    "content": "好吧",
+    "image": null,
+    "quote": null,
+    "favorite": false,
+    "createdAt": "2026-08-18T11:55:20.873Z",
+    "updatedAt": "2026-08-18T11:55:20.873Z"
+  }
+]
