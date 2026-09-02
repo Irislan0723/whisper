@@ -3486,14 +3486,14 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     const resp = await fetch(baseUrl + "/relay/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
-      body: JSON.stringify({ message: fullMessage, systemPrompt })
+      body: JSON.stringify({ message: fullMessage, systemPrompt, model })
     });
     if (!resp.ok) {
       const errText = await resp.text().catch(() => "");
       throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
     }
     const data = await resp.json();
-    return { model: data.model || "cc-pro", text: data.text || "" };
+    return { model: data.model || model || "cc-pro", text: data.text || "" };
   }
 
   if (preset?.provider === "anthropic") {
@@ -4098,12 +4098,18 @@ app.post("/api/chat/models", apiAuth, async (req, res) => {
   const provider = req.body.provider || "openai";
   if (!baseUrl || !apiKey) return res.status(400).json({ error: "baseUrl and apiKey required" });
 
-  // Claude Code Relay — 不需要拉取，返回固定模型列表
+  // Claude Code Relay — 返回 Pro 订阅可用的所有模型
   if (provider === "cc") {
     return res.json({ models: [
-      { id: "cc-pro", name: "CC Pro (默认)" },
-      { id: "cc-opus", name: "CC Opus" },
-      { id: "cc-sonnet", name: "CC Sonnet" }
+      { id: "claude-sonnet-4-5-20250514", name: "Sonnet 4.5" },
+      { id: "claude-opus-4-6", name: "Opus 4.6" },
+      { id: "claude-sonnet-4-6", name: "Sonnet 4.6" },
+      { id: "claude-opus-4-8", name: "Opus 4.8" },
+      { id: "claude-opus-4-7", name: "Opus 4.7" },
+      { id: "claude-opus-5-0", name: "Opus 5" },
+      { id: "claude-sonnet-5-0", name: "Sonnet 5" },
+      { id: "claude-haiku-4-5-20251001", name: "Haiku 4.5" },
+      { id: "claude-fable-5-1", name: "Fable 5.1" }
     ]});
   }
 
