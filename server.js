@@ -3483,10 +3483,16 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       historyText ? "最近对话记录：\n" + historyText + "\n---" : "",
       userText
     ].filter(Boolean).join("\n");
+    // 提取第一张图片的 base64（如果有）
+    const firstImage = chatImages.length ? chatImages[0] : null;
+    let imageBase64 = null;
+    if (firstImage && typeof firstImage === "string" && firstImage.startsWith("data:")) {
+      imageBase64 = firstImage;
+    }
     const resp = await fetch(baseUrl + "/relay/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
-      body: JSON.stringify({ message: fullMessage, systemPrompt, model })
+      body: JSON.stringify({ message: fullMessage, systemPrompt, model, image: imageBase64 })
     });
     if (!resp.ok) {
       const errText = await resp.text().catch(() => "");
