@@ -48,6 +48,12 @@ function invokeClaude({ systemPrompt, message, model, sessionId }) {
       args.push("--resume", sessionId);
     }
 
+    // 禁用所有 MCP 工具 — CC CLI 登录后会加载官端 MCP 连接器，
+    // 我们不要它用真实工具，只要它输出 <tool_call> 文本标签由前端执行
+    // 注意：--disallowedTools 对 MCP 工具无效（已知 bug），
+    // 必须用 --strict-mcp-config + 空配置来彻底屏蔽
+    args.push("--strict-mcp-config", "--mcp-config", "{}");
+
     // 不使用 autocompact — 由前端控制上下文，不让 CC 花额度压缩
 
     // 系统提示词：写入临时文件再用 --system-prompt-file（避免 shell 参数过长）
