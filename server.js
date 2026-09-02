@@ -3473,26 +3473,44 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     ];
   }
 
-  // ── Claude Code Relay（走 Pro 订阅额度） ──
+  // ── Claude Code Relay（走 Pro 订阅额度，精简上下文节省额度） ──
   if (preset?.provider === "cc") {
-    const historyText = (history || []).slice(-16).map(m => {
+    // CC 是无状态 CLI，没有工具能力。构建精简版 systemPrompt，
+    // 剔除所有工具指令，只保留人设、状态、记忆、摘要等核心上下文。
+    const ccSystemParts = [
+      `当前时间：${nowStr}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
+      settings.persona?.irisName ? `Iris 的称呼：${settings.persona.irisName}` : "",
+      settings.persona?.replyStyle ? `Claude 回复风格：${settings.persona.replyStyle}` : "",
+      // 状态信息（只保留事实，不需要工具操作指令）
+      companionStatusText ? `【近期陪伴状态】\n${companionStatusText}` : "",
+      pendingCompanionText ? `【待处理陪伴邀请】\n${pendingCompanionText}\n（你无法在此调用工具回应，请用自然语言表达你的态度。）` : "",
+      pendingListeningText ? `【待处理一起听邀请】请用自然语言回应。` : "",
+      transferStatusText ? `【近期转账状态】\n${transferStatusText}` : "",
+      // 日历、天气 — 精简
+      dailyCalendarText ? `【今日状态】\n${dailyCalendarText}` : "",
+      dailyWeatherText ? `【天气】${dailyWeatherText}` : "",
+      // 自我档案 — 保留，维持角色一致性
+      selfProfileText ? `【自我档案】\n${selfProfileText}` : "",
+      // 相关记忆 — CC 不能自己搜索，自动注入的记忆是唯一记忆来源，非常重要
+      memoryText ? `【相关记忆】\n${memoryText}\n若与当前对话冲突，以当前对话为准。` : "",
+      // 表情包 — CC 可以通过文字标记发表情包
+      "Iris 发来的"【表情包】"是她发送的表情包图片的语义描述。"
+    ].filter(Boolean).join("\n\n");
+
+    // 对话历史：CC 无状态，每次都发，限 10 条 × 400 字节省额度
+    const historyText = (history || []).slice(-10).map(m => {
       const name = m.role === "iris" ? "Iris" : "Claude";
-      return name + ": " + (m.content || "").slice(0, 800);
+      return name + ": " + (m.content || "").slice(0, 400);
     }).join("\n");
     const fullMessage = [
-      historyText ? "最近对话记录：\n" + historyText + "\n---" : "",
+      historyText ? "最近对话：\n" + historyText + "\n---" : "",
       userText
     ].filter(Boolean).join("\n");
-    // 提取第一张图片的 base64（如果有）
-    const firstImage = chatImages.length ? chatImages[0] : null;
-    let imageBase64 = null;
-    if (firstImage && typeof firstImage === "string" && firstImage.startsWith("data:")) {
-      imageBase64 = firstImage;
-    }
+
     const resp = await fetch(baseUrl + "/relay/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
-      body: JSON.stringify({ message: fullMessage, systemPrompt, model, image: imageBase64 })
+      body: JSON.stringify({ message: fullMessage, systemPrompt: ccSystemParts, model })
     });
     if (!resp.ok) {
       const errText = await resp.text().catch(() => "");
