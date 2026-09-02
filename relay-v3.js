@@ -52,7 +52,7 @@ function invokeClaude({ systemPrompt, message, model, sessionId }) {
     // 我们不要它用真实工具，只要它输出 <tool_call> 文本标签由前端执行
     // 注意：--disallowedTools 对 MCP 工具无效（已知 bug），
     // 必须用 --strict-mcp-config + 空配置来彻底屏蔽
-    args.push("--strict-mcp-config", "--mcp-config", "{}");
+    args.push("--strict-mcp-config", "--mcp-config", JSON.stringify({ mcpServers: {} }));
 
     // 不使用 autocompact — 由前端控制上下文，不让 CC 花额度压缩
 
