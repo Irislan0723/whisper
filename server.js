@@ -3473,6 +3473,29 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     ];
   }
 
+  // ── Claude Code Relay（走 Pro 订阅额度） ──
+  if (preset?.provider === "cc") {
+    const historyText = (history || []).slice(-16).map(m => {
+      const name = m.role === "iris" ? "Iris" : "Claude";
+      return name + ": " + (m.content || "").slice(0, 800);
+    }).join("\n");
+    const fullMessage = [
+      historyText ? "最近对话记录：\n" + historyText + "\n---" : "",
+      userText
+    ].filter(Boolean).join("\n");
+    const resp = await fetch(baseUrl + "/relay/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
+      body: JSON.stringify({ message: fullMessage, systemPrompt })
+    });
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
+    }
+    const data = await resp.json();
+    return { model: data.model || "cc-pro", text: data.text || "" };
+  }
+
   if (preset?.provider === "anthropic") {
     let anthropicContent = userText;
     if (chatImages.length) {
@@ -4074,6 +4097,16 @@ app.post("/api/chat/models", apiAuth, async (req, res) => {
   const apiKey  = req.body.apiKey;
   const provider = req.body.provider || "openai";
   if (!baseUrl || !apiKey) return res.status(400).json({ error: "baseUrl and apiKey required" });
+
+  // Claude Code Relay — 不需要拉取，返回固定模型列表
+  if (provider === "cc") {
+    return res.json({ models: [
+      { id: "cc-pro", name: "CC Pro (默认)" },
+      { id: "cc-opus", name: "CC Opus" },
+      { id: "cc-sonnet", name: "CC Sonnet" }
+    ]});
+  }
+
   try {
     const r = await fetch(`${baseUrl}/models`, {
       headers: provider === "anthropic"
