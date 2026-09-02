@@ -3493,7 +3493,9 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
     }
     const data = await resp.json();
-    return { model: data.model || model || "cc-pro", text: data.text || "" };
+    const ccText = data.text || "";
+    const { text: visibleText, reasoning: inlineReasoning } = splitInlineThinking(ccText);
+    return { model: data.model || model || "cc-pro", text: visibleText, reasoning: data.thinking || inlineReasoning || "" };
   }
 
   if (preset?.provider === "anthropic") {
