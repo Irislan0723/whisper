@@ -43,8 +43,8 @@ ssh ubuntu@101.32.214.236 "cd /home/ubuntu/memory-service && git fetch origin <b
 # 拉前端文件（示例，按实际改过的文件名替换）
 ssh ubuntu@101.32.214.236 "cd /home/ubuntu/memory-service && git fetch origin <branch> && git checkout origin/<branch> -- public/chat-app-xxx.js"
 
-# 重启服务
-ssh ubuntu@101.32.214.236 "pm2 restart all"
+# 重启服务（进程名是 memory，不是 whisper！）
+ssh ubuntu@101.32.214.236 "pm2 restart memory"
 ```
 
 ---
