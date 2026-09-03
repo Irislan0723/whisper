@@ -2608,7 +2608,7 @@ const listeningToolGroupV88=TOOL_GROUPS_V17.find(group=>group[0]==='一起听');
 if(listeningToolGroupV88){listeningToolGroupV88[1]=[...LISTENING_TOOL_NAMES_V88];listeningToolGroupV88[2]=[...LISTENING_TOOL_LABELS_V88]}
 else TOOL_GROUPS_V17.push(['一起听',[...LISTENING_TOOL_NAMES_V88],[...LISTENING_TOOL_LABELS_V88]]);
 const toolConfigV85Base=toolConfigV17;
-toolConfigV17=function(value){const config=toolConfigV85Base(value);if(config.mode!=='all'){const legacy=config.allowed.includes('manage_listening_room');config.allowed=config.allowed.filter(name=>name!=='manage_listening_room');if(legacy||!LISTENING_TOOL_NAMES_V88.some(name=>config.allowed.includes(name)))config.allowed=[...new Set([...config.allowed,...LISTENING_TOOL_NAMES_V88])]}return config};
+toolConfigV17=function(value){const config=toolConfigV85Base(value);if(config.mode!=='all'){const ver=Number(value?.version||0);const legacy=config.allowed.includes('manage_listening_room');config.allowed=config.allowed.filter(name=>name!=='manage_listening_room');if(legacy||(ver<5&&!LISTENING_TOOL_NAMES_V88.some(name=>config.allowed.includes(name))))config.allowed=[...new Set([...config.allowed,...LISTENING_TOOL_NAMES_V88])]}return config};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>renderToolManagerV17?.());else renderToolManagerV17?.();
 
 /* V80: API / Agent per-conversation mode toggle.  Inserted above the model
@@ -2617,7 +2617,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 const MODE_ICON_V80='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
 function injectModeToggleStylesV80(){if($('modeToggleStylesV80'))return;document.head.insertAdjacentHTML('beforeend','<style id="modeToggleStylesV80">.right-menu-mode-v80{padding:8px 0 6px;margin-bottom:2px}.right-menu-mode-label-v80{display:flex;align-items:center;gap:10px;margin:0 4px 8px;color:var(--chat-muted);font-size:12px}.right-menu-mode-label-v80 .right-menu-icon{display:flex;align-items:center}.mode-segmented-v80{display:flex;width:100%;border-radius:10px;overflow:hidden;border:1px solid var(--chat-border);background:var(--chat-bg)}.mode-segmented-v80 button{flex:1;padding:8px 0;border:0;background:transparent;color:var(--chat-muted);font:13px var(--font-b);cursor:pointer;transition:background .15s,color .15s}.mode-segmented-v80 button.active{background:var(--chat-accent);color:var(--accent-contrast)}.right-model-hint-v80{margin:0 0 8px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--chat-accent) 10%,var(--chat-bg));color:var(--chat-muted);font:12px/1.5 var(--font-b);text-align:center}</style>')}
 function ensureModeToggleV80(){const root=$('rightSettingsMenuV12');if(!root||$('modeToggleV80'))return;const modelSection=root.querySelector('.right-menu-model');if(!modelSection)return;const section=document.createElement('section');section.className='right-menu-mode-v80';section.id='modeToggleV80';section.innerHTML='<div class="right-menu-mode-label-v80"><span class="right-menu-icon">'+MODE_ICON_V80+'</span><span>对话模式</span></div><div class="mode-segmented-v80" id="modeSegmentedV80"><button type="button" data-mode="api">API</button><button type="button" data-mode="agent">Agent</button></div>';root.insertBefore(section,modelSection);section.querySelectorAll('[data-mode]').forEach(btn=>{btn.onclick=()=>switchModeV80(btn.dataset.mode)})}
-async function switchModeV80(mode){if(!current)return;const next=mode==='agent'?'agent':'api';if((current.mode||'api')===next)return;try{await updateConversation(current.id,{mode:next});current.mode=next;hydrateModeToggleV80();toast(next==='agent'?'已切换到 Agent 模式':'已切换到 API 模式','success')}catch(error){toast('切换模式失败：'+error.message,'error')}}
+async function switchModeV80(mode){if(!current)return;const next=mode==='agent'?'agent':'api';if((current.mode||'api')===next)return;try{await updateConversation(current.id,{mode:next});current.mode=next;hydrateModeToggleV80();renderToolManagerV17();toast(next==='agent'?'已切换到 Agent 模式':'已切换到 API 模式','success')}catch(error){toast('切换模式失败：'+error.message,'error')}}
 function hydrateModeToggleV80(){ensureModeToggleV80();const mode=(current?.mode||'api');const seg=$('modeSegmentedV80');if(seg)seg.querySelectorAll('button').forEach(btn=>btn.classList.toggle('active',btn.dataset.mode===mode));setModelPickerLabelV12()}
 function presetsForModeV80(){const mode=(current?.mode||'api');const all=settings.presets||[];return mode==='agent'?all.filter(p=>p.provider==='cc'):all.filter(p=>p.provider!=='cc')}
 const openModelSheetV12Base=openModelSheetV12;
@@ -2626,3 +2626,35 @@ const hydrateRightV80Base=hydrateRight;
 hydrateRight=function(){hydrateRightV80Base();hydrateModeToggleV80()};
 function initModeToggleV80(){injectModeToggleStylesV80();ensureModeToggleV80()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initModeToggleV80);else initModeToggleV80();
+
+/* V88b: Agent mode tool config — override toolConfigV17 & persistToolConfigV17
+   so the tool manager shows agent defaults (memory + self-profile) when in agent
+   mode, and saves agent-mode tool changes to the conversation object instead of
+   the role. */
+const CC_AGENT_DEFAULT_TOOLS_V88=new Set(['read_self_profile','update_self_profile','read_memories','search_memories','add_memory','update_memory','delete_memory']);
+const toolConfigV88bBase=toolConfigV17;
+toolConfigV17=function(value){
+  if((current?.mode||'api')==='agent'){
+    const agentCfg=current.agentToolConfig;
+    if(agentCfg&&typeof agentCfg==='object'){
+      return{enabled:agentCfg.enabled!==false,mode:'custom',allowed:Array.isArray(agentCfg.allowed)?agentCfg.allowed:[]}
+    }
+    /* 无保存过的 agentToolConfig → 默认只开启 agent 默认工具 */
+    const base=toolConfigV88bBase(value);
+    const agentAllowed=base.mode==='all'?[...CC_AGENT_DEFAULT_TOOLS_V88]:base.allowed.filter(name=>CC_AGENT_DEFAULT_TOOLS_V88.has(name));
+    return{enabled:true,mode:'custom',allowed:agentAllowed}
+  }
+  return toolConfigV88bBase(value)
+};
+const persistToolConfigV88bBase=persistToolConfigV17;
+persistToolConfigV17=async function(config){
+  if((current?.mode||'api')==='agent'){
+    try{
+      const saved=await updateConversation(current.id,{agentToolConfig:config});
+      current.agentToolConfig=saved.agentToolConfig||config;
+      renderToolManagerV17();toast('Agent 工具设置已保存','success')
+    }catch(e){toast('保存失败：'+e.message,'error')}
+    return
+  }
+  return persistToolConfigV88bBase(config)
+};

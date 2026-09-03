@@ -2468,7 +2468,7 @@ async function selectRelatedMemoriesForConversation(conversation, query, categor
     const significantlyStronger = prior && score >= Number(prior.score || 0) * 1.35 + 1;
     if (recentlyInjected && !significantlyStronger) continue;
     selected.push(memory);
-    if (selected.length >= 5) break;
+    if (selected.length >= 3) break;
   }
   return selected;
 }
@@ -3633,10 +3633,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       canQuoteUserMessage ? `【可引用消息】\n${quoteableMessages.slice(-8).map(m => `- id=${m.id}：${String(m.content || "[图片]").replace(/\s+/g, " ").slice(0, 80)}`).join("\n")}` : "",
       // dynamic tools: user-toggled non-default tools
       dynamicToolDesc ? `【当前已开启的额外工具】\n${dynamicToolDesc}` : "",
-      // stickers: compact for CC (drop long descriptions, keep ID+name+tags)
-      stickerPromptForDynamic
-        ? stickerPromptForDynamic.replace(/^(- [a-z0-9_]+｜)(.+)$/gm, (_, pfx, rest) => pfx + rest.split("、").slice(0, 3).join("、"))
-        : ""
+      stickerPromptForDynamic || ""
     ].filter(Boolean).join("\n");
 
     // ── 首次调用：发完整人设 + 工具；resume：只发动态上下文 ──
@@ -4170,7 +4167,11 @@ app.post("/api/chat/conversations", apiAuth, (req, res) => {
 app.put("/api/chat/conversations/:id", apiAuth, (req, res) => {
   const list = readChatConversations(); const idx = list.findIndex(x => x.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: "Conversation not found" });
-  ["title", "roleId", "presetId", "model", "pinned", "archived", "appearance", "multiBubble", "mergeBubbles", "imageRetention", "autoTranslate", "imageGenerationEnabled", "mcpConfig", "mode", "agentProvider", "agentModel"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; });
+  ["title", "roleId", "presetId", "model", "pinned", "archived", "appearance", "multiBubble", "mergeBubbles", "imageRetention", "autoTranslate", "imageGenerationEnabled", "mcpConfig", "mode", "agentProvider", "agentModel", "agentToolConfig"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; });
+  // 归一化 agentToolConfig（如果传入的话）
+  if (req.body.agentToolConfig !== undefined && req.body.agentToolConfig && typeof req.body.agentToolConfig === "object") {
+    list[idx].agentToolConfig = normaliseRoleToolConfig(req.body.agentToolConfig);
+  }
   list[idx].updatedAt = chatNow();
   writeChatConversations(list);
   if (req.body.imageRetention !== undefined) {
@@ -4756,9 +4757,11 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
     settings.memory = { ...(settings.memory || {}), enabled: role.memoryEnabled !== false };
     settings.toolConfig = normaliseRoleToolConfig(role.toolConfig);
     settings.recentToolActivity = ensureArray(conversation.recentToolActivity).slice(-12);
-    // Agent 模式：强制只开启默认工具（记忆 + 自我档案），其他由用户动态开启
+    // Agent 模式：优先使用对话级 agentToolConfig，否则回退到默认过滤
     if ((conversation.mode || "api") === "agent") {
-      settings.toolConfig = agentModeToolConfig(settings.toolConfig);
+      settings.toolConfig = (conversation.agentToolConfig && typeof conversation.agentToolConfig === "object")
+        ? normaliseRoleToolConfig(conversation.agentToolConfig)
+        : agentModeToolConfig(settings.toolConfig);
     }
   }
   const profile = readChatProfile();
@@ -5158,9 +5161,11 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
     settings.memory = { ...(settings.memory || {}), enabled: role.memoryEnabled !== false };
     settings.toolConfig = normaliseRoleToolConfig(role.toolConfig);
     settings.recentToolActivity = ensureArray(conversation.recentToolActivity).slice(-12);
-    // Agent 模式：强制只开启默认工具（记忆 + 自我档案），其他由用户动态开启
+    // Agent 模式：优先使用对话级 agentToolConfig，否则回退到默认过滤
     if ((conversation.mode || "api") === "agent") {
-      settings.toolConfig = agentModeToolConfig(settings.toolConfig);
+      settings.toolConfig = (conversation.agentToolConfig && typeof conversation.agentToolConfig === "object")
+        ? normaliseRoleToolConfig(conversation.agentToolConfig)
+        : agentModeToolConfig(settings.toolConfig);
     }
   }
   const profile = readChatProfile();
