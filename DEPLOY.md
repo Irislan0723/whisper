@@ -43,7 +43,8 @@ ssh ubuntu@101.32.214.236 "cd /home/ubuntu/memory-service && git fetch origin <b
 # 拉前端文件（示例，按实际改过的文件名替换）
 ssh ubuntu@101.32.214.236 "cd /home/ubuntu/memory-service && git fetch origin <branch> && git checkout origin/<branch> -- public/chat-app-xxx.js"
 
-# 重启服务（TODO: Iris 补充重启命令，pm2 restart？systemctl？）
+# 重启服务
+ssh ubuntu@101.32.214.236 "pm2 restart all"
 ```
 
 ---
@@ -65,7 +66,8 @@ ssh root@45.32.68.56 "cd /opt/cc-relay && curl -o relay-tmux.js https://raw.gith
 # US VPS — CC Relay 日志
 ssh root@45.32.68.56 "journalctl -u cc-relay -f --no-pager"
 
-# 香港服务器 — Whisper 日志（TODO: Iris 补充命令）
+# 香港服务器 — Whisper 日志
+ssh ubuntu@101.32.214.236 "pm2 logs"
 ```
 
 ---
