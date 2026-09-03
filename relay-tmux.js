@@ -84,7 +84,7 @@ function startCC(systemPrompt) {
   const startScript = join(DATA, "start-claude.sh");
   writeFileSync(startScript, [
     "#!/bin/bash",
-    `exec claude --system-prompt-file "${promptFile}" --tools "" --settings "${settingsFile}"`
+    `exec claude --system-prompt-file "${promptFile}" --tools "" --settings "${settingsFile}" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`
   ].join("\n") + "\n", { mode: 0o755 });
 
   // 杀旧 session
