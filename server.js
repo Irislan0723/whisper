@@ -2325,6 +2325,19 @@ function getActiveChatPreset(settings) {
   const presets = Array.isArray(settings.presets) ? settings.presets : [];
   return presets.find(p => p.id === settings.activePresetId) || presets[0] || null;
 }
+/** Agent 模式下，用 conversation.agentProvider 找到对应 preset 并覆盖 settings */
+function applyAgentPresetOverride(settings, conversation) {
+  if ((conversation.mode || "api") !== "agent") return;
+  const agentProvider = conversation.agentProvider || "cc";
+  const agentPreset = ensureArray(settings.presets).find(p => p.provider === agentProvider);
+  if (!agentPreset) return;
+  settings.activePresetId = agentPreset.id;
+  if (conversation.agentModel) {
+    settings.presets = ensureArray(settings.presets).map(p =>
+      p.id === agentPreset.id ? { ...p, model: conversation.agentModel } : p
+    );
+  }
+}
 async function buildMemoryPreview(categories = ["deep", "daily", "diary"]) {
   const mems = (await dbAll("memories")).map(memoryFromDb);
   const cats = new Set(categories && categories.length ? categories : ["deep", "daily", "diary"]);
@@ -4081,13 +4094,14 @@ app.get("/api/chat/conversations", apiAuth, (req, res) => {
 });
 app.post("/api/chat/conversations", apiAuth, (req, res) => {
   const now = chatNow();
-  const item = { id: generateId(), title: String(req.body.title || "新对话").slice(0, 80), roleId: req.body.roleId || "", presetId: req.body.presetId || "", model: req.body.model || "", pinned: false, archived: false, imageRetention: "5-turns", autoTranslate: false, imageGenerationEnabled: false, mcpConfig: { enabled: false, allConnectors: false, connectorIds: [] }, createdAt: now, updatedAt: now };
+  const mode = req.body.mode === "agent" ? "agent" : "api";
+  const item = { id: generateId(), title: String(req.body.title || "新对话").slice(0, 80), roleId: req.body.roleId || "", presetId: req.body.presetId || "", model: req.body.model || "", mode, agentProvider: mode === "agent" ? (req.body.agentProvider || "cc") : "", agentModel: req.body.agentModel || "", pinned: false, archived: false, imageRetention: "5-turns", autoTranslate: false, imageGenerationEnabled: false, mcpConfig: { enabled: false, allConnectors: false, connectorIds: [] }, createdAt: now, updatedAt: now };
   const list = readChatConversations(); list.push(item); writeChatConversations(list); res.status(201).json(item);
 });
 app.put("/api/chat/conversations/:id", apiAuth, (req, res) => {
   const list = readChatConversations(); const idx = list.findIndex(x => x.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: "Conversation not found" });
-  ["title", "roleId", "presetId", "model", "pinned", "archived", "appearance", "multiBubble", "mergeBubbles", "imageRetention", "autoTranslate", "imageGenerationEnabled", "mcpConfig"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; });
+  ["title", "roleId", "presetId", "model", "pinned", "archived", "appearance", "multiBubble", "mergeBubbles", "imageRetention", "autoTranslate", "imageGenerationEnabled", "mcpConfig", "mode", "agentProvider", "agentModel"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; });
   list[idx].updatedAt = chatNow();
   writeChatConversations(list);
   if (req.body.imageRetention !== undefined) {
@@ -4662,6 +4676,7 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
     settings.activePresetId = conversation.presetId;
     settings.presets = ensureArray(settings.presets).map(p => p.id === conversation.presetId && conversation.model ? { ...p, model: conversation.model } : p);
   }
+  applyAgentPresetOverride(settings, conversation);
   if (role) {
     const rolePrompt = removeLegacyBubbleInstruction([
       role.identity ? `你的身份：${role.identity}` : "",
@@ -5047,6 +5062,7 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
     settings.activePresetId = conversation.presetId;
     settings.presets = ensureArray(settings.presets).map(preset => preset.id === conversation.presetId ? { ...preset, model: conversation.model } : preset);
   }
+  applyAgentPresetOverride(settings, conversation);
   const role = readChatRoles().find(item => item.id === conversation.roleId);
   if (role) {
     const rolePrompt = removeLegacyBubbleInstruction([
