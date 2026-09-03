@@ -3646,16 +3646,11 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     for (let round = 0; round < 6; round++) {
       let data;
       if (round === 0) {
-        if (isNewSession) {
-          // 新 session：静态 system prompt（人设 + 默认工具 + 日程），动态上下文 + 用户消息
-          const fullSystemPrompt = [systemPrompt, defaultToolDesc].filter(Boolean).join("\n\n");
-          const firstMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
-          data = await ccSend(firstMsg, fullSystemPrompt);
-        } else {
-          // resume：不发 system prompt（已在 session 里），只发动态上下文 + 用户消息
-          const resumeMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
-          data = await ccSend(resumeMsg, null);
-        }
+        // round 0 始终带 systemPrompt：新 session 用来初始化，resume 用来让 relay 缓存
+        // （防止 relay 重启后丢失 lastSysPrompt 导致 CC 无法重新启动）
+        const fullSystemPrompt = [systemPrompt, defaultToolDesc].filter(Boolean).join("\n\n");
+        const firstMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
+        data = await ccSend(firstMsg, fullSystemPrompt);
       } else {
         // 工具结果轮：直接发送结果文本（在已有 session 内）
         data = await ccSend(lastToolResult, null);
