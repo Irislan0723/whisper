@@ -3591,14 +3591,30 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     // 动态工具描述（其他已开启工具，每轮注入）
     const dynamicToolDesc = ccToolDescriptions(roundDynamicTools);
 
-    // ── 工具行动记录压缩：写入类只保留摘要，查询类保留结果 ──
+    // ── tool activity compression: write/MCP = summary only, dedup consecutive, 24h cap ──
     const WRITE_TOOL_NAMES = new Set(["add_memory", "update_memory", "delete_memory", "update_self_profile", "save_mood", "write_letter", "add_calendar_event", "update_calendar_event", "delete_calendar_event", "publish_daily_note", "manage_companion_invitation", "manage_transfer", "send_listening_invitation", "respond_listening_invitation"]);
-    const compressedToolActivity = ensureArray(settings.recentToolActivity).map(item => {
-      if (WRITE_TOOL_NAMES.has(item.name) && item.ok) {
-        // 写入类工具：只保留成功状态 + 参数摘要，不重复完整结果
-        return `- ${item.at || ""}｜${item.name}｜成功｜${item.args || "—"}`;
+    const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
+    const recentActivity = ensureArray(settings.recentToolActivity)
+      .filter(item => !item.at || item.at >= oneDayAgo);
+    // dedup consecutive identical calls (same tool + args + ok)
+    const dedupedActivity = [];
+    let lastActKey = null;
+    for (const item of recentActivity) {
+      const key = `${item.name}|${item.args || ""}|${item.ok}`;
+      if (key === lastActKey && dedupedActivity.length) {
+        dedupedActivity[dedupedActivity.length - 1]._count = (dedupedActivity[dedupedActivity.length - 1]._count || 1) + 1;
+      } else {
+        dedupedActivity.push({ ...item, _count: 1 });
+        lastActKey = key;
       }
-      return `- ${item.at || ""}｜${item.name}｜${item.ok ? "成功" : "未执行"}｜${item.args || "—"}｜${item.result || "—"}`;
+    }
+    const compressedToolActivity = dedupedActivity.slice(-8).map(item => {
+      const isWrite = WRITE_TOOL_NAMES.has(item.name) || item.name.startsWith("mcp_");
+      const suffix = item._count > 1 ? ` (x${item._count})` : "";
+      if (isWrite && item.ok) {
+        return `- ${item.at || ""}|${item.name}|ok|${item.args || ""}${suffix}`;
+      }
+      return `- ${item.at || ""}|${item.name}|${item.ok ? "ok" : "fail"}|${item.args || ""}|${item.result || ""}${suffix}`;
     });
 
     // ── 动态上下文（每次调用都不同：时间/天气/日历/记忆/状态/动态工具） ──
@@ -3614,11 +3630,13 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       compressedToolActivity.length ? `【近期工具行动】\n${compressedToolActivity.join("\n")}` : "",
       relatedMemoryLookupPerformed && !memoryText ? "【自动记忆检索】未命中相关记忆。" : "",
       memoryText ? `【相关记忆】\n${memoryText}` : "",
-      canQuoteUserMessage ? `【可引用消息】\n${quoteableMessages.slice(-12).map(m => `- id=${m.id}：${String(m.content || "[图片]").replace(/\s+/g, " ").slice(0, 100)}`).join("\n")}` : "",
-      // 动态工具：用户手动开启的非默认工具
+      canQuoteUserMessage ? `【可引用消息】\n${quoteableMessages.slice(-8).map(m => `- id=${m.id}：${String(m.content || "[图片]").replace(/\s+/g, " ").slice(0, 80)}`).join("\n")}` : "",
+      // dynamic tools: user-toggled non-default tools
       dynamicToolDesc ? `【当前已开启的额外工具】\n${dynamicToolDesc}` : "",
-      // 表情包（动态注入，按设定轮数刷新）
-      stickerPromptForDynamic || ""
+      // stickers: compact for CC (drop long descriptions, keep ID+name+tags)
+      stickerPromptForDynamic
+        ? stickerPromptForDynamic.replace(/^(- [a-z0-9_]+｜)(.+)$/gm, (_, pfx, rest) => pfx + rest.split("、").slice(0, 3).join("、"))
+        : ""
     ].filter(Boolean).join("\n");
 
     // ── 首次调用：发完整人设 + 工具；resume：只发动态上下文 ──
