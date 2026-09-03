@@ -2952,24 +2952,18 @@ function ccToolDescriptions(tools) {
   const lines = tools.map(tool => {
     const params = tool.parameters?.properties || {};
     const required = new Set(ensureArray(tool.parameters?.required));
-    const paramList = Object.entries(params).map(([k, v]) => {
-      const req = required.has(k) ? "必填" : "选填";
-      const desc = v.description || "";
-      const type = v.type || "string";
-      const enumStr = v.enum ? `，可选值: ${v.enum.join("/")}` : "";
-      return `    - ${k} (${type}, ${req}${enumStr}): ${desc}`;
-    }).join("\n");
-    return `  ${tool.name}: ${tool.description}\n    参数:\n${paramList || "    （无参数）"}`;
+    // 极简参数：只列名字，必填加*，有enum的列值
+    const paramParts = Object.entries(params).map(([k, v]) => {
+      const star = required.has(k) ? "*" : "";
+      const enumStr = v.enum ? `(${v.enum.join("|")})` : "";
+      return `${k}${star}${enumStr}`;
+    });
+    const paramStr = paramParts.length ? `(${paramParts.join(", ")})` : "()";
+    return `${tool.name}${paramStr} — ${(tool.description || "").slice(0, 60)}`;
   });
   return [
-    "【可用工具】",
-    "需要使用工具时，在回复中用以下格式调用（可一次调用多个）：",
-    '<tool_call name="工具名">{"参数名": "值"}</tool_call>',
-    "",
-    "工具调用必须是完整合法的 JSON。调用后等待系统返回结果再继续。",
-    "不要伪造工具结果，不要声称已调用但没有写出 tool_call 标签。",
-    "",
-    "可用工具列表：",
+    '【工具】格式: <tool_call name="名">{"参数":"值"}</tool_call>',
+    "必须合法JSON。可一次多个。等结果再继续。",
     ...lines
   ].join("\n");
 }
