@@ -97,12 +97,27 @@ function startCC(systemPrompt) {
 
   console.log("[CC] tmux session 已创建，等待 CLI 就绪...");
 
+  // CC CLI 首次在新目录运行时会弹 "trust this folder" 交互确认
+  // 自动检测并选择 "Yes, I trust this folder"，避免无人值守时卡死
+  const trustPoller = setInterval(() => {
+    try {
+      const pane = execSync(`tmux capture-pane -t ${TMUX} -p`, { encoding: "utf-8" });
+      if (pane.includes("trust this folder")) {
+        execSync(`tmux send-keys -t ${TMUX} Down Enter`);
+        console.log("[CC] 自动通过目录信任确认");
+        clearInterval(trustPoller);
+      }
+    } catch { clearInterval(trustPoller); }
+  }, 2000);
+  const stopTrustPoller = () => clearInterval(trustPoller);
+
   // 等 SessionStart hook 回调 /hook/ready
   return new Promise((resolve, reject) => {
-    ccReadyResolve = resolve;
+    ccReadyResolve = () => { stopTrustPoller(); resolve(); };
     // 60 秒超时
     setTimeout(() => {
       if (!ccReady) {
+        stopTrustPoller();
         ccReadyResolve = null;
         reject(new Error("CC CLI 启动超时 (60s)"));
       }
