@@ -1015,7 +1015,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // Right drawer V13: wording/icon polish and hexadecimal fields beside every
 // colour swatch.  The text inputs accept both C27B7B and #C27B7B.
 const rightMenuIconV13={
-  robot:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a1 1 0 0 1 1 1v2h-2V3a1 1 0 0 1 1-1Z"/><rect x="4" y="6" width="16" height="12" rx="3" ry="3"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><path d="M9.5 16a2.5 2.5 0 0 0 5 0"/><path d="M2 10v4"/><path d="M22 10v4"/></svg>',
+  robot:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08Z"/></svg>',
   brush:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 4.5 5 5M13 6l5 5-7.6 7.6c-1.1 1.1-2.7 1.6-4.2 1.2l-1.2-.3.3-1.2c.4-1.5 1-3 2.1-4.1L13 6Z"/><path d="M4 20c1.6.5 3.1.3 4.4-.7"/></svg>'
 };
 function normaliseHexV13(value){
