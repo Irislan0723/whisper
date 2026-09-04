@@ -346,14 +346,14 @@
 .appearance-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--accent-pale);flex-shrink:0;position:relative;transition:all .18s}
 .appearance-option.active .appearance-check{border-color:var(--accent);background:var(--accent)}
 .appearance-option.active .appearance-check::after{content:'';position:absolute;top:3px;left:6px;width:5px;height:9px;border:solid var(--accent-contrast);border-width:0 2px 2px 0;transform:rotate(45deg)}
-/* Appearance dark overrides */
-[data-appearance="dark"] .appearance-option{background:#262626;border-color:#3A3A3A;color:#F2F2F2}
-[data-appearance="dark"] .appearance-option:hover{background:#2C2C2C}
-[data-appearance="dark"] .appearance-option.active{border-color:var(--accent);background:rgba(255,255,255,0.05)}
-[data-appearance="dark"] .appearance-option-icon{background:#2C2C2C}
-[data-appearance="dark"] .appearance-option-text strong{color:#F2F2F2}
-[data-appearance="dark"] .appearance-option-text small{color:#888}
-[data-appearance="dark"] .appearance-check{border-color:#3A3A3A}
+/* Appearance dark overrides — must target html[data-appearance] to avoid matching button[data-appearance="dark"] */
+html[data-appearance="dark"] .appearance-option{background:#262626;border-color:#3A3A3A;color:#F2F2F2}
+html[data-appearance="dark"] .appearance-option:hover{background:#2C2C2C}
+html[data-appearance="dark"] .appearance-option.active{border-color:var(--accent);background:rgba(255,255,255,0.05)}
+html[data-appearance="dark"] .appearance-option-icon{background:#2C2C2C}
+html[data-appearance="dark"] .appearance-option-text strong{color:#F2F2F2}
+html[data-appearance="dark"] .appearance-option-text small{color:#888}
+html[data-appearance="dark"] .appearance-check{border-color:#3A3A3A}
 </style>
 </head>
 <body>
