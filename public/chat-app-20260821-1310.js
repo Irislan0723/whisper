@@ -2677,11 +2677,7 @@ function injectUsageStylesV90(){
   '</style>');
 }
 
-function usageBarColor(pct){
-  if(pct>=80)return '#d65c5c';
-  if(pct>=50)return '#e0a548';
-  return 'var(--chat-accent)';
-}
+function usageBarColor(){return 'var(--chat-accent)'}
 
 function formatResetTime(iso){
   if(!iso)return '—';
