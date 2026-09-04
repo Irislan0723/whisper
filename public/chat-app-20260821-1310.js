@@ -71,7 +71,8 @@ async function saveConversationSettings(){if(!current)return;const val=$('conver
 function openPanel(name){closeDrawers();document.body.classList.add('workspace-open');$('workspace').classList.add('open');document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));$(`panel-${name}`).classList.add('active');$('workspaceTitle').textContent={models:'模型设置',roles:'角色卡',archive:'归档'}[name];if(name==='models')renderModelSettings();if(name==='roles'){hydrateProfile();renderRoles()}if(name==='archive')renderArchive()}
 function renderModelSettings(){const ps=settings.presets||[];$('presetCards').innerHTML=ps.map(p=>`<div class="role-card card"><div class="role-info"><strong>${esc(p.name||'未命名预设')}</strong><p>${esc((p.models||[p.model]).filter(Boolean).join('、'))}</p></div><button class="btn btn-outline edit-preset" data-id="${p.id}">编辑</button><button class="btn btn-outline delete-preset" data-id="${p.id}">删除</button></div>`).join('')||'<div class="empty-note">还没有模型预设</div>';document.querySelectorAll('.edit-preset').forEach(x=>x.onclick=()=>editPreset(x.dataset.id));document.querySelectorAll('.delete-preset').forEach(x=>x.onclick=()=>deletePreset(x.dataset.id));['mainModel','summaryModel','translationModel','imageModel'].forEach((id,i)=>fillModelSelect($(id),i>0));const f=settings.functions||{};$('mainModel').value=f.main||'';$('summaryModel').value=f.summary||'';$('translationModel').value=f.translation||'';$('imageModel').value=f.image||'';$('summaryEnabled').checked=!!f.summaryEnabled;$('summaryThreshold').value=f.summaryThreshold||30}
 function editPreset(id){const p=settings.presets.find(x=>x.id===id);if(!p)return;$('editingPresetId').value=p.id;$('presetName').value=p.name||'';$('apiProvider').value=p.provider||'openai';$('baseUrl').value=p.baseUrl||'';$('apiKey').value=p.apiKey||'';renderFetchedModels(p.models||[p.model].filter(Boolean),p.models||[p.model].filter(Boolean))}
-function clearPreset(){$('editingPresetId').value='';$('presetName').value='';$('apiProvider').value='openai';$('baseUrl').value='';$('apiKey').value='';$('modelsList').innerHTML='<span class="empty-note">填写地址与 Key 后拉取模型</span>'}
+function clearPreset(){$('editingPresetId').value='';$('presetName').value='';$('apiProvider').value='openai';$('baseUrl').value='';$('apiKey').value='';$('modelsList').innerHTML='<span class="empty-note">填写地址与 Key 后拉取模型</span>';updateProviderHints()}
+function updateProviderHints(){var p=$('apiProvider').value;if(p==='cc'){$('baseUrl').placeholder='http://你的US服务器IP:3001';$('apiKey').placeholder='Relay Token'}else if(p==='anthropic'){$('baseUrl').placeholder='https://api.anthropic.com';$('apiKey').placeholder='sk-ant-...'}else{$('baseUrl').placeholder='https://api.example.com/v1 或完整端点';$('apiKey').placeholder='sk-...'}}
 function renderFetchedModels(models,selected=[]){$('modelsList').innerHTML=models.map(m=>{const id=typeof m==='string'?m:m.id||m.name;return `<label class="model-check"><input type="checkbox" value="${esc(id)}" ${selected.includes(id)?'checked':''}> <span>${esc(id)}</span></label>`}).join('')||'<span class="empty-note">没有返回模型</span>'}
 async function fetchModels(){const baseUrl=$('baseUrl').value.trim(),apiKey=$('apiKey').value.trim(),provider=$('apiProvider').value;if(!baseUrl||!apiKey)return toast('请填写 API 地址和 Key');$('fetchModels').disabled=true;$('fetchModels').textContent='拉取中…';try{const d=await api('/api/chat/models',{method:'POST',body:JSON.stringify({baseUrl,apiKey,provider})});renderFetchedModels(d.models||[]);toast(`已拉取 ${(d.models||[]).length} 个模型`,'success')}catch(e){toast(e.message,'error')}finally{$('fetchModels').disabled=false;$('fetchModels').textContent='拉取模型'}}
 async function savePreset(){const models=[...document.querySelectorAll('#modelsList input:checked')].map(x=>x.value),id=$('editingPresetId').value||`preset-${Date.now()}`;if(!models.length)return toast('至少选择一个模型');const item={id,name:$('presetName').value.trim()||'未命名预设',provider:$('apiProvider').value,baseUrl:$('baseUrl').value.trim(),apiKey:$('apiKey').value.trim(),models,model:models[0]},idx=settings.presets.findIndex(x=>x.id===id);if(idx>=0)settings.presets[idx]=item;else settings.presets.push(item);if(!settings.activePresetId)settings.activePresetId=id;await saveSettings();clearPreset();renderModelSettings();toast('模型预设已保存','success')}
@@ -89,7 +90,7 @@ async function deleteRole(id){if(conversations.some(c=>c.roleId===id))return toa
 function hydrateProfile(){$('profileName').value=profile.name||'Iris';$('profileIdentity').value=profile.identity||'';$('profileDetails').value=profile.details||'';$('profileAvatarFile').dataset.data=profile.avatar||'';setAvatarPreview('profileAvatarPreview',profile.avatar,profile.name||'Iris')}
 async function saveProfile(){const button=$('saveProfile');button.disabled=true;try{profile=await api('/api/chat/profile',{method:'PUT',body:JSON.stringify({name:$('profileName').value.trim()||'Iris',identity:$('profileIdentity').value.trim(),details:$('profileDetails').value.trim(),avatar:$('profileAvatarFile').dataset.data||profile.avatar||''})});localStorage.setItem('iris_avatar_name1',profile.name);if(profile.avatar)localStorage.setItem('iris_avatar_img1',profile.avatar);initTopBar();hydrateProfile();toast('我的角色卡已保存','success')}catch(e){toast('保存失败：'+e.message,'error')}finally{button.disabled=false}}
 function renderArchive(){const arr=conversations.filter(c=>c.archived);$('archiveList').innerHTML=arr.map(c=>`<div class="role-card card"><div class="role-info"><strong>${esc(c.title)}</strong><p>${new Date(c.updatedAt).toLocaleDateString('zh-CN')}</p></div><button class="btn btn-outline restore-chat" data-id="${c.id}">恢复</button></div>`).join('')||'<div class="empty-note">暂无归档对话</div>';document.querySelectorAll('.restore-chat').forEach(x=>x.onclick=async()=>{await updateConversation(x.dataset.id,{archived:false});renderArchive();renderConversations()})}
-function bind(){ $('openLeft').onclick=()=>openDrawer('left');$('openRight').onclick=()=>openDrawer('right');$('scrim').onclick=closeDrawers;document.querySelectorAll('.drawer-close').forEach(x=>x.onclick=closeDrawers);$('newChatBtn').onclick=showLanding;document.querySelectorAll('.nav-action').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$('closeWorkspace').onclick=()=>$('workspace').classList.remove('open');$('conversationMenu').onclick=e=>{const b=e.target.closest('button');if(b)conversationAction(b.dataset.act,$('conversationMenu').dataset.id);$('conversationMenu').classList.remove('open')};document.addEventListener('click',e=>{if(!e.target.closest('.more-btn')&&!e.target.closest('#conversationMenu'))$('conversationMenu').classList.remove('open')});$('sendBtn').onclick=sendUserBubble;$('askReplyBtn').onclick=requestAiReply;$('chatInput').oninput=e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,96)+'px'};$('addImage').onclick=()=>$('imageInput').click();$('imageInput').onchange=async e=>{const f=e.target.files[0];if(!f)return;pendingImage=await fileData(f);$('previewImg').src=pendingImage;$('previewName').textContent=f.name;$('imagePreview').classList.add('show')};$('removeImage').onclick=clearImage;$('closeRolePicker').onclick=()=>$('rolePicker').classList.remove('open');$('confirmRole').onclick=createConversationAndSend;$('createRoleFromPicker').onclick=()=>{$('rolePicker').classList.remove('open');openPanel('roles')};$('fetchModels').onclick=fetchModels;$('savePreset').onclick=savePreset;$('newPreset').onclick=clearPreset;$('saveFunctions').onclick=saveFunctions;$('saveRole').onclick=saveRole;$('clearRole').onclick=clearRole;$('saveProfile').onclick=saveProfile;$('roleAvatarFile').onchange=async e=>{if(e.target.files[0])e.target.dataset.data=await avatarData(e.target.files[0])};$('profileAvatarFile').onchange=async e=>{if(e.target.files[0])e.target.dataset.data=await avatarData(e.target.files[0])};['conversationModel','multiBubble','avatarSize','avatarRadius','bubbleWidth','userBubble','aiBubble'].forEach(id=>$(id).onchange=saveConversationSettings)}
+function bind(){ $('openLeft').onclick=()=>openDrawer('left');$('openRight').onclick=()=>openDrawer('right');$('scrim').onclick=closeDrawers;document.querySelectorAll('.drawer-close').forEach(x=>x.onclick=closeDrawers);$('newChatBtn').onclick=showLanding;document.querySelectorAll('.nav-action').forEach(x=>x.onclick=()=>openPanel(x.dataset.panel));$('closeWorkspace').onclick=()=>$('workspace').classList.remove('open');$('conversationMenu').onclick=e=>{const b=e.target.closest('button');if(b)conversationAction(b.dataset.act,$('conversationMenu').dataset.id);$('conversationMenu').classList.remove('open')};document.addEventListener('click',e=>{if(!e.target.closest('.more-btn')&&!e.target.closest('#conversationMenu'))$('conversationMenu').classList.remove('open')});$('sendBtn').onclick=sendUserBubble;$('askReplyBtn').onclick=requestAiReply;$('chatInput').oninput=e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,96)+'px'};$('addImage').onclick=()=>$('imageInput').click();$('imageInput').onchange=async e=>{const f=e.target.files[0];if(!f)return;pendingImage=await fileData(f);$('previewImg').src=pendingImage;$('previewName').textContent=f.name;$('imagePreview').classList.add('show')};$('removeImage').onclick=clearImage;$('closeRolePicker').onclick=()=>$('rolePicker').classList.remove('open');$('confirmRole').onclick=createConversationAndSend;$('createRoleFromPicker').onclick=()=>{$('rolePicker').classList.remove('open');openPanel('roles')};$('fetchModels').onclick=fetchModels;$('savePreset').onclick=savePreset;$('newPreset').onclick=clearPreset;$('saveFunctions').onclick=saveFunctions;$('saveRole').onclick=saveRole;$('clearRole').onclick=clearRole;$('saveProfile').onclick=saveProfile;$('apiProvider').onchange=updateProviderHints;$('roleAvatarFile').onchange=async e=>{if(e.target.files[0])e.target.dataset.data=await avatarData(e.target.files[0])};$('profileAvatarFile').onchange=async e=>{if(e.target.files[0])e.target.dataset.data=await avatarData(e.target.files[0])};['conversationModel','multiBubble','avatarSize','avatarRadius','bubbleWidth','userBubble','aiBubble'].forEach(id=>$(id).onchange=saveConversationSettings)}
 function ensureNotificationBootEntry(){const nav=document.querySelector('#leftDrawer .nav-grid');if(!nav||nav.querySelector('[data-panel="notifications"]'))return;const button=document.createElement('button');button.type='button';button.className='nav-action';button.dataset.panel='notifications';button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>通知';nav.appendChild(button)}
 async function init(){initIcons();ensureNotificationBootEntry();bind();try{const [s,c,r,p]=await Promise.all([api('/api/chat/settings'),api('/api/chat/conversations'),api('/api/chat/roles'),api('/api/chat/profile')]);settings={...settings,...s,functions:{...settings.functions,...(s.functions||{})}};conversations=c.conversations||[];roles=r.roles||[];profile=p||profile}catch(e){toast('聊天数据加载失败：'+e.message,'error')}initTopBar();const requestedConversationId=new URLSearchParams(location.search).get('conversationId');if(requestedConversationId&&conversations.some(item=>String(item.id)===String(requestedConversationId))){history.replaceState(null,'',location.pathname);await openConversation(requestedConversationId)}else showLanding()}
 init();
@@ -1014,7 +1015,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // Right drawer V13: wording/icon polish and hexadecimal fields beside every
 // colour swatch.  The text inputs accept both C27B7B and #C27B7B.
 const rightMenuIconV13={
-  robot:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M9.5 3h5"/><rect x="3" y="6" width="18" height="14" rx="4"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/><path d="M9 17h6"/></svg>',
+  robot:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08Z"/></svg>',
   brush:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 4.5 5 5M13 6l5 5-7.6 7.6c-1.1 1.1-2.7 1.6-4.2 1.2l-1.2-.3.3-1.2c.4-1.5 1-3 2.1-4.1L13 6Z"/><path d="M4 20c1.6.5 3.1.3 4.4-.7"/></svg>'
 };
 function normaliseHexV13(value){
@@ -2607,5 +2608,162 @@ const listeningToolGroupV88=TOOL_GROUPS_V17.find(group=>group[0]==='一起听');
 if(listeningToolGroupV88){listeningToolGroupV88[1]=[...LISTENING_TOOL_NAMES_V88];listeningToolGroupV88[2]=[...LISTENING_TOOL_LABELS_V88]}
 else TOOL_GROUPS_V17.push(['一起听',[...LISTENING_TOOL_NAMES_V88],[...LISTENING_TOOL_LABELS_V88]]);
 const toolConfigV85Base=toolConfigV17;
-toolConfigV17=function(value){const config=toolConfigV85Base(value);if(config.mode!=='all'){const legacy=config.allowed.includes('manage_listening_room');config.allowed=config.allowed.filter(name=>name!=='manage_listening_room');if(legacy||!LISTENING_TOOL_NAMES_V88.some(name=>config.allowed.includes(name)))config.allowed=[...new Set([...config.allowed,...LISTENING_TOOL_NAMES_V88])]}return config};
+toolConfigV17=function(value){const config=toolConfigV85Base(value);if(config.mode!=='all'){const ver=Number(value?.version||0);const legacy=config.allowed.includes('manage_listening_room');config.allowed=config.allowed.filter(name=>name!=='manage_listening_room');if(legacy||(ver<5&&!LISTENING_TOOL_NAMES_V88.some(name=>config.allowed.includes(name))))config.allowed=[...new Set([...config.allowed,...LISTENING_TOOL_NAMES_V88])]}return config};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>renderToolManagerV17?.());else renderToolManagerV17?.();
+
+/* V80: API / Agent per-conversation mode toggle.  Inserted above the model
+   picker in the right sidebar.  In Agent mode the API model picker hides and
+   the relay routes through Claude Code CLI instead. */
+const MODE_ICON_V80='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+function injectModeToggleStylesV80(){if($('modeToggleStylesV80'))return;document.head.insertAdjacentHTML('beforeend','<style id="modeToggleStylesV80">.right-menu-mode-v80{padding:8px 0 6px;margin-bottom:2px}.right-menu-mode-label-v80{display:flex;align-items:center;gap:10px;margin:0 4px 8px;color:var(--chat-muted);font-size:12px}.right-menu-mode-label-v80 .right-menu-icon{display:flex;align-items:center}.mode-segmented-v80{display:flex;width:100%;border-radius:10px;overflow:hidden;border:1px solid var(--chat-border);background:var(--chat-bg)}.mode-segmented-v80 button{flex:1;padding:8px 0;border:0;background:transparent;color:var(--chat-muted);font:13px var(--font-b);cursor:pointer;transition:background .15s,color .15s}.mode-segmented-v80 button.active{background:var(--chat-accent);color:var(--accent-contrast)}.right-model-hint-v80{margin:0 0 8px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--chat-accent) 10%,var(--chat-bg));color:var(--chat-muted);font:12px/1.5 var(--font-b);text-align:center}</style>')}
+function ensureModeToggleV80(){const root=$('rightSettingsMenuV12');if(!root||$('modeToggleV80'))return;const modelSection=root.querySelector('.right-menu-model');if(!modelSection)return;const section=document.createElement('section');section.className='right-menu-mode-v80';section.id='modeToggleV80';section.innerHTML='<div class="right-menu-mode-label-v80"><span class="right-menu-icon">'+MODE_ICON_V80+'</span><span>对话模式</span></div><div class="mode-segmented-v80" id="modeSegmentedV80"><button type="button" data-mode="api">API</button><button type="button" data-mode="agent">Agent</button></div>';root.insertBefore(section,modelSection);section.querySelectorAll('[data-mode]').forEach(btn=>{btn.onclick=()=>switchModeV80(btn.dataset.mode)})}
+async function switchModeV80(mode){if(!current)return;const next=mode==='agent'?'agent':'api';if((current.mode||'api')===next)return;try{await updateConversation(current.id,{mode:next});current.mode=next;hydrateModeToggleV80();renderToolManagerV17();toast(next==='agent'?'已切换到 Agent 模式':'已切换到 API 模式','success')}catch(error){toast('切换模式失败：'+error.message,'error')}}
+function hydrateModeToggleV80(){ensureModeToggleV80();const mode=(current?.mode||'api');const seg=$('modeSegmentedV80');if(seg)seg.querySelectorAll('button').forEach(btn=>btn.classList.toggle('active',btn.dataset.mode===mode));setModelPickerLabelV12()}
+function presetsForModeV80(){const mode=(current?.mode||'api');const all=settings.presets||[];return mode==='agent'?all.filter(p=>p.provider==='cc'):all.filter(p=>p.provider!=='cc')}
+const openModelSheetV12Base=openModelSheetV12;
+openModelSheetV12=function(presetId){ensureModelSheetV12();const filtered=presetsForModeV80(),sheet=$('rightModelSheetV12'),title=$('rightModelSheetTitle'),list=$('rightModelSheetListV12'),isAgent=(current?.mode||'api')==='agent';sheet.classList.add('open');sheet.setAttribute('aria-hidden','false');if(!presetId){title.textContent=isAgent?'选择 Agent 模型':'选择模型预设';const follow=isAgent?'':'<button type="button" class="right-model-follow" data-model-follow>跟随主模型 <span>›</span></button>';const hint=isAgent?'<p class="right-model-hint-v80">请选择一个模型开启对话</p>':'';list.innerHTML=hint+follow+(filtered.length?filtered.map(p=>'<button type="button" class="right-model-preset" data-model-preset="'+esc(p.id)+'"><span><strong>'+esc(p.name||'未命名预设')+'</strong><small>'+(p.models||[p.model].filter(Boolean)).length+' 个已保存模型</small></span><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>').join(''):'<p class="right-model-empty">当前模式没有可用预设，请到左侧"模型设置"创建。</p>');if(!isAgent)list.querySelector('[data-model-follow]')?.addEventListener('click',()=>chooseConversationModelV12());list.querySelectorAll('[data-model-preset]').forEach(button=>button.onclick=()=>openModelSheetV12(button.dataset.modelPreset));return}const preset=filtered.find(item=>item.id===presetId)||(settings.presets||[]).find(item=>item.id===presetId);if(!preset){openModelSheetV12();return}const models=(preset.models||[preset.model].filter(Boolean));title.textContent=preset.name||'未命名预设';list.innerHTML='<button type="button" class="right-model-follow" data-model-back>‹ 返回预设列表</button>'+(models.length?models.map(model=>'<button type="button" class="right-model-choice" data-model-value="'+esc(model)+'"><span><strong>'+esc(model)+'</strong><small>'+esc(preset.name||'当前预设')+'</small></span><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>').join(''):'<p class="right-model-empty">这个预设还没有保存模型。</p>');list.querySelector('[data-model-back]')?.addEventListener('click',()=>openModelSheetV12());list.querySelectorAll('[data-model-value]').forEach(button=>button.onclick=()=>chooseConversationModelV12(preset.id,button.dataset.modelValue))};
+const hydrateRightV80Base=hydrateRight;
+hydrateRight=function(){hydrateRightV80Base();hydrateModeToggleV80()};
+function initModeToggleV80(){injectModeToggleStylesV80();ensureModeToggleV80()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initModeToggleV80);else initModeToggleV80();
+
+/* V88b: Agent mode tool config — override toolConfigV17 & persistToolConfigV17
+   so the tool manager shows agent defaults (memory + self-profile) when in agent
+   mode, and saves agent-mode tool changes to the conversation object instead of
+   the role. */
+const CC_AGENT_DEFAULT_TOOLS_V88=new Set(['read_self_profile','update_self_profile','read_memories','search_memories','add_memory','update_memory','delete_memory']);
+const toolConfigV88bBase=toolConfigV17;
+toolConfigV17=function(value){
+  if((current?.mode||'api')==='agent'){
+    const agentCfg=current.agentToolConfig;
+    if(agentCfg&&typeof agentCfg==='object'){
+      return{enabled:agentCfg.enabled!==false,mode:'custom',allowed:Array.isArray(agentCfg.allowed)?agentCfg.allowed:[]}
+    }
+    /* 无保存过的 agentToolConfig → 默认只开启 agent 默认工具 */
+    const base=toolConfigV88bBase(value);
+    const agentAllowed=base.mode==='all'?[...CC_AGENT_DEFAULT_TOOLS_V88]:base.allowed.filter(name=>CC_AGENT_DEFAULT_TOOLS_V88.has(name));
+    return{enabled:true,mode:'custom',allowed:agentAllowed}
+  }
+  return toolConfigV88bBase(value)
+};
+const persistToolConfigV88bBase=persistToolConfigV17;
+persistToolConfigV17=async function(config){
+  if((current?.mode||'api')==='agent'){
+    try{
+      const saved=await updateConversation(current.id,{agentToolConfig:config});
+      current.agentToolConfig=saved.agentToolConfig||config;
+      renderToolManagerV17();toast('Agent 工具设置已保存','success')
+    }catch(e){toast('保存失败：'+e.message,'error')}
+    return
+  }
+  return persistToolConfigV88bBase(config)
+};
+
+/* ═══════ Claude Code Usage / Quota Panel ═══════ */
+const usageIconV90='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+let usageTimerV90=null;
+
+function injectUsageStylesV90(){
+  if($('usageStylesV90'))return;
+  document.head.insertAdjacentHTML('beforeend','<style id="usageStylesV90">'+
+    '.usage-panel-v90{display:grid;gap:16px;padding:4px 0}'+
+    '.usage-card-v90{padding:16px;border:1px solid var(--chat-border);border-radius:14px;background:var(--chat-surface)}'+
+    '.usage-card-v90 h4{margin:0 0 10px;color:var(--chat-text);font:600 15px/1.3 var(--font-b)}'+
+    '.usage-bar-v90{position:relative;height:8px;border-radius:99px;background:color-mix(in srgb,var(--chat-muted) 16%,transparent);overflow:hidden}'+
+    '.usage-bar-fill-v90{position:absolute;inset:0;border-radius:99px;transition:width .4s ease}'+
+    '.usage-meta-v90{display:flex;justify-content:space-between;margin-top:8px;color:var(--chat-muted);font:12px/1.4 var(--font-b)}'+
+    '.usage-pct-v90{font-weight:700;font-size:22px;color:var(--chat-text);margin-bottom:6px}'+
+    '.usage-note-v90{margin:0;color:var(--chat-muted);font:12px/1.6 var(--font-b);text-align:center}'+
+  '</style>');
+}
+
+function usageBarColor(){return 'var(--chat-accent)'}
+
+function formatResetTime(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);
+  const now=new Date();
+  const diffMs=d-now;
+  if(diffMs<=0)return '已重置';
+  const diffMin=Math.floor(diffMs/60000);
+  if(diffMin<60)return diffMin+' 分钟后';
+  const diffHr=Math.floor(diffMin/60);
+  if(diffHr<24)return diffHr+' 小时 '+String(diffMin%60).padStart(2,'0')+' 分钟后';
+  const weekdays=['日','一','二','三','四','五','六'];
+  return '周'+weekdays[d.getDay()]+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function ensureUsagePanelV90(){
+  if($('panel-usage'))return;
+  $('panel-archive')?.insertAdjacentHTML('afterend',
+    '<div class="panel" id="panel-usage"><div class="card">'+
+    '<h3>Claude Code 额度</h3>'+
+    '<div id="usageContentV90"><p class="empty-note">加载中…</p></div>'+
+    '</div></div>');
+}
+
+function renderUsageContentV90(data){
+  const el=$('usageContentV90');
+  if(!el)return;
+  const fh=data.five_hour||{};
+  const sd=data.seven_day||{};
+  const fhPct=Math.round(fh.utilization??0);
+  const sdPct=Math.round(sd.utilization??0);
+  el.innerHTML=
+    '<div class="usage-panel-v90">'+
+      '<div class="usage-card-v90">'+
+        '<h4>当前窗口</h4>'+
+        '<div class="usage-pct-v90">'+fhPct+'%</div>'+
+        '<div class="usage-bar-v90"><div class="usage-bar-fill-v90" style="width:'+fhPct+'%;background:'+usageBarColor(fhPct)+'"></div></div>'+
+        '<div class="usage-meta-v90"><span>已使用</span><span>重置：'+esc(formatResetTime(fh.resets_at))+'</span></div>'+
+      '</div>'+
+      '<div class="usage-card-v90">'+
+        '<h4>本周额度</h4>'+
+        '<div class="usage-pct-v90">'+sdPct+'%</div>'+
+        '<div class="usage-bar-v90"><div class="usage-bar-fill-v90" style="width:'+sdPct+'%;background:'+usageBarColor(sdPct)+'"></div></div>'+
+        '<div class="usage-meta-v90"><span>已使用</span><span>重置：'+esc(formatResetTime(sd.resets_at))+'</span></div>'+
+      '</div>'+
+      '<p class="usage-note-v90">数据来自 Claude 官方，约每分钟刷新</p>'+
+    '</div>';
+}
+
+async function fetchAndRenderUsageV90(){
+  ensureUsagePanelV90();
+  try{
+    const data=await api('/api/agent/claude-usage');
+    renderUsageContentV90(data);
+  }catch(e){
+    const el=$('usageContentV90');
+    if(el)el.innerHTML='<p class="empty-note">获取失败：'+esc(e.message||'未知错误')+'</p>';
+  }
+}
+
+function activateUsagePanelV90(){
+  closeDrawers();
+  injectUsageStylesV90();
+  ensureUsagePanelV90();
+  document.body.classList.add('workspace-open');
+  $('workspace').classList.add('open');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  $('panel-usage').classList.add('active');
+  $('workspaceTitle').textContent='额度';
+  fetchAndRenderUsageV90();
+  // 自动刷新：90 秒
+  clearInterval(usageTimerV90);
+  usageTimerV90=setInterval(()=>{
+    if(!$('panel-usage')?.classList.contains('active')){clearInterval(usageTimerV90);return}
+    fetchAndRenderUsageV90();
+  },90000);
+}
+
+function ensureUsageEntryV90(){
+  const root=$('leftSettingsMenuV14');
+  if(!root||$('leftUsageEntryV90'))return;
+  root.querySelector('.left-tool-shelf-v14')?.insertAdjacentHTML('beforeend',
+    '<button type="button" class="left-menu-action-v14" id="leftUsageEntryV90">'+
+    '<span class="left-menu-icon-v14">'+usageIconV90+'</span>额度</button>');
+  $('leftUsageEntryV90').onclick=activateUsagePanelV90;
+}
+
+// 初始化：左侧栏加入"额度"按钮
+{const origEnsureLeft=ensureLeftDrawerV14;ensureLeftDrawerV14=function(){origEnsureLeft.apply(this,arguments);ensureUsageEntryV90()}};

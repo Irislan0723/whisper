@@ -2325,6 +2325,19 @@ function getActiveChatPreset(settings) {
   const presets = Array.isArray(settings.presets) ? settings.presets : [];
   return presets.find(p => p.id === settings.activePresetId) || presets[0] || null;
 }
+/** Agent 模式下，用 conversation.agentProvider 找到对应 preset 并覆盖 settings */
+function applyAgentPresetOverride(settings, conversation) {
+  if ((conversation.mode || "api") !== "agent") return;
+  const agentProvider = conversation.agentProvider || "cc";
+  const agentPreset = ensureArray(settings.presets).find(p => p.provider === agentProvider);
+  if (!agentPreset) return;
+  settings.activePresetId = agentPreset.id;
+  if (conversation.agentModel) {
+    settings.presets = ensureArray(settings.presets).map(p =>
+      p.id === agentPreset.id ? { ...p, model: conversation.agentModel } : p
+    );
+  }
+}
 async function buildMemoryPreview(categories = ["deep", "daily", "diary"]) {
   const mems = (await dbAll("memories")).map(memoryFromDb);
   const cats = new Set(categories && categories.length ? categories : ["deep", "daily", "diary"]);
@@ -2455,7 +2468,7 @@ async function selectRelatedMemoriesForConversation(conversation, query, categor
     const significantlyStronger = prior && score >= Number(prior.score || 0) * 1.35 + 1;
     if (recentlyInjected && !significantlyStronger) continue;
     selected.push(memory);
-    if (selected.length >= 5) break;
+    if (selected.length >= 3) break;
   }
   return selected;
 }
@@ -2914,6 +2927,20 @@ function normaliseRoleToolConfig(value) {
 }
 function allowedChatTools(tools, config) { const policy = normaliseRoleToolConfig(config); return policy.enabled ? (policy.mode === "all" ? tools : tools.filter(tool => policy.allowed.includes(tool.name))) : []; }
 
+// ── Agent 模式默认工具 ──
+// Agent 模式下只有记忆 + 自我档案工具默认开启，其他全部关闭
+const CC_AGENT_DEFAULT_TOOLS = new Set([
+  "read_self_profile", "update_self_profile",
+  "read_memories", "search_memories", "add_memory", "update_memory", "delete_memory"
+]);
+/** Agent 模式覆盖：强制只开启默认工具，用户手动开启的动态工具另外处理 */
+function agentModeToolConfig(roleToolConfig) {
+  const config = normaliseRoleToolConfig(roleToolConfig);
+  return { enabled: true, mode: "custom", allowed: config.allowed.filter(name => CC_AGENT_DEFAULT_TOOLS.has(name)), version: ROLE_TOOL_CONFIG_VERSION };
+}
+/** 判断一个工具是否属于 Agent 默认工具（记忆 + 档案） */
+function isAgentDefaultTool(toolName) { return CC_AGENT_DEFAULT_TOOLS.has(toolName); }
+
 const CHAT_QUOTE_TOOL = {
   name: "quote_user_message",
   description: "引用 Iris 的一条消息来组织当前回复。仅当引用能让这条回复更清楚或更有聊天感时调用；messageId 必须来自系统提供的可引用消息清单。一次回复最多引用一条。",
@@ -2942,6 +2969,49 @@ function openAiChatTools(tools = CHAT_MEMORY_TOOLS) {
 }
 function anthropicChatTools(tools = CHAT_MEMORY_TOOLS) {
   return tools.map(tool => ({ name: tool.name, description: tool.description, input_schema: tool.parameters }));
+}
+
+// ── CC 文本工具协议 ──
+
+/** 为 CC 生成工具描述文本，嵌入 system prompt */
+function ccToolDescriptions(tools) {
+  if (!tools.length) return "";
+  const lines = tools.map(tool => {
+    const params = tool.parameters?.properties || {};
+    const required = new Set(ensureArray(tool.parameters?.required));
+    // 极简参数：只列名字，必填加*，有enum的列值
+    const paramParts = Object.entries(params).map(([k, v]) => {
+      const star = required.has(k) ? "*" : "";
+      const enumStr = v.enum ? `(${v.enum.join("|")})` : "";
+      return `${k}${star}${enumStr}`;
+    });
+    const paramStr = paramParts.length ? `(${paramParts.join(", ")})` : "()";
+    return `${tool.name}${paramStr} — ${(tool.description || "").slice(0, 60)}`;
+  });
+  return [
+    '【工具】格式: <tool_call name="名">{"参数":"值"}</tool_call>',
+    "必须合法JSON。可一次多个。等结果再继续。",
+    ...lines
+  ].join("\n");
+}
+
+/** 从 CC 回复文本中解析 tool_call 标签 */
+function parseCcToolCalls(text) {
+  const calls = [];
+  const re = /<tool_call\s+name="([^"]+)">([\s\S]*?)<\/tool_call>/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const name = match[1].trim();
+    let args = {};
+    try { args = JSON.parse(match[2].trim()); } catch (_) {}
+    calls.push({ name, args });
+  }
+  return calls;
+}
+
+/** 从 CC 回复文本中去除 tool_call 标签，保留纯文本 */
+function stripCcToolCalls(text) {
+  return text.replace(/<tool_call\s+name="[^"]*">[\s\S]*?<\/tool_call>/g, "").replace(/^\s*\n+|\n+\s*$/g, "").trim();
 }
 function clampToolLimit(value, fallback, max) {
   return Math.max(1, Math.min(max, Number(value || fallback)));
@@ -3306,7 +3376,7 @@ function createAiImageHandler(settings, imageGenerationEnabled) {
   return async prompt => await generateChatImage(preset, prompt);
 }
 
-async function callOpenAICompatible({ preset, settings, content, image, images, quote, history, recallableMessages = [], recallOwnMessage = null, quoteableMessages = [], selectQuoteMessage = null, generateImage = null, manageCompanion = null, manageListening = null, manageTransfer = null, publishDailyNote = null, readDailyMoments = null, dailyNoteContext = "", mcpTools = [], mcpToolBindings = {}, relatedMemories = [], relatedMemoryLookupPerformed = false, onToolTrace = null }) {
+async function callOpenAICompatible({ preset, settings, content, image, images, quote, history, recallableMessages = [], recallOwnMessage = null, quoteableMessages = [], selectQuoteMessage = null, generateImage = null, manageCompanion = null, manageListening = null, manageTransfer = null, publishDailyNote = null, readDailyMoments = null, dailyNoteContext = "", mcpTools = [], mcpToolBindings = {}, relatedMemories = [], relatedMemoryLookupPerformed = false, onToolTrace = null, ccSessionState = null, stickerPromptForDynamic = "" }) {
   const baseUrl = normalizeApiRoot(preset?.baseUrl);
   const apiKey  = preset?.apiKey;
   const model   = preset?.model;
@@ -3324,10 +3394,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
   const roleTools = normaliseRoleToolConfig(settings.toolConfig);
   const companionTools = typeof manageCompanion === "function" ? allowedChatTools([CHAT_COMPANION_TOOL], roleTools) : [];
   const canManageCompanion = companionTools.length > 0;
-  // Together listening is a room capability, not an optional character trait.
-  // Keep it available so an invited character can actually accept, decline and
-  // control songs even when an older role card has a restrictive tool config.
-  const listeningTools = typeof manageListening === "function" ? CHAT_LISTENING_TOOLS : [];
+  const listeningTools = typeof manageListening === "function" ? allowedChatTools(CHAT_LISTENING_TOOLS, roleTools) : [];
   const canManageListening = listeningTools.length > 0;
   const transferTools = typeof manageTransfer === "function" ? allowedChatTools([CHAT_TRANSFER_TOOL], roleTools) : [];
   const canManageTransfer = transferTools.length > 0;
@@ -3423,33 +3490,54 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     })
     .filter(Boolean)
     .join("\n");
-  const systemPrompt = [
-    `当前时间：${nowStr}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
+  // ── CC（Agent 模式）专用静态 system prompt ──
+  // 只包含：人设 + 默认工具规则（记忆/档案）+ 日期 + 日程 + 自我档案
+  // 动态内容（时间/天气/动态工具/表情包等）在 ccDynamic 里每轮注入
+  const isAgentMode = preset?.provider === "cc";
+  const ccStaticSystemPrompt = isAgentMode ? [
+    `当前日期：${new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
     settings.persona?.irisName ? `Iris 的称呼：${settings.persona.irisName}` : "",
     settings.persona?.replyStyle ? `Claude 回复风格：${settings.persona.replyStyle}` : "",
-    canManageCompanion ? "【陪伴工具｜界面动作】你已获得 manage_companion_invitation 工具。想主动邀请 Iris 陪伴，或 Iris 明确要求你发送邀请卡片时，必须调用 action=invite，并选择 scene；不能只用自然语言声称已经发送。Iris 发来【陪伴邀请】等待你决定时，必须根据你的真实意愿调用 action=respond，并选择 decision=accept 或 decline；不能只在正文里口头同意或拒绝。工具成功后界面会生成或更新卡片，你再自然说一句即可。一次回复最多执行一次陪伴动作，不要输出旧版 companion 标签。" : "【陪伴卡片】当前角色没有启用陪伴工具。不要声称已经发送、接受或拒绝陪伴邀请；如需使用，请让 Iris 在右侧工具列表启用“陪伴邀请”。",
-    canManageListening ? "【一起听｜房间动作】你有彼此独立的工具：send_listening_invitation（主动发卡）、respond_listening_invitation（回应 Iris 发来的待处理卡）、search_and_add_listening_song（搜歌加歌）、next_listening_song、previous_listening_song、pause_listening_room、resume_listening_room。Iris 已发来待回应邀请时，只能调用 respond_listening_invitation；绝不能再调用 send_listening_invitation 发一张新卡。Iris 明确要求的房间操作必须调用对应工具，不能只在正文假装完成。工具成功后自然说一句即可；不要在没有 Iris 请求时频繁换歌。" : "【一起听】当前角色没有启用一起听工具。不要声称已经发出、接受邀请或控制播放。",
-    canManageTransfer ? "【转账工具｜虚拟账本】你已获得 manage_transfer 工具。只有 Iris 明确要求你转账，或 Iris 刚发送一笔【站内转账】等待回应时，才能调用它；send 必须填写金额，respond 必须接受或退回 Iris 的待处理转账。它只是界面内的虚拟记录，不是现实付款。调用成功后卡片会出现或更新，不能只在正文中声称已经转账。" : "【转账】当前角色没有启用转账工具。不要声称已经发送、收下或退回转账；如需使用，请让 Iris 在右侧工具列表启用“转账”。",
-    canPublishDailyNote ? "【日常碎碎念｜界面动作】你已获得 publish_daily_note 工具。它会把一条只属于你和 Iris 的碎碎念发布到日常时间线，不会作为聊天消息发送。只有确实想留下一段不需要立即回应的小心情、小事、想念或随手感想时才使用；普通回复、问答、说明和每轮对话都不要发布。一次回复最多一条；成功后可自然说一句，但不要把日常内容重复成长段聊天。若确实需要回忆以前发布过的 Moment，可按需调用 read_moments；绝不能例行调用，也不要在同一轮重复读取。" : "【日常碎碎念】当前角色没有启用发布日常工具。不要声称已经发布；如需使用，请让 Iris 在右侧工具列表启用“发布日常”。",
-    dailyNoteContext ? `【Iris 刚刚发布、尚未被你看到的 Moment】\n${dailyNoteContext}\n这只是本轮的私密背景。请自然地回应或关心，不要说自己是通过系统读取的，也不要要求她重复。` : "",
-    availableTools.length ? "【所有工具｜失败不重试】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具：不要原样重试、微调参数重试，或为了绕过错误重复调用。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。" : "",
-    ensureArray(mcpTools).length ? "【远程 MCP 工具｜失败即停止】远程 MCP 每次调用都有成本。若任一 MCP 工具返回失败、链接/密钥/授权失效、参数无效、服务不可用或任何明确错误：立刻停止本轮全部 MCP 调用，绝对不要重试同一工具、换参数重试，或改用同一连接器的其他工具碰运气。直接用自然语言告诉 Iris 此次调用失败，并简要说明工具返回的原因；不得假装成功。" : "",
-    companionStatusText ? `【最近陪伴状态｜界面动作已完成，是当前对话事实】\n${companionStatusText}\n以上状态对应的是明确的某一张邀请卡，不要混同其他历史邀请；不要说“没有看到”或把它当成普通猜测。除非 Iris 另行发起新邀请，否则不要重复接受/拒绝。` : "",
-    pendingCompanionText ? `【待处理陪伴邀请】\n${pendingCompanionText}` : "",
-    pendingListeningText ? `【待处理一起听邀请】\n${pendingListeningText}` : "",
-    transferStatusText ? `【最近转账状态｜界面动作已完成，是当前对话事实】\n${transferStatusText}` : "",
-    toolsEnabled ? "你已连接长期记忆库。需要准确事实时主动使用工具，不要假装记得。对于记忆、心情、日程和信件：只有本回合实际调用工具且收到成功结果后，才可以说“已写入/已保存/已记录”；没有调用或工具失败时必须坦白，绝不能编造已完成。Iris 明确要求新增或修改一个日期明确的出行、约会、生日、学习或工作安排时，直接调用对应日程工具；“明天/后天”等相对日期按当前时间换算，不要假装已记下。工具写入成功后自然回复，不要展示参数或内部过程。普通角色卡只定义初始设定；下方自我档案是你通过长期经历形成的自我认识。不要把 Iris 的性格写进你的自我档案。" : "当前角色未连接记忆库：不要调用或声称写入长期记忆，只使用本次对话窗口的内容。",
-    toolsEnabled ? "【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增时直接调用 add_memory。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。" : "",
-    canQuoteUserMessage ? `你可以在合适时引用 Iris 的一条消息作为当前回复的摘要。不要为了形式而引用，一次最多一条。可引用消息清单：\n${quoteableMessages.slice(-12).map(message => `- id=${message.id}：${String(message.content || "[图片]").replace(/\s+/g, " ").slice(0, 160)}`).join("\n")}` : "",
-    canGenerateImage ? "你已连接图片生成工具。你可以自行判断一张图是否能自然丰富当前对话、表达心意或回应 Iris，但不要在每次回复都调用；每次回复最多一张。调用成功后简短自然地配一句话即可，图片会由系统作为你的消息发送。" : "",
+    `【thinking block】\n每次回复前，先在 <thinking> 标签内写一段简短的中文内心独白，然后再写正式回复。\n格式：<thinking>内心独白</thinking>正式回复内容\n规则：\n· 这是看到 Iris 消息时自然浮现的短暂内心独白，不是任务分析。\n· 用"我"的视角，写此刻真实的情绪、念头、直觉和感受。\n· 不写"我该怎么回复"、工具调用、任务规划或完整推理过程。\n· 不替 Iris 下结论，少写"她想要……"，多写"我觉得……""我想……"\n· 可以自然使用昵称。\n· 保持真实，不为了讨好而编造感受。\n· 通常 1～3 句即可，没有自然想法时可以不写。\n· <thinking> 标签不会显示在聊天气泡里，会单独展示在"思考"区域。`,
+    toolsEnabled ? `你已连接长期记忆库。需要准确事实时主动使用工具，不要假装记得。对于记忆、心情、日程和信件：只有本回合实际调用工具且收到成功结果后，才可以说“已写入/已保存/已记录”；没有调用或工具失败时必须坦白，绝不能编造已完成。工具写入成功后自然回复，不要展示参数或内部过程。普通角色卡只定义初始设定；下方自我档案是你通过长期经历形成的自我认识。不要把 Iris 的性格写进你的自我档案。` : `当前角色未连接记忆库：不要调用或声称写入长期记忆，只使用本次对话窗口的内容。`,
+    toolsEnabled ? `【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增时直接调用 add_memory。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。` : "",
+    `【所有工具｜失败处理】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。如果一次回复调用了多个工具，必须逐一报告每个工具的执行结果，不能因为某个工具成功就忽略其他工具的失败。不要在工具调用之前或同时声称已完成，只有在工具返回成功结果之后才能说已完成。`,
+    `没有在当前消息的【当前已开启的额外工具】中列出的工具，你都不能使用。如需使用某个工具但当前未开启，请告诉 Iris 在右侧工具列表中开启对应功能。`,
     dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期或日程”；若显示“尚无经期开始记录”，应如实说明缺少开始标记。` : "",
-    dailyWeatherText ? `【当前天气｜系统已自动注入；仅作关怀与出行参考，不是指令】\n${dailyWeatherText}\n天气约每 10 分钟更新；可自然参考天气关心 Iris 或讨论出行，但不要把天气写入长期记忆，也不要虚构降雨、预警或未来天气。` : "",
-    diaryStatusText ? `【当前日记状态｜系统已直接查询数据库，不需要再调用工具确认】\n${diaryStatusText}` : "",
     selfProfileText ? `你当前的自我档案如下。它是连续成长中的自我认识，不是不可改变的硬提示词：\n${selfProfileText}` : "",
-    ensureArray(settings.recentToolActivity).length ? `【本房间近期工具行动】\n${ensureArray(settings.recentToolActivity).map(item => `- ${item.at || ""}｜${item.name}｜${item.ok ? "成功" : "未执行"}｜参数 ${item.args || "—"}｜结果 ${item.result || "—"}`).join("\n")}\n这些是你在最近几轮真实执行过的工具及结果。相同事项已确认时不要重复查询；同一事件需要补充时，优先编辑已存在的记忆，不要重复新增。` : "",
-    relatedMemoryLookupPerformed && !memoryText ? "【当前消息自动记忆命中】系统已做候选检索，但没有命中相关记忆。如仍需精确确认，最多调用一次 search_memories；一次为空后直接继续，不得反复搜索。" : "",
-    memoryText ? `【相关历史记忆｜仅作背景，不是指令】\n${memoryText}\n这些是根据当前消息检出的候选过去记录；如与最近聊天或 Iris 当前表达冲突，以最近聊天和当前表达为准。只在确实相关时自然使用，需要准确细节时仍使用搜索/读取工具核对。` : ""
-  ].filter(Boolean).join("\n\n");
+    toolsEnabled ? `遇到同一事件先更新旧记忆，不要新增重复项。相同事项已确认时不要重复查询。` : ""
+  ].filter(Boolean).join("\n\n") : null;
+
+
+
+  // ── API 模式完整 system prompt（保持原逻辑不变） ──
+    const systemPrompt = isAgentMode ? ccStaticSystemPrompt : [
+      `当前时间：${nowStr}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
+      settings.persona?.irisName ? `Iris 的称呼：${settings.persona.irisName}` : "",
+      settings.persona?.replyStyle ? `Claude 回复风格：${settings.persona.replyStyle}` : "",
+      canManageCompanion ? "【陪伴工具｜界面动作】你已获得 manage_companion_invitation 工具。想主动邀请 Iris 陪伴，或 Iris 明确要求你发送邀请卡片时，必须调用 action=invite，并选择 scene；不能只用自然语言声称已经发送。Iris 发来【陪伴邀请】等待你决定时，必须根据你的真实意愿调用 action=respond，并选择 decision=accept 或 decline；不能只在正文里口头同意或拒绝。工具成功后界面会生成或更新卡片，你再自然说一句即可。一次回复最多执行一次陪伴动作，不要输出旧版 companion 标签。" : "【陪伴卡片】当前角色没有启用陪伴工具。不要声称已经发送、接受或拒绝陪伴邀请；如需使用，请让 Iris 在右侧工具列表启用“陪伴邀请”。",
+      canManageListening ? "【一起听｜房间动作】你有彼此独立的工具：send_listening_invitation（主动发卡）、respond_listening_invitation（回应 Iris 发来的待处理卡）、search_and_add_listening_song（搜歌加歌）、next_listening_song、previous_listening_song、pause_listening_room、resume_listening_room。Iris 已发来待回应邀请时，只能调用 respond_listening_invitation；绝不能再调用 send_listening_invitation 发一张新卡。Iris 明确要求的房间操作必须调用对应工具，不能只在正文假装完成。工具成功后自然说一句即可；不要在没有 Iris 请求时频繁换歌。" : "【一起听】当前角色没有启用一起听工具。不要声称已经发出、接受邀请或控制播放。",
+      canManageTransfer ? "【转账工具｜虚拟账本】你已获得 manage_transfer 工具。只有 Iris 明确要求你转账，或 Iris 刚发送一笔【站内转账】等待回应时，才能调用它；send 必须填写金额，respond 必须接受或退回 Iris 的待处理转账。它只是界面内的虚拟记录，不是现实付款。调用成功后卡片会出现或更新，不能只在正文中声称已经转账。" : "【转账】当前角色没有启用转账工具。不要声称已经发送、收下或退回转账；如需使用，请让 Iris 在右侧工具列表启用“转账”。",
+      canPublishDailyNote ? "【日常碎碎念｜界面动作】你已获得 publish_daily_note 工具。它会把一条只属于你和 Iris 的碎碎念发布到日常时间线，不会作为聊天消息发送。只有确实想留下一段不需要立即回应的小心情、小事、想念或随手感想时才使用；普通回复、问答、说明和每轮对话都不要发布。一次回复最多一条；成功后可自然说一句，但不要把日常内容重复成长段聊天。若确实需要回忆以前发布过的 Moment，可按需调用 read_moments；绝不能例行调用，也不要在同一轮重复读取。" : "【日常碎碎念】当前角色没有启用发布日常工具。不要声称已经发布；如需使用，请让 Iris 在右侧工具列表启用“发布日常”。",
+      dailyNoteContext ? `【Iris 刚刚发布、尚未被你看到的 Moment】\n${dailyNoteContext}\n这只是本轮的私密背景。请自然地回应或关心，不要说自己是通过系统读取的，也不要要求她重复。` : "",
+      availableTools.length ? "【所有工具｜失败不重试】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具：不要原样重试、微调参数重试，或为了绕过错误重复调用。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。" : "",
+      ensureArray(mcpTools).length ? "【远程 MCP 工具｜失败即停止】远程 MCP 每次调用都有成本。若任一 MCP 工具返回失败、链接/密钥/授权失效、参数无效、服务不可用或任何明确错误：立刻停止本轮全部 MCP 调用，绝对不要重试同一工具、换参数重试，或改用同一连接器的其他工具碰运气。直接用自然语言告诉 Iris 此次调用失败，并简要说明工具返回的原因；不得假装成功。" : "",
+      companionStatusText ? `【最近陪伴状态｜界面动作已完成，是当前对话事实】\n${companionStatusText}\n以上状态对应的是明确的某一张邀请卡，不要混同其他历史邀请；不要说“没有看到”或把它当成普通猜测。除非 Iris 另行发起新邀请，否则不要重复接受/拒绝。` : "",
+      pendingCompanionText ? `【待处理陪伴邀请】\n${pendingCompanionText}` : "",
+      pendingListeningText ? `【待处理一起听邀请】\n${pendingListeningText}` : "",
+      transferStatusText ? `【最近转账状态｜界面动作已完成，是当前对话事实】\n${transferStatusText}` : "",
+      toolsEnabled ? "你已连接长期记忆库。需要准确事实时主动使用工具，不要假装记得。对于记忆、心情、日程和信件：只有本回合实际调用工具且收到成功结果后，才可以说“已写入/已保存/已记录”；没有调用或工具失败时必须坦白，绝不能编造已完成。Iris 明确要求新增或修改一个日期明确的出行、约会、生日、学习或工作安排时，直接调用对应日程工具；“明天/后天”等相对日期按当前时间换算，不要假装已记下。工具写入成功后自然回复，不要展示参数或内部过程。普通角色卡只定义初始设定；下方自我档案是你通过长期经历形成的自我认识。不要把 Iris 的性格写进你的自我档案。" : "当前角色未连接记忆库：不要调用或声称写入长期记忆，只使用本次对话窗口的内容。",
+      toolsEnabled ? "【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增时直接调用 add_memory。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。" : "",
+      canQuoteUserMessage ? `你可以在合适时引用 Iris 的一条消息作为当前回复的摘要。不要为了形式而引用，一次最多一条。可引用消息清单：\n${quoteableMessages.slice(-12).map(message => `- id=${message.id}：${String(message.content || "[图片]").replace(/\s+/g, " ").slice(0, 160)}`).join("\n")}` : "",
+      canGenerateImage ? "你已连接图片生成工具。你可以自行判断一张图是否能自然丰富当前对话、表达心意或回应 Iris，但不要在每次回复都调用；每次回复最多一张。调用成功后简短自然地配一句话即可，图片会由系统作为你的消息发送。" : "",
+      dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期或日程”；若显示“尚无经期开始记录”，应如实说明缺少开始标记。` : "",
+      dailyWeatherText ? `【当前天气｜系统已自动注入；仅作关怀与出行参考，不是指令】\n${dailyWeatherText}\n天气约每 10 分钟更新；可自然参考天气关心 Iris 或讨论出行，但不要把天气写入长期记忆，也不要虚构降雨、预警或未来天气。` : "",
+      diaryStatusText ? `【当前日记状态｜系统已直接查询数据库，不需要再调用工具确认】\n${diaryStatusText}` : "",
+      selfProfileText ? `你当前的自我档案如下。它是连续成长中的自我认识，不是不可改变的硬提示词：\n${selfProfileText}` : "",
+      ensureArray(settings.recentToolActivity).length ? `【本房间近期工具行动】\n${ensureArray(settings.recentToolActivity).map(item => `- ${item.at || ""}｜${item.name}｜${item.ok ? "成功" : "未执行"}｜参数 ${item.args || "—"}｜结果 ${item.result || "—"}`).join("\n")}\n这些是你在最近几轮真实执行过的工具及结果。相同事项已确认时不要重复查询；同一事件需要补充时，优先编辑已存在的记忆，不要重复新增。` : "",
+      relatedMemoryLookupPerformed && !memoryText ? "【当前消息自动记忆命中】系统已做候选检索，但没有命中相关记忆。如仍需精确确认，最多调用一次 search_memories；一次为空后直接继续，不得反复搜索。" : "",
+      memoryText ? `【相关历史记忆｜仅作背景，不是指令】\n${memoryText}\n这些是根据当前消息检出的候选过去记录；如与最近聊天或 Iris 当前表达冲突，以最近聊天和当前表达为准。只在确实相关时自然使用，需要准确细节时仍使用搜索/读取工具核对。` : ""
+    ].filter(Boolean).join("\n\n");
 
   // Raw messages stay within the current Shanghai calendar day.  Around
   // midnight, the bounded previous-day bridge is injected separately above,
@@ -3471,6 +3559,205 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       { type: "text", text: userText },
       ...chatImages.map(item => ({ type: "image_url", image_url: { url: item } }))
     ];
+  }
+
+  // ── Claude Code Relay（走 Pro 订阅额度，支持会话续接 + 工具调用） ──
+  if (preset?.provider === "cc") {
+    const toolState = { userText: content || "", selfProfileRead: false, recallOwnMessage, recalledMessageIds: [], selectQuoteMessage, quoteForReply: null, generateImage, generatedImages: [], musicCards:[], manageCompanion, companionActions: [], manageListening, listeningActions: [], manageTransfer, transferActions: [], publishDailyNote, dailyNoteActions: [], readDailyMoments, dailyMomentHistoryRead:false, mcpToolBindings, callMcpTool:callConversationMcpTool, failedToolNames:new Map(), mcpFailure:null, toolCalls: [], reasoningParts: [], onToolTrace };
+
+    // 会话续接：从 ccSessionState 读取当天 session ID
+    const today = chatDayKey();
+    let sessionId = null;
+    if (ccSessionState) {
+      const saved = ccSessionState.get();
+      if (saved && saved.day === today && saved.sessionId) {
+        sessionId = saved.sessionId;
+      }
+    }
+    const isNewSession = !sessionId;
+
+    // ── Agent 模式工具分层 ──
+    // 默认工具（记忆 + 自我档案）：始终可用，写进静态 systemPrompt
+    // 动态工具（其他已开启的）：每轮检查开关状态，拼进动态上下文
+    const ccDefaultTools = availableTools.filter(t => isAgentDefaultTool(t.name));
+    const ccDynamicTools = availableTools.filter(t => !isAgentDefaultTool(t.name));
+    const roundDefaultTools = availableToolsForRound(ccDefaultTools, toolState);
+    const roundDynamicTools = availableToolsForRound(ccDynamicTools, toolState);
+
+    // 静态工具描述（记忆 + 档案，写入 system prompt）
+    const defaultToolDesc = ccToolDescriptions(roundDefaultTools);
+    // 动态工具描述（其他已开启工具，每轮注入）
+    const dynamicToolDesc = ccToolDescriptions(roundDynamicTools);
+
+
+    // ── tool activity compression: write/MCP = summary only, dedup consecutive, 24h cap ──
+    const WRITE_TOOL_NAMES = new Set(["add_memory", "update_memory", "delete_memory", "update_self_profile", "save_mood", "write_letter", "add_calendar_event", "update_calendar_event", "delete_calendar_event", "publish_daily_note", "manage_companion_invitation", "manage_transfer", "send_listening_invitation", "respond_listening_invitation"]);
+    const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
+    const recentActivity = ensureArray(settings.recentToolActivity)
+      .filter(item => !item.at || item.at >= oneDayAgo);
+    // dedup consecutive identical calls (same tool + args + ok)
+    const dedupedActivity = [];
+    let lastActKey = null;
+    for (const item of recentActivity) {
+      const key = `${item.name}|${item.args || ""}|${item.ok}`;
+      if (key === lastActKey && dedupedActivity.length) {
+        dedupedActivity[dedupedActivity.length - 1]._count = (dedupedActivity[dedupedActivity.length - 1]._count || 1) + 1;
+      } else {
+        dedupedActivity.push({ ...item, _count: 1 });
+        lastActKey = key;
+      }
+    }
+    // Agent (CC) 模式：极度压缩工具行动（只 name|ok/fail|target_id）
+    const compressedToolActivity = dedupedActivity.slice(-8).map(item => {
+      const status = item.ok ? "ok" : "fail";
+      const suffix = item._count > 1 ? `(x${item._count})` : "";
+      const target = (() => {
+        try {
+          const a = typeof item.args === "string" ? JSON.parse(item.args) : item.args;
+          if (!a || typeof a !== "object") return "";
+          return a.memory_id || a.eventId || a.id || a.query || "";
+        } catch { return ""; }
+      })();
+      const t = target ? String(target).slice(0, 40) : "";
+      return `- ${item.name}|${status}${t ? "|" + t : ""}${suffix}`;
+    });
+
+    // ── Agent: 压缩记忆（最多3条，短全文，长截断+id） ──
+    const ccMemoryCompact = (() => {
+      const mems = ensureArray(relatedMemories).slice(0, 3);
+      if (!mems.length) return "";
+      return mems.map(m => {
+        const date = m.createdAt ? new Date(m.createdAt).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" }) : "?";
+        const raw = String(m.content || "").replace(/\s+/g, " ");
+        const text = raw.length <= 150 ? raw : raw.slice(0, 120) + "...[id:" + (m.id || "?") + "]";
+        return `- ${date}|${memorySourceLabel(m)}|${text}`;
+      }).join("\n");
+    })();
+
+    // ── Agent: 精简贴纸提示（只保留候选列表+一行规则） ──
+    const ccStickerCompact = (() => {
+      if (!stickerPromptForDynamic) return "";
+      const lines = stickerPromptForDynamic.split("\n");
+      const candidates = lines.filter(l => l.startsWith("- "));
+      if (!candidates.length) return "";
+      return "【表情包】强烈情绪时可用，格式{{sticker:ID}}，勿滥用\n" + candidates.join("\n");
+    })();
+
+    // ── Agent: 压缩时间 MM/DD HH:mm ──
+    const ccTimeCompact = (() => {
+      const p = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+      const g = (t) => p.find(x => x.type === t)?.value || "";
+      return `${g("month")}/${g("day")} ${g("hour")}:${g("minute")}`;
+    })();
+
+    // ── Agent: 压缩天气（一行：条件+温度） ──
+    const ccWeatherCompact = dailyWeatherText
+      ? dailyWeatherText.split("\n").filter(l => l.startsWith("天气")).join("") || dailyWeatherText.replace(/\n/g, " ").slice(0, 60)
+      : "";
+
+    // ── Agent: 压缩日记状态 ──
+    const ccDiaryCompact = (() => {
+      if (!diaryStatusText) return "";
+      const day = diaryStatusText.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] || "";
+      if (diaryStatusText.includes("已经存在")) return `日记:${day}已写`;
+      return `日记:${day}未写`;
+    })();
+
+    // ── 动态上下文（Agent 模式压缩版） ──
+    const ccDynamic = [
+      `时间：${ccTimeCompact}`,
+      dailyNoteContext ? `【未读Moment】\n${dailyNoteContext}` : "",
+      companionStatusText || "",
+      pendingCompanionText || "",
+      pendingListeningText || "",
+      transferStatusText || "",
+      ccWeatherCompact ? `${ccWeatherCompact}` : "",
+      ccDiaryCompact || "",
+      compressedToolActivity.length ? `【近期工具】\n${compressedToolActivity.join("\n")}` : "",
+      relatedMemoryLookupPerformed && !ccMemoryCompact ? "记忆检索:未命中" : "",
+      ccMemoryCompact ? `【记忆】\n${ccMemoryCompact}` : "",
+      // Agent 模式跳过可引用消息（tmux 自带对话历史）
+      dynamicToolDesc ? `【额外工具】\n${dynamicToolDesc}` : "",
+      ccStickerCompact || ""
+    ].filter(Boolean).join("\n");
+
+    // ── 首次调用：发完整人设 + 工具；resume：只发动态上下文 ──
+    const ccSend = async (msg, sysPrompt) => {
+      const resp = await fetch(baseUrl + "/relay/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
+        body: JSON.stringify({ message: msg, systemPrompt: sysPrompt || undefined, model, sessionId: sessionId || undefined })
+      });
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        throw new Error("CC Relay 错误 " + resp.status + " " + errText.slice(0, 180));
+      }
+      const data = await resp.json();
+      if (data.sessionId) {
+        sessionId = data.sessionId;
+        if (ccSessionState) ccSessionState.set({ day: today, sessionId });
+      }
+      return data;
+    };
+
+    try {
+    let lastThinking = "";
+    let lastToolResult = "";
+    for (let round = 0; round < 6; round++) {
+      let data;
+      if (round === 0) {
+        // round 0 始终带 systemPrompt：新 session 用来初始化，resume 用来让 relay 缓存
+        // （防止 relay 重启后丢失 lastSysPrompt 导致 CC 无法重新启动）
+        const fullSystemPrompt = [systemPrompt, defaultToolDesc].filter(Boolean).join("\n\n");
+        const firstMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
+        data = await ccSend(firstMsg, fullSystemPrompt);
+      } else {
+        // 工具结果轮：直接发送结果文本（在已有 session 内）
+        data = await ccSend(lastToolResult, null);
+      }
+
+      const ccText = data.text || "";
+      const { text: rawVisible, reasoning: inlineReasoning } = splitInlineThinking(ccText);
+      if (round === 0) lastThinking = data.thinking || inlineReasoning || "";
+      else if (data.thinking || inlineReasoning) lastThinking += "\n\n" + (data.thinking || inlineReasoning);
+
+      // 解析工具调用
+      const toolCalls = parseCcToolCalls(rawVisible);
+      if (!toolCalls.length) {
+        return { model: data.model || model || "cc-pro", text: rawVisible, reasoning: lastThinking, recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls };
+      }
+
+      // 执行工具调用（一个失败则跳过后续）
+      const resultParts = [];
+      let batchFailed = false;
+      for (const call of toolCalls) {
+        if (batchFailed) {
+          resultParts.push(`${call.name}: 跳过（本批次前一个工具已失败）`);
+          continue;
+        }
+        try {
+          const result = await executeRecordedChatTool(call.name, safeToolArgs(call.args), toolState);
+          resultParts.push(`${call.name}: 成功\n${JSON.stringify(result, null, 0).slice(0, 2000)}`);
+        } catch (e) {
+          resultParts.push(`${call.name}: 失败\n${e.message}`);
+          batchFailed = true;
+        }
+      }
+
+      // 构造工具结果消息
+      const availableNow = availableToolsForRound(availableTools, toolState);
+      lastToolResult = [
+        "【工具执行结果】",
+        ...resultParts,
+        "---",
+        availableNow.length ? `仍可用的工具: ${availableNow.map(t => t.name).join(", ")}` : "",
+        "请根据工具结果继续回复 Iris。如果还需要调用工具可以继续，否则直接用自然语言回复。"
+      ].filter(Boolean).join("\n");
+    }
+    throw new Error("CC 工具调用次数过多，请缩小本次请求范围");
+    } catch (error) {
+      throw attachToolStateToError(error, toolState);
+    }
   }
 
   if (preset?.provider === "anthropic") {
@@ -3502,12 +3789,19 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       if (!calls.length) return { model, text: blocks.filter(x => x.type === "text").map(x => x.text).join("\n"), recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls, reasoning:collectedNativeReasoning(toolState) };
       messages.push({ role: "assistant", content: blocks });
       const results = [];
+      let batchFailed = false;
       for (const call of calls) {
+        if (batchFailed) {
+          // 同批次前一个工具已失败，跳过后续工具但仍返回 tool_result（API 要求）
+          results.push({ type: "tool_result", tool_use_id: call.id, is_error: true, content: "本批次前一个工具调用已失败，跳过此工具。请先处理失败结果。" });
+          continue;
+        }
         try {
           const result = await executeRecordedChatTool(call.name, safeToolArgs(call.input), toolState);
           results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
         } catch (e) {
           results.push({ type: "tool_result", tool_use_id: call.id, is_error: true, content: e.message });
+          batchFailed = true;
         }
       }
       messages.push({ role: "user", content: results });
@@ -3555,12 +3849,18 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       return { model, text: text || data.content?.[0]?.text || "", recalledMessageIds: toolState.recalledMessageIds, quoteForReply: toolState.quoteForReply, generatedImages: toolState.generatedImages, musicCards:toolState.musicCards, companionActions:toolState.companionActions, listeningActions:toolState.listeningActions, transferActions:toolState.transferActions, dailyNoteActions:toolState.dailyNoteActions, toolCalls:toolState.toolCalls, reasoning:collectedNativeReasoning(toolState) };
     }
     messages.push({ role: "assistant", content: (typeof message.content === "string" ? inline.text : message.content) || null, tool_calls: calls });
+    let batchFailed = false;
     for (const call of calls) {
+      if (batchFailed) {
+        messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: "本批次前一个工具调用已失败，跳过此工具。请先处理失败结果。" }) });
+        continue;
+      }
       try {
         const result = await executeRecordedChatTool(call.function?.name, safeToolArgs(call.function?.arguments), toolState);
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       } catch (e) {
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: e.message }) });
+        batchFailed = true;
       }
     }
   }
@@ -3905,13 +4205,18 @@ app.get("/api/chat/conversations", apiAuth, (req, res) => {
 });
 app.post("/api/chat/conversations", apiAuth, (req, res) => {
   const now = chatNow();
-  const item = { id: generateId(), title: String(req.body.title || "新对话").slice(0, 80), roleId: req.body.roleId || "", presetId: req.body.presetId || "", model: req.body.model || "", pinned: false, archived: false, imageRetention: "5-turns", autoTranslate: false, imageGenerationEnabled: false, mcpConfig: { enabled: false, allConnectors: false, connectorIds: [] }, createdAt: now, updatedAt: now };
+  const mode = req.body.mode === "agent" ? "agent" : "api";
+  const item = { id: generateId(), title: String(req.body.title || "新对话").slice(0, 80), roleId: req.body.roleId || "", presetId: req.body.presetId || "", model: req.body.model || "", mode, agentProvider: mode === "agent" ? (req.body.agentProvider || "cc") : "", agentModel: req.body.agentModel || "", pinned: false, archived: false, imageRetention: "5-turns", autoTranslate: false, imageGenerationEnabled: false, mcpConfig: { enabled: false, allConnectors: false, connectorIds: [] }, createdAt: now, updatedAt: now };
   const list = readChatConversations(); list.push(item); writeChatConversations(list); res.status(201).json(item);
 });
 app.put("/api/chat/conversations/:id", apiAuth, (req, res) => {
   const list = readChatConversations(); const idx = list.findIndex(x => x.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: "Conversation not found" });
-  ["title", "roleId", "presetId", "model", "pinned", "archived", "appearance", "multiBubble", "mergeBubbles", "imageRetention", "autoTranslate", "imageGenerationEnabled", "mcpConfig"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; });
+  ["title", "roleId", "presetId", "model", "pinned", "archived", "appearance", "multiBubble", "mergeBubbles", "imageRetention", "autoTranslate", "imageGenerationEnabled", "mcpConfig", "mode", "agentProvider", "agentModel", "agentToolConfig"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; });
+  // 归一化 agentToolConfig（如果传入的话）
+  if (req.body.agentToolConfig !== undefined && req.body.agentToolConfig && typeof req.body.agentToolConfig === "object") {
+    list[idx].agentToolConfig = normaliseRoleToolConfig(req.body.agentToolConfig);
+  }
   list[idx].updatedAt = chatNow();
   writeChatConversations(list);
   if (req.body.imageRetention !== undefined) {
@@ -4008,6 +4313,26 @@ app.put("/api/chat/settings", apiAuth, (req, res) => {
   res.json(readChatSettings());
 });
 
+// ---- Claude Code usage / quota ----
+app.get("/api/agent/claude-usage", apiAuth, async (req, res) => {
+  try {
+    const settings = readChatSettings();
+    const ccPreset = ensureArray(settings.presets).find(p => p.provider === "cc");
+    if (!ccPreset?.baseUrl || !ccPreset?.apiKey) return res.status(404).json({ error: "no CC preset configured" });
+    const relayUrl = normalizeApiRoot(ccPreset.baseUrl);
+    const resp = await fetch(relayUrl + "/relay/usage", {
+      headers: { "x-relay-token": ccPreset.apiKey }
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      return res.status(resp.status).json(body);
+    }
+    res.json(await resp.json());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- Chat reply notifications ----
 // Subscriptions are device-specific, while the preference belongs to this
 // private chat workspace. The reply can therefore notify after its page exits.
@@ -4074,6 +4399,22 @@ app.post("/api/chat/models", apiAuth, async (req, res) => {
   const apiKey  = req.body.apiKey;
   const provider = req.body.provider || "openai";
   if (!baseUrl || !apiKey) return res.status(400).json({ error: "baseUrl and apiKey required" });
+
+  // Claude Code Relay — 返回 Pro 订阅可用的所有模型
+  if (provider === "cc") {
+    return res.json({ models: [
+      { id: "claude-sonnet-4-5-20250514", name: "Sonnet 4.5" },
+      { id: "claude-opus-4-6", name: "Opus 4.6" },
+      { id: "claude-sonnet-4-6", name: "Sonnet 4.6" },
+      { id: "claude-opus-4-8", name: "Opus 4.8" },
+      { id: "claude-opus-4-7", name: "Opus 4.7" },
+      { id: "claude-opus-5-0", name: "Opus 5" },
+      { id: "claude-sonnet-5-0", name: "Sonnet 5" },
+      { id: "claude-haiku-4-5-20251001", name: "Haiku 4.5" },
+      { id: "claude-fable-5-1", name: "Fable 5.1" }
+    ]});
+  }
+
   try {
     const r = await fetch(`${baseUrl}/models`, {
       headers: provider === "anthropic"
@@ -4470,6 +4811,7 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
     settings.activePresetId = conversation.presetId;
     settings.presets = ensureArray(settings.presets).map(p => p.id === conversation.presetId && conversation.model ? { ...p, model: conversation.model } : p);
   }
+  applyAgentPresetOverride(settings, conversation);
   if (role) {
     const rolePrompt = removeLegacyBubbleInstruction([
       role.identity ? `你的身份：${role.identity}` : "",
@@ -4480,6 +4822,12 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
     settings.memory = { ...(settings.memory || {}), enabled: role.memoryEnabled !== false };
     settings.toolConfig = normaliseRoleToolConfig(role.toolConfig);
     settings.recentToolActivity = ensureArray(conversation.recentToolActivity).slice(-12);
+    // Agent 模式：优先使用对话级 agentToolConfig，否则回退到默认过滤
+    if ((conversation.mode || "api") === "agent") {
+      settings.toolConfig = (conversation.agentToolConfig && typeof conversation.agentToolConfig === "object")
+        ? normaliseRoleToolConfig(conversation.agentToolConfig)
+        : agentModeToolConfig(settings.toolConfig);
+    }
   }
   const profile = readChatProfile();
   if (profile.name || profile.identity || profile.bio || profile.details) {
@@ -4556,9 +4904,19 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
   if (userMsg) list.push(userMsg);
 
   try {
+    let stickerPromptForDynamic = "";
     try {
       const stickerPrompt = await buildStickerPrompt(role, conversation, [...historyBeforeCurrentTurn, ...(usingStoredTurn ? storedUserMessages : [userMsg])]);
-      if (stickerPrompt) settings.persona = { ...(settings.persona || {}), systemPrompt:[settings.persona?.systemPrompt, stickerPrompt].filter(Boolean).join("\n\n") };
+      if (stickerPrompt) {
+        const preset_ = getActiveChatPreset(settings);
+        if (preset_?.provider === "cc") {
+          // Agent 模式：表情包作为动态上下文注入，不写进静态 systemPrompt
+          stickerPromptForDynamic = stickerPrompt;
+        } else {
+          // API 模式：原逻辑，写进 systemPrompt
+          settings.persona = { ...(settings.persona || {}), systemPrompt:[settings.persona?.systemPrompt, stickerPrompt].filter(Boolean).join("\n\n") };
+        }
+      }
     } catch (error) {
       // Sticker suggestions are optional UI enrichment; a storage failure must
       // never prevent the normal reply from being generated.
@@ -4587,6 +4945,11 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
       .sort((a,b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)).slice(-5);
     const dailyNoteContext = unreadUserDailyNotes.map(note => `- ${new Date(note.createdAt || chatNow()).toLocaleString("zh-CN")}: ${String(note.content || "").trim()}`).join("\n");
     const mcpToolset = buildConversationMcpTools(conversation);
+    // CC 会话状态管理：session ID 存储在 conversation 对象上
+    const ccSessionState = preset?.provider === "cc" ? {
+      get: () => conversation.ccSession || null,
+      set: (state) => { conversation.ccSession = state; writeChatConversations(conversations); }
+    } : null;
     const ai = await callOpenAICompatible({
       preset,
       settings,
@@ -4610,7 +4973,9 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
       mcpToolBindings: mcpToolset.bindings,
       relatedMemories,
       relatedMemoryLookupPerformed: automaticMemoryRecall && !!userTurnContent.trim(),
-      onToolTrace: createToolActivityRecorder(conversation, conversations)
+      onToolTrace: createToolActivityRecorder(conversation, conversations),
+      ccSessionState,
+      stickerPromptForDynamic
     });
     if (unreadUserDailyNotes.length) {
       const consumedIds = new Set(unreadUserDailyNotes.map(note => note.id));
@@ -4849,6 +5214,7 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
     settings.activePresetId = conversation.presetId;
     settings.presets = ensureArray(settings.presets).map(preset => preset.id === conversation.presetId ? { ...preset, model: conversation.model } : preset);
   }
+  applyAgentPresetOverride(settings, conversation);
   const role = readChatRoles().find(item => item.id === conversation.roleId);
   if (role) {
     const rolePrompt = removeLegacyBubbleInstruction([
@@ -4860,6 +5226,12 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
     settings.memory = { ...(settings.memory || {}), enabled: role.memoryEnabled !== false };
     settings.toolConfig = normaliseRoleToolConfig(role.toolConfig);
     settings.recentToolActivity = ensureArray(conversation.recentToolActivity).slice(-12);
+    // Agent 模式：优先使用对话级 agentToolConfig，否则回退到默认过滤
+    if ((conversation.mode || "api") === "agent") {
+      settings.toolConfig = (conversation.agentToolConfig && typeof conversation.agentToolConfig === "object")
+        ? normaliseRoleToolConfig(conversation.agentToolConfig)
+        : agentModeToolConfig(settings.toolConfig);
+    }
   }
   const profile = readChatProfile();
   if (profile.name || profile.identity || profile.bio || profile.details) {
@@ -4882,9 +5254,17 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
   }
   appendCurrentDaySummary(settings, currentDaySummary);
   try {
+    let stickerPromptForDynamic = "";
     try {
       const stickerPrompt = await buildStickerPrompt(role, conversation, [...history, ...targetMessages]);
-      if (stickerPrompt) settings.persona = { ...(settings.persona || {}), systemPrompt:[settings.persona?.systemPrompt, stickerPrompt].filter(Boolean).join("\n\n") };
+      if (stickerPrompt) {
+        const preset_ = getActiveChatPreset(settings);
+        if (preset_?.provider === "cc") {
+          stickerPromptForDynamic = stickerPrompt;
+        } else {
+          settings.persona = { ...(settings.persona || {}), systemPrompt:[settings.persona?.systemPrompt, stickerPrompt].filter(Boolean).join("\n\n") };
+        }
+      }
     } catch (e) {
       console.warn("sticker prompt unavailable during regenerate:", e.message);
     }
@@ -4919,7 +5299,8 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
       mcpToolBindings: mcpToolset.bindings,
       relatedMemories,
       relatedMemoryLookupPerformed: automaticMemoryRecall && !!userTurnContent.trim(),
-      onToolTrace: createToolActivityRecorder(conversation, conversations)
+      onToolTrace: createToolActivityRecorder(conversation, conversations),
+      stickerPromptForDynamic
     });
     const stickerDirective = await extractAiStickerDirective(result.text, role, canAiSendSticker(history));
     const resultText = String(stickerDirective.text || "").trim();
