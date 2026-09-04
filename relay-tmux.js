@@ -450,6 +450,54 @@ app.post("/relay/rotate", auth, async (_req, res) => {
 });
 
 // ════════════════════════════════════════
+//  Claude Code 额度查询（读本地 OAuth token → Anthropic usage API）
+// ════════════════════════════════════════
+const CREDENTIALS_PATH = join(process.env.HOME || "/root", ".claude", ".credentials.json");
+
+app.get("/relay/usage", auth, async (_req, res) => {
+  try {
+    // 每次现读，不缓存 token（CC 会自动刷新该文件）
+    if (!existsSync(CREDENTIALS_PATH)) return res.status(404).json({ error: "credentials not found" });
+    const creds = JSON.parse(readFileSync(CREDENTIALS_PATH, "utf-8"));
+    const token = creds?.claudeAiOauth?.accessToken;
+    if (!token) return res.status(404).json({ error: "no accessToken" });
+
+    const resp = await fetch("https://api.anthropic.com/api/oauth/usage", {
+      headers: { "Authorization": `Bearer ${token}`, "anthropic-beta": "oauth-2025-04-20" }
+    });
+
+    if (resp.status === 429) {
+      const retryAfter = resp.headers.get("retry-after") || "60";
+      return res.status(429).json({ error: "rate limited", retryAfter: Number(retryAfter) });
+    }
+    if (resp.status === 401) {
+      return res.status(401).json({ error: "token expired or invalid" });
+    }
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: `upstream ${resp.status}` });
+    }
+
+    const data = await resp.json();
+
+    // 只返回前端需要的字段，不泄露 token 或内部细节
+    res.json({
+      five_hour: {
+        utilization: data.five_hour?.utilization ?? null,
+        resets_at: data.five_hour?.resets_at ?? null
+      },
+      seven_day: {
+        utilization: data.seven_day?.utilization ?? null,
+        resets_at: data.seven_day?.resets_at ?? null
+      },
+      updated_at: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error("[usage] 查询失败:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ════════════════════════════════════════
 //  每日换窗（UTC+8 凌晨 5 点 = UTC 21:00）
 // ════════════════════════════════════════
 

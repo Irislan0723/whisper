@@ -4313,6 +4313,26 @@ app.put("/api/chat/settings", apiAuth, (req, res) => {
   res.json(readChatSettings());
 });
 
+// ---- Claude Code usage / quota ----
+app.get("/api/agent/claude-usage", apiAuth, async (req, res) => {
+  try {
+    const settings = readChatSettings();
+    const ccPreset = ensureArray(settings.presets).find(p => p.provider === "cc");
+    if (!ccPreset?.baseUrl || !ccPreset?.apiKey) return res.status(404).json({ error: "no CC preset configured" });
+    const relayUrl = normalizeApiRoot(ccPreset.baseUrl);
+    const resp = await fetch(relayUrl + "/relay/usage", {
+      headers: { "x-relay-token": ccPreset.apiKey }
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      return res.status(resp.status).json(body);
+    }
+    res.json(await resp.json());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- Chat reply notifications ----
 // Subscriptions are device-specific, while the preference belongs to this
 // private chat workspace. The reply can therefore notify after its page exits.

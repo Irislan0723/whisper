@@ -2658,3 +2658,116 @@ persistToolConfigV17=async function(config){
   }
   return persistToolConfigV88bBase(config)
 };
+
+/* ═══════ Claude Code Usage / Quota Panel ═══════ */
+const usageIconV90='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+let usageTimerV90=null;
+
+function injectUsageStylesV90(){
+  if($('usageStylesV90'))return;
+  document.head.insertAdjacentHTML('beforeend','<style id="usageStylesV90">'+
+    '.usage-panel-v90{display:grid;gap:16px;padding:4px 0}'+
+    '.usage-card-v90{padding:16px;border:1px solid var(--chat-border);border-radius:14px;background:var(--chat-surface)}'+
+    '.usage-card-v90 h4{margin:0 0 10px;color:var(--chat-text);font:600 15px/1.3 var(--font-b)}'+
+    '.usage-bar-v90{position:relative;height:8px;border-radius:99px;background:color-mix(in srgb,var(--chat-muted) 16%,transparent);overflow:hidden}'+
+    '.usage-bar-fill-v90{position:absolute;inset:0;border-radius:99px;transition:width .4s ease}'+
+    '.usage-meta-v90{display:flex;justify-content:space-between;margin-top:8px;color:var(--chat-muted);font:12px/1.4 var(--font-b)}'+
+    '.usage-pct-v90{font-weight:700;font-size:22px;color:var(--chat-text);margin-bottom:6px}'+
+    '.usage-note-v90{margin:0;color:var(--chat-muted);font:12px/1.6 var(--font-b);text-align:center}'+
+  '</style>');
+}
+
+function usageBarColor(pct){
+  if(pct>=80)return '#d65c5c';
+  if(pct>=50)return '#e0a548';
+  return 'var(--chat-accent)';
+}
+
+function formatResetTime(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);
+  const now=new Date();
+  const diffMs=d-now;
+  if(diffMs<=0)return '已重置';
+  const diffMin=Math.floor(diffMs/60000);
+  if(diffMin<60)return diffMin+' 分钟后';
+  const diffHr=Math.floor(diffMin/60);
+  if(diffHr<24)return diffHr+' 小时 '+String(diffMin%60).padStart(2,'0')+' 分钟后';
+  const weekdays=['日','一','二','三','四','五','六'];
+  return '周'+weekdays[d.getDay()]+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function ensureUsagePanelV90(){
+  if($('panel-usage'))return;
+  $('panel-archive')?.insertAdjacentHTML('afterend',
+    '<div class="panel" id="panel-usage"><div class="card">'+
+    '<h3>Claude Code 额度</h3>'+
+    '<div id="usageContentV90"><p class="empty-note">加载中…</p></div>'+
+    '</div></div>');
+}
+
+function renderUsageContentV90(data){
+  const el=$('usageContentV90');
+  if(!el)return;
+  const fh=data.five_hour||{};
+  const sd=data.seven_day||{};
+  const fhPct=Math.round(fh.utilization??0);
+  const sdPct=Math.round(sd.utilization??0);
+  el.innerHTML=
+    '<div class="usage-panel-v90">'+
+      '<div class="usage-card-v90">'+
+        '<h4>当前窗口</h4>'+
+        '<div class="usage-pct-v90">'+fhPct+'%</div>'+
+        '<div class="usage-bar-v90"><div class="usage-bar-fill-v90" style="width:'+fhPct+'%;background:'+usageBarColor(fhPct)+'"></div></div>'+
+        '<div class="usage-meta-v90"><span>已使用</span><span>重置：'+esc(formatResetTime(fh.resets_at))+'</span></div>'+
+      '</div>'+
+      '<div class="usage-card-v90">'+
+        '<h4>本周额度</h4>'+
+        '<div class="usage-pct-v90">'+sdPct+'%</div>'+
+        '<div class="usage-bar-v90"><div class="usage-bar-fill-v90" style="width:'+sdPct+'%;background:'+usageBarColor(sdPct)+'"></div></div>'+
+        '<div class="usage-meta-v90"><span>已使用</span><span>重置：'+esc(formatResetTime(sd.resets_at))+'</span></div>'+
+      '</div>'+
+      '<p class="usage-note-v90">数据来自 Claude 官方，约每分钟刷新</p>'+
+    '</div>';
+}
+
+async function fetchAndRenderUsageV90(){
+  ensureUsagePanelV90();
+  try{
+    const data=await api('/api/agent/claude-usage');
+    renderUsageContentV90(data);
+  }catch(e){
+    const el=$('usageContentV90');
+    if(el)el.innerHTML='<p class="empty-note">获取失败：'+esc(e.message||'未知错误')+'</p>';
+  }
+}
+
+function activateUsagePanelV90(){
+  closeDrawers();
+  injectUsageStylesV90();
+  ensureUsagePanelV90();
+  document.body.classList.add('workspace-open');
+  $('workspace').classList.add('open');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  $('panel-usage').classList.add('active');
+  $('workspaceTitle').textContent='额度';
+  fetchAndRenderUsageV90();
+  // 自动刷新：90 秒
+  clearInterval(usageTimerV90);
+  usageTimerV90=setInterval(()=>{
+    if(!$('panel-usage')?.classList.contains('active')){clearInterval(usageTimerV90);return}
+    fetchAndRenderUsageV90();
+  },90000);
+}
+
+function ensureUsageEntryV90(){
+  const root=$('leftSettingsMenuV14');
+  if(!root||$('leftUsageEntryV90'))return;
+  root.querySelector('.left-tool-shelf-v14')?.insertAdjacentHTML('beforeend',
+    '<button type="button" class="left-menu-action-v14" id="leftUsageEntryV90">'+
+    '<span class="left-menu-icon-v14">'+usageIconV90+'</span>额度</button>');
+  $('leftUsageEntryV90').onclick=activateUsagePanelV90;
+}
+
+// 初始化：左侧栏加入"额度"按钮
+{const origEnsureLeft=ensureLeftDrawerV14;ensureLeftDrawerV14=function(){origEnsureLeft.apply(this,arguments);ensureUsageEntryV90()}};
