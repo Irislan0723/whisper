@@ -1,5 +1,5 @@
 import express from "express";
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
@@ -27,16 +27,13 @@ function auth(req, res, next) {
 // ════════════════════════════════════════
 //  全局状态
 // ════════════════════════════════════════
-let currentRound   = null;   // { id, resolve, reject, timer }
 let lastSysPrompt  = null;   // 最近一次系统提示词（轮换用）
 let lastSessionId  = null;   // 最近一次 CC session ID（Swap 用）
-let ccReady        = false;  // CC CLI 是否就绪
-let ccReadyResolve = null;   // startCC 等待就绪的 resolve
 let busy = false;
 const queue = [];
 
 // ════════════════════════════════════════
-//  tmux 操作
+//  tmux 操作（仅用于首次信任确认）
 // ════════════════════════════════════════
 function tmuxAlive() {
   try { execSync(`tmux has-session -t ${TMUX} 2>/dev/null`, { stdio: "ignore" }); return true; }
@@ -52,112 +49,183 @@ function writeSettings() {
   const file = join(DATA, "cc-settings.json");
   writeFileSync(file, JSON.stringify({
     alwaysThinkingEnabled: true,
-    showThinkingSummaries: true,
     autoCompactEnabled: true,
     autoUpdates: false,
     switchModelsOnFlag: false,
     cleanupPeriodDays: 99999,
     disableBundledSkills: true,
-    hooks: {
-      SessionStart: [{ hooks: [{
-        type: "command",
-        command: `curl -sf -m 5 -X POST http://127.0.0.1:${PORT}/hook/ready -H 'Content-Type: application/json' -d @- || true`
-      }]}],
-      Stop: [{ hooks: [{
-        type: "command",
-        command: `curl -sf -m 5 -X POST http://127.0.0.1:${PORT}/hook/stop -H 'Content-Type: application/json' -d @- || true`
-      }]}],
-      StopFailure: [{ hooks: [{
-        type: "command",
-        command: `curl -sf -m 5 -X POST http://127.0.0.1:${PORT}/hook/stop-failure -H 'Content-Type: application/json' -d @- || true`
-      }]}]
-    }
+    hooks: {}
   }, null, 2), "utf-8");
   return file;
 }
 
-/** 启动 CC CLI（在 tmux session 里）
- *  @param {string} systemPrompt - 系统提示词
- *  @param {string|null} resumeId - 如果提供，用 --resume 恢复该 session
- */
-function startCC(systemPrompt, resumeId) {
-  // 写系统提示词
-  const promptFile = join(DATA, "system-prompt.md");
-  writeFileSync(promptFile, systemPrompt, "utf-8");
-  lastSysPrompt = systemPrompt;
+/** 确保目录已被信任（首次运行时需要） */
+async function ensureTrusted() {
+  // 检查是否已有 .claude 信任标记
+  const trustFile = join(DATA, ".claude", "settings.json");
+  if (existsSync(trustFile)) return;
 
-  // 写 settings
-  const settingsFile = writeSettings();
-
-  // 构造启动命令
-  const baseArgs = `--system-prompt-file "${promptFile}" --tools "" --settings "${settingsFile}" --strict-mcp-config --mcp-config '{"mcpServers":{}}'`;
-  const cmd = resumeId
-    ? `exec claude --resume "${resumeId}" ${baseArgs}`
-    : `exec claude ${baseArgs}`;
-
-  // 写启动脚本（避免 tmux send-keys 的引号问题）
-  const startScript = join(DATA, "start-claude.sh");
-  writeFileSync(startScript, `#!/bin/bash\n${cmd}\n`, { mode: 0o755 });
-
-  // 杀旧 session
+  // 用 tmux 交互模式跑一次来处理信任对话框
+  console.log("[trust] 首次运行，通过 tmux 处理目录信任...");
   if (tmuxAlive()) tmuxKill();
-  ccReady = false;
 
-  // 创建 tmux session + 启动 claude
+  const settingsFile = writeSettings();
+  const promptFile = join(DATA, "system-prompt.md");
+  if (!existsSync(promptFile)) writeFileSync(promptFile, "你是助手。", "utf-8");
+
   execSync(`tmux new-session -d -s ${TMUX} -c ${DATA}`);
-  execSync(`tmux send-keys -t ${TMUX} '${startScript}' Enter`);
+  execSync(`tmux send-keys -t ${TMUX} 'claude --settings "${settingsFile}" --dangerously-skip-permissions' Enter`);
 
-  console.log(`[CC] tmux session 已创建${resumeId ? ` (resume: ${resumeId.slice(0, 8)})` : ""}，等待 CLI 就绪...`);
-
-  // CC CLI 首次在新目录运行时会弹 "trust this folder" 交互确认
-  // 自动检测并选择 "Yes, I trust this folder"，避免无人值守时卡死
-  const trustPoller = setInterval(() => {
-    try {
-      const pane = execSync(`tmux capture-pane -t ${TMUX} -p`, { encoding: "utf-8" });
-      if (pane.includes("trust this folder")) {
-        execSync(`tmux send-keys -t ${TMUX} Down Enter`);
-        console.log("[CC] 自动通过目录信任确认");
-        clearInterval(trustPoller);
-      }
-    } catch { clearInterval(trustPoller); }
-  }, 2000);
-  const stopTrustPoller = () => clearInterval(trustPoller);
-
-  // 等 SessionStart hook 回调 /hook/ready
-  return new Promise((resolve, reject) => {
-    ccReadyResolve = () => { stopTrustPoller(); resolve(); };
-    // 60 秒超时
-    setTimeout(() => {
-      if (!ccReady) {
-        stopTrustPoller();
-        ccReadyResolve = null;
-        reject(new Error("CC CLI 启动超时 (60s)"));
-      }
-    }, 60000);
+  // 等待信任对话框或 CLI 启动
+  await new Promise((resolve) => {
+    const poller = setInterval(() => {
+      try {
+        const pane = execSync(`tmux capture-pane -t ${TMUX} -p`, { encoding: "utf-8" });
+        if (pane.includes("trust this folder")) {
+          execSync(`tmux send-keys -t ${TMUX} Down Enter`);
+          console.log("[trust] 自动通过目录信任确认");
+          clearInterval(poller);
+          setTimeout(() => { tmuxKill(); resolve(); }, 3000);
+        } else if (pane.includes(">") || pane.includes("Claude")) {
+          // CLI 已启动（无需信任确认）
+          console.log("[trust] 目录已被信任");
+          clearInterval(poller);
+          tmuxKill();
+          resolve();
+        }
+      } catch { clearInterval(poller); resolve(); }
+    }, 2000);
+    // 30 秒超时
+    setTimeout(() => { clearInterval(poller); tmuxKill(); resolve(); }, 30000);
   });
 }
 
 // ════════════════════════════════════════
-//  发送消息到 CC（bracketed paste）
+//  发送消息到 CC（-p 模式 + stream-json）
+//  每条消息独立 spawn，通过 --resume 维持对话
 // ════════════════════════════════════════
-function sendToCC(message) {
-  // 写临时文件 → load-buffer
-  const tmp = join(DATA, `msg-${Date.now()}.txt`);
-  writeFileSync(tmp, message, "utf-8");
 
-  try {
-    execSync(`tmux load-buffer "${tmp}"`);
-    execSync(`tmux paste-buffer -p -t ${TMUX}`);
-  } finally {
-    try { unlinkSync(tmp); } catch {}
-  }
+/**
+ * 用 -p --output-format stream-json 模式发送一条消息
+ * 返回 { text, thinking, sessionId }
+ */
+function ccPrintSend(message, systemPrompt, resumeId) {
+  return new Promise((resolve, reject) => {
+    const promptFile = join(DATA, "system-prompt.md");
+    if (systemPrompt) {
+      writeFileSync(promptFile, systemPrompt, "utf-8");
+      lastSysPrompt = systemPrompt;
+    }
 
-  // 停一拍再回车（教程 page 8：贴完立刻 Enter 会抢跑）
-  return new Promise(resolve => {
-    setTimeout(() => {
-      execSync(`tmux send-keys -t ${TMUX} Enter`);
-      resolve();
-    }, 300);
+    const settingsFile = writeSettings();
+
+    // 构造参数
+    const args = [
+      "-p",                               // print 模式
+      "--output-format", "stream-json",    // 结构化流式输出
+      "--verbose",                         // stream-json 需要 verbose
+      "--system-prompt-file", promptFile,
+      "--tools", "",
+      "--settings", settingsFile,
+      "--strict-mcp-config",
+      "--mcp-config", '{"mcpServers":{}}',
+      "--dangerously-skip-permissions",    // 无人值守
+    ];
+
+    if (resumeId) {
+      args.push("--resume", resumeId);
+    }
+
+    const child = spawn("claude", args, {
+      cwd: DATA,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, HOME: process.env.HOME || "/root" },
+    });
+
+    let thinking = "";
+    let text = "";
+    let sessionId = resumeId || "";
+    let stderr = "";
+    let buffer = "";
+
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk.toString();
+      // 逐行解析 NDJSON
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // 保留不完整的最后一行
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const evt = JSON.parse(line);
+          processStreamEvent(evt);
+        } catch { /* 忽略非 JSON 行 */ }
+      }
+    });
+
+    function processStreamEvent(evt) {
+      // stream-json 事件类型：
+      // { type: "assistant", message: { content: [...] }, ... }
+      // { type: "system", ... }
+      // { type: "stream_event", event: { type: "content_block_delta", delta: {...} } }
+      if (evt.type === "assistant" && evt.message?.content) {
+        for (const block of evt.message.content) {
+          if (block.type === "thinking" && block.thinking) {
+            thinking += (thinking ? "\n\n" : "") + block.thinking;
+          }
+          if (block.type === "text" && block.text) {
+            text += block.text;
+          }
+        }
+        // 从 assistant message 中提取 session id
+        if (evt.session_id) sessionId = evt.session_id;
+      }
+      // 也捕获 system 事件中的 session_id
+      if (evt.session_id && !sessionId) sessionId = evt.session_id;
+    }
+
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+
+    // 发送消息到 stdin（-p 模式从 stdin 读取用户消息）
+    child.stdin.write(message);
+    child.stdin.end();
+
+    // 300 秒超时（含 CC CLI 启动时间 + API 响应时间）
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error("CC 回复超时 (300s)"));
+    }, 300000);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+
+      // 处理剩余 buffer
+      if (buffer.trim()) {
+        try {
+          const evt = JSON.parse(buffer);
+          processStreamEvent(evt);
+        } catch {}
+      }
+
+      // 从 transcript 中获取 session ID（如果 stream 没给）
+      if (!sessionId) {
+        sessionId = findLatestTranscript() || "";
+      }
+      if (sessionId) lastSessionId = sessionId;
+
+      if (code !== 0 && !text) {
+        console.error(`[cc-p] 进程退出 code=${code}, stderr:`, stderr.slice(0, 500));
+        reject(new Error(`CC 进程异常退出 (code=${code}): ${stderr.slice(0, 200)}`));
+      } else {
+        console.log(`[cc-p] 完成, text:${text.length} think:${thinking.length} sid:${sessionId?.slice(0, 8)}`);
+        resolve({ text, thinking, sessionId });
+      }
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(new Error("CC 启动失败: " + err.message));
+    });
   });
 }
 
@@ -182,80 +250,34 @@ async function drain() {
 }
 
 async function processMessage({ message, systemPrompt }) {
-  // CC 没跑就启动
-  if (!ccReady || !tmuxAlive()) {
-    const sp = systemPrompt || lastSysPrompt;
-    if (!sp) throw new Error("CC 未就绪：没有系统提示词");
-    await startCC(sp);
-  }
-
   // 如果传了新的系统提示词，存起来（下次轮换用）
   if (systemPrompt) lastSysPrompt = systemPrompt;
+  const sp = systemPrompt || lastSysPrompt;
+  if (!sp) throw new Error("没有可用的系统提示词");
 
-  return new Promise(async (resolve, reject) => {
-    const id = Date.now().toString();
-
-    // 180 秒超时
-    const timer = setTimeout(() => {
-      if (currentRound?.id === id) {
-        currentRound = null;
-        reject(new Error("CC 回复超时 (180s)"));
-      }
-    }, 180000);
-
-    currentRound = { id, resolve, reject, timer };
-
-    try {
-      await sendToCC(message);
-    } catch (e) {
-      clearTimeout(timer);
-      currentRound = null;
-      reject(new Error("发送失败: " + e.message));
-    }
-  });
+  // 用 -p 模式发送，通过 --resume 维持对话
+  return await ccPrintSend(message, sp, lastSessionId || undefined);
 }
 
 // ════════════════════════════════════════
-//  Hook 接收端点（CC → relay）
+//  Hook 接收端点（保留兼容，Swap 后的 tmux 模式可能触发）
 // ════════════════════════════════════════
 
-// SessionStart hook → CC 就绪
 app.post("/hook/ready", (req, res) => {
   res.json({ ok: true });
   const sid = req.body?.session_id || "";
   console.log("[hook] CC 已就绪, session:", sid?.slice(0, 8));
-  ccReady = true;
   if (sid) lastSessionId = sid;
-  if (ccReadyResolve) { ccReadyResolve(); ccReadyResolve = null; }
 });
 
-// Stop hook → 回合正常结束
 app.post("/hook/stop", (req, res) => {
   res.json({ ok: true });
-  const text = req.body?.last_assistant_message || "";
-  const sid  = req.body?.session_id || "";
-  console.log("[hook] Stop, text:", text.length, "chars, session:", sid?.slice(0, 8));
-
+  const sid = req.body?.session_id || "";
   if (sid) lastSessionId = sid;
-
-  if (currentRound) {
-    clearTimeout(currentRound.timer);
-    currentRound.resolve({ text, thinking: "", sessionId: sid });
-    currentRound = null;
-  }
 });
 
-// StopFailure hook → 回合异常
 app.post("/hook/stop-failure", (req, res) => {
   res.json({ ok: true });
-  const { error_type, error_message } = req.body || {};
-  console.error("[hook] StopFailure:", error_type, error_message);
-
-  if (currentRound) {
-    clearTimeout(currentRound.timer);
-    currentRound.reject(new Error(`CC ${error_type}: ${error_message}`));
-    currentRound = null;
-  }
 });
 
 // ════════════════════════════════════════
@@ -379,15 +401,10 @@ async function performSwap() {
 
   // ── 8. 刷新系统提示词日期 ──
   const refreshedPrompt = refreshSystemPromptDate(lastSysPrompt);
-  if (!refreshedPrompt) throw new Error("没有可用的系统提示词");
+  if (refreshedPrompt) lastSysPrompt = refreshedPrompt;
 
-  // ── 9. Kill 旧 tmux + 用 --resume 启动新 session ──
-  if (tmuxAlive()) tmuxKill();
-  ccReady = false;
-
-  await startCC(refreshedPrompt, newId);
-
-  // 更新 lastSessionId
+  // ── 9. 更新 session ID（-p 模式下不需要 kill tmux 或启动新进程）──
+  // 下次 ccPrintSend 会自动用新 ID --resume
   lastSessionId = newId;
 
   console.log(`[swap] ✓ Swap 完成: ${activeId.slice(0, 8)} → ${newId.slice(0, 8)}, 保留 ${turnCount} 回合 / ${keptCount} 事件`);
@@ -406,7 +423,7 @@ app.post("/relay/send", auth, async (req, res) => {
 
   try {
     const result = await enqueue({ message, systemPrompt });
-    console.log("[relay] 成功, text:", result.text.length);
+    console.log("[relay] 成功, text:", result.text.length, "thinking:", result.thinking.length);
     res.json({
       text:      result.text,
       thinking:  result.thinking,
@@ -424,8 +441,8 @@ app.post("/relay/send", auth, async (req, res) => {
 // ════════════════════════════════════════
 app.get("/relay/health", (_req, res) => {
   res.json({
-    status: "ok", queue: queue.length, busy, ccReady,
-    tmux: tmuxAlive(), lastSessionId: lastSessionId?.slice(0, 8) || null
+    status: "ok", queue: queue.length, busy,
+    lastSessionId: lastSessionId?.slice(0, 8) || null
   });
 });
 
@@ -467,16 +484,14 @@ async function swapSession() {
   }
 }
 
-/** 旧式轮换：kill + 全新启动（Swap 的 fallback） */
+/** 旧式轮换：清空 session ID，下次 send 会创建全新 session */
 async function freshRestart() {
   console.log("[rotate] 执行 fresh restart...");
-  if (tmuxAlive()) tmuxKill();
-  ccReady = false;
+  lastSessionId = null;   // 清空 → 下次 ccPrintSend 不带 --resume = 新 session
 
   if (lastSysPrompt) {
-    const refreshedPrompt = refreshSystemPromptDate(lastSysPrompt);
-    await startCC(refreshedPrompt);
-    console.log("[rotate] 新 session 已启动 (fresh)");
+    lastSysPrompt = refreshSystemPromptDate(lastSysPrompt);
+    console.log("[rotate] 系统提示词已刷新日期，等下次 send 时创建新 session");
   } else {
     console.log("[rotate] 没有系统提示词，等下次 send 再启动");
   }
@@ -500,7 +515,18 @@ function scheduleDaily() {
 // ════════════════════════════════════════
 //  启动
 // ════════════════════════════════════════
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`CC Relay (tmux+swap) v2 on :${PORT}`);
+app.listen(PORT, "0.0.0.0", async () => {
+  console.log(`CC Relay (print-mode+swap) v3 on :${PORT}`);
+
+  // 确保目录已被信任
+  try { await ensureTrusted(); } catch (e) { console.warn("[trust] 信任检查失败:", e.message); }
+
+  // 尝试恢复上次的 session ID
+  const latestId = findLatestTranscript();
+  if (latestId) {
+    lastSessionId = latestId;
+    console.log(`[init] 恢复上次 session: ${latestId.slice(0, 8)}`);
+  }
+
   scheduleDaily();
 });
