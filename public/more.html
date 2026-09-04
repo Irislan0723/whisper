@@ -333,15 +333,27 @@
 [data-appearance="dark"] .font-toggle.on {
   background: var(--accent);
 }
-/* Appearance mode setting - dark style adjustments */
-[data-appearance="dark"] .appearance-setting {
-  color: #F2F2F2;
-}
-[data-appearance="dark"] .appearance-btn {
-  background: #2C2C2C !important;
-  border-color: #3A3A3A !important;
-  color: #B0B0B0 !important;
-}
+/* ---- Appearance modal ---- */
+.appearance-options{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+.appearance-option{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:1px solid var(--accent-pale);border-radius:14px;background:var(--bg-card);color:var(--text);cursor:pointer;transition:all .18s;font-family:inherit;text-align:left}
+.appearance-option:hover{background:var(--bg-secondary)}
+.appearance-option.active{border-color:var(--accent);background:rgba(var(--shadow-color),0.06)}
+.appearance-option-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--bg-secondary);flex-shrink:0}
+.appearance-option-icon svg{stroke:var(--accent)}
+.appearance-option-text{flex:1;min-width:0}
+.appearance-option-text strong{display:block;font-size:14px;font-weight:500;color:var(--text);margin-bottom:2px}
+.appearance-option-text small{font-size:12px;color:var(--text-light);line-height:1.4}
+.appearance-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--accent-pale);flex-shrink:0;position:relative;transition:all .18s}
+.appearance-option.active .appearance-check{border-color:var(--accent);background:var(--accent)}
+.appearance-option.active .appearance-check::after{content:'';position:absolute;top:3px;left:6px;width:5px;height:9px;border:solid var(--accent-contrast);border-width:0 2px 2px 0;transform:rotate(45deg)}
+/* Appearance dark overrides */
+[data-appearance="dark"] .appearance-option{background:#262626;border-color:#3A3A3A;color:#F2F2F2}
+[data-appearance="dark"] .appearance-option:hover{background:#2C2C2C}
+[data-appearance="dark"] .appearance-option.active{border-color:var(--accent);background:rgba(255,255,255,0.05)}
+[data-appearance="dark"] .appearance-option-icon{background:#2C2C2C}
+[data-appearance="dark"] .appearance-option-text strong{color:#F2F2F2}
+[data-appearance="dark"] .appearance-option-text small{color:#888}
+[data-appearance="dark"] .appearance-check{border-color:#3A3A3A}
 </style>
 </head>
 <body>
@@ -407,17 +419,13 @@
         </span>
         <span class="settings-item-arrow">›</span>
       </button>
-      <div class="settings-item appearance-setting" style="flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px;cursor:default">
-        <span class="settings-item-left" style="margin-bottom:2px">
+      <button class="settings-item" id="appearanceBtn">
+        <span class="settings-item-left">
           <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
           <span>外观模式</span>
         </span>
-        <div class="appearance-options" id="appearanceOptions" style="display:flex;gap:6px">
-          <button class="appearance-btn" data-appearance="system" style="flex:1;padding:7px 0;border:1.5px solid var(--accent-light);border-radius:50px;background:var(--bg-card);color:var(--text-mid);font-family:var(--font-cn);font-size:12px;cursor:pointer;transition:all .2s">跟随系统</button>
-          <button class="appearance-btn" data-appearance="light" style="flex:1;padding:7px 0;border:1.5px solid var(--accent-light);border-radius:50px;background:var(--bg-card);color:var(--text-mid);font-family:var(--font-cn);font-size:12px;cursor:pointer;transition:all .2s">浅色</button>
-          <button class="appearance-btn" data-appearance="dark" style="flex:1;padding:7px 0;border:1.5px solid var(--accent-light);border-radius:50px;background:var(--bg-card);color:var(--text-mid);font-family:var(--font-cn);font-size:12px;cursor:pointer;transition:all .2s">深色</button>
-        </div>
-      </div>
+        <span class="settings-item-arrow">›</span>
+      </button>
       <button class="settings-item" id="fontBtn">
         <span class="settings-item-left">
           <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9.5" y1="4" x2="9.5" y2="20"/><line x1="14.5" y1="4" x2="14.5" y2="20"/><line x1="7" y1="20" x2="17" y2="20"/></svg>
@@ -571,6 +579,48 @@
   </div>
 </div>
 
+<!-- Appearance mode modal -->
+<div class="modal-overlay" id="appearanceModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">外观模式</span>
+      <button class="modal-close" id="closeAppearanceModal">✕</button>
+    </div>
+    <div class="appearance-options" id="appearanceOptions" style="display:flex;flex-direction:column;gap:8px">
+      <button class="appearance-option" data-appearance="system">
+        <span class="appearance-option-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </span>
+        <span class="appearance-option-text">
+          <strong>跟随系统</strong>
+          <small>自动匹配设备的深色/浅色设置</small>
+        </span>
+        <span class="appearance-check"></span>
+      </button>
+      <button class="appearance-option" data-appearance="light">
+        <span class="appearance-option-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </span>
+        <span class="appearance-option-text">
+          <strong>浅色模式</strong>
+          <small>始终使用浅色外观</small>
+        </span>
+        <span class="appearance-check"></span>
+      </button>
+      <button class="appearance-option" data-appearance="dark">
+        <span class="appearance-option-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+        </span>
+        <span class="appearance-option-text">
+          <strong>深色模式</strong>
+          <small>始终使用深色外观</small>
+        </span>
+        <span class="appearance-check"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Bottom Dock -->
@@ -600,35 +650,46 @@
 </nav>
 
 <script>
-/* ---- Appearance mode (Light / Dark / System) ---- */
+/* ---- Appearance mode modal (Light / Dark / System) ---- */
 (function(){
+  var modal = document.getElementById('appearanceModal');
   var opts = document.getElementById('appearanceOptions');
-  if (!opts) return;
+  if (!modal || !opts) return;
   var current = localStorage.getItem('iris-appearance') || 'system';
+
   function highlight(mode) {
-    opts.querySelectorAll('.appearance-btn').forEach(function(btn) {
-      var active = btn.dataset.appearance === mode;
-      if (active) {
-        btn.style.background = 'var(--accent)';
-        btn.style.color = 'var(--accent-contrast)';
-        btn.style.borderColor = 'var(--accent)';
-      } else {
-        btn.style.background = '';
-        btn.style.color = '';
-        btn.style.borderColor = '';
-      }
+    opts.querySelectorAll('.appearance-option').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.appearance === mode);
     });
   }
   highlight(current);
+
+  // Open modal
+  document.getElementById('appearanceBtn').addEventListener('click', function() {
+    current = localStorage.getItem('iris-appearance') || 'system';
+    highlight(current);
+    modal.classList.add('open');
+  });
+  // Close modal
+  document.getElementById('closeAppearanceModal').addEventListener('click', function() {
+    modal.classList.remove('open');
+  });
+  modal.addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) modal.classList.remove('open');
+  });
+
+  // Option click
   opts.addEventListener('click', function(e) {
-    var btn = e.target.closest('.appearance-btn');
+    var btn = e.target.closest('.appearance-option');
     if (!btn) return;
     var mode = btn.dataset.appearance;
+    current = mode;
     localStorage.setItem('iris-appearance', mode);
     highlight(mode);
     if (typeof window.irisApplyAppearance === 'function') {
       window.irisApplyAppearance(mode);
     }
+    showToast(mode === 'system' ? '已切换为跟随系统' : mode === 'dark' ? '已切换为深色模式' : '已切换为浅色模式');
   });
 })();
 
