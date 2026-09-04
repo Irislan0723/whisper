@@ -3394,10 +3394,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
   const roleTools = normaliseRoleToolConfig(settings.toolConfig);
   const companionTools = typeof manageCompanion === "function" ? allowedChatTools([CHAT_COMPANION_TOOL], roleTools) : [];
   const canManageCompanion = companionTools.length > 0;
-  // Together listening is a room capability, not an optional character trait.
-  // Keep it available so an invited character can actually accept, decline and
-  // control songs even when an older role card has a restrictive tool config.
-  const listeningTools = typeof manageListening === "function" ? CHAT_LISTENING_TOOLS : [];
+  const listeningTools = typeof manageListening === "function" ? allowedChatTools(CHAT_LISTENING_TOOLS, roleTools) : [];
   const canManageListening = listeningTools.length > 0;
   const transferTools = typeof manageTransfer === "function" ? allowedChatTools([CHAT_TRANSFER_TOOL], roleTools) : [];
   const canManageTransfer = transferTools.length > 0;
