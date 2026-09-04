@@ -219,6 +219,129 @@
   .more-grid { gap: 12px; }
   .more-card { padding: 22px 14px; }
 }
+
+/* ---- Dark mode: More page overrides ---- */
+[data-appearance="dark"] .more-card {
+  background: #262626;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .more-card:hover {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+}
+[data-appearance="dark"] .more-card-name {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .more-card-desc {
+  color: #888;
+}
+[data-appearance="dark"] .more-title {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .more-sub {
+  color: #888;
+}
+[data-appearance="dark"] .more-section-title {
+  color: #888;
+}
+[data-appearance="dark"] .settings-list {
+  background: #262626;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+}
+[data-appearance="dark"] .settings-item {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .settings-item + .settings-item {
+  border-top-color: #3A3A3A;
+}
+[data-appearance="dark"] .settings-item:hover {
+  background: #2C2C2C;
+}
+[data-appearance="dark"] .settings-item-arrow {
+  color: #888;
+}
+/* Theme picker dark overrides */
+[data-appearance="dark"] .theme-swatch.active {
+  border-color: #F2F2F2;
+}
+[data-appearance="dark"] .theme-swatch-label {
+  color: #888;
+}
+[data-appearance="dark"] .theme-detail-name {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .theme-color-item {
+  background: #2C2C2C;
+}
+[data-appearance="dark"] .theme-color-hex {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .theme-color-label {
+  color: #888;
+}
+[data-appearance="dark"] .td-delete {
+  background: #2C2C2C;
+}
+[data-appearance="dark"] .tc-name-input {
+  background: #2C2C2C;
+  border-color: #3A3A3A;
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .custom-hex {
+  background: #2C2C2C;
+  border-color: #3A3A3A;
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .custom-label {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .custom-desc {
+  color: #888;
+}
+[data-appearance="dark"] .custom-preview {
+  border-color: #3A3A3A;
+}
+/* Font settings dark */
+[data-appearance="dark"] .font-section-label {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .font-current {
+  color: #888;
+}
+[data-appearance="dark"] .font-current b {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .font-btn {
+  background: #2C2C2C;
+  border-color: #3A3A3A;
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .font-url-input {
+  background: #2C2C2C;
+  border-color: #3A3A3A;
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .font-shared-row {
+  border-top-color: #3A3A3A;
+}
+[data-appearance="dark"] .font-shared-label {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .font-toggle {
+  background: #3A3A3A;
+}
+[data-appearance="dark"] .font-toggle.on {
+  background: var(--accent);
+}
+/* Appearance mode setting - dark style adjustments */
+[data-appearance="dark"] .appearance-setting {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .appearance-btn {
+  background: #2C2C2C !important;
+  border-color: #3A3A3A !important;
+  color: #B0B0B0 !important;
+}
 </style>
 </head>
 <body>
@@ -485,9 +608,15 @@
   function highlight(mode) {
     opts.querySelectorAll('.appearance-btn').forEach(function(btn) {
       var active = btn.dataset.appearance === mode;
-      btn.style.background = active ? 'var(--accent)' : 'var(--bg-card)';
-      btn.style.color = active ? 'var(--accent-contrast)' : 'var(--text-mid)';
-      btn.style.borderColor = active ? 'var(--accent)' : 'var(--accent-light)';
+      if (active) {
+        btn.style.background = 'var(--accent)';
+        btn.style.color = 'var(--accent-contrast)';
+        btn.style.borderColor = 'var(--accent)';
+      } else {
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }
     });
   }
   highlight(current);

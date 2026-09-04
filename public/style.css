@@ -120,83 +120,177 @@
 /* [data-theme="custom"] uses runtime-injected CSS variables */
 
 /* ---- Dark Appearance Mode ---- */
-/* Applied via data-appearance="dark" on <html>, works with any theme */
+/* Applied via data-appearance="dark" on <html>, works with any theme.
+   Color hierarchy (darkest → lightest):
+     Nav bars #181818 → Page bg #1E1E1E → Cards #262626 → Hover #2C2C2C
+   Text is always light. Theme accent colors are NOT overridden. */
 [data-appearance="dark"] {
-  --bg:           #121212;
-  --bg-card:      #1E1E1E;
-  --bg-secondary: #202020;
+  --bg:           #1E1E1E;
+  --bg-card:      #262626;
+  --bg-secondary: #2C2C2C;
   --text:         #F2F2F2;
-  --text-mid:     #A9A9A9;
-  --text-light:   #777777;
-  --border:       rgba(255,255,255,0.08);
+  --text-mid:     #B0B0B0;
+  --text-light:   #888888;
+  --border:       rgba(255,255,255,0.10);
   --shadow-color: 0,0,0;
-  --white:        #1E1E1E;
+  --white:        #262626;
+  --accent-pale:  rgba(255,255,255,0.06);
 }
-/* Top bar, bottom dock, modals use a slightly lighter dark surface */
-[data-appearance="dark"] .top-bar,
-[data-appearance="dark"] .dock,
+
+/* Nav bars: darkest layer */
+[data-appearance="dark"] .top-bar {
+  background: #181818;
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+[data-appearance="dark"] .dock {
+  background: #181818;
+  border-top-color: rgba(255,255,255,0.06);
+}
 [data-appearance="dark"] .dock::after {
   background: #181818;
 }
-[data-appearance="dark"] .modal,
-[data-appearance="dark"] .menu-pop {
-  background: #1E1E1E;
+/* Dock item text and icons: light in dark mode */
+[data-appearance="dark"] .dock-item {
+  color: #888;
 }
+[data-appearance="dark"] .dock-item.active {
+  color: var(--accent);
+}
+[data-appearance="dark"] .dock-center .dock-label {
+  color: #888;
+}
+[data-appearance="dark"] .dock-center.active .dock-label {
+  color: var(--accent);
+}
+/* Top bar text: light */
+[data-appearance="dark"] .top-bar-title {
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .top-bar-right {
+  color: #B0B0B0;
+}
+[data-appearance="dark"] .top-bar-home:hover {
+  background: #2C2C2C;
+}
+[data-appearance="dark"] .top-bar-avatar {
+  background: #2C2C2C;
+  border-color: #3A3A3A;
+}
+
+/* Cards */
 [data-appearance="dark"] .card {
-  background: #1E1E1E;
+  background: #262626;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
 }
 [data-appearance="dark"] .card:hover {
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
 }
+
+/* Inputs */
 [data-appearance="dark"] .input {
-  background: #202020;
+  background: #2C2C2C;
+  border-color: #3A3A3A;
+  color: #F2F2F2;
 }
+[data-appearance="dark"] .input:focus {
+  border-color: var(--accent);
+}
+[data-appearance="dark"] select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* Chips */
 [data-appearance="dark"] .chip {
-  background: #1E1E1E;
-  border-color: #2A2A2A;
+  background: #262626;
+  border-color: #3A3A3A;
+  color: #B0B0B0;
+}
+[data-appearance="dark"] .chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 [data-appearance="dark"] .chip.active {
   border-color: var(--accent);
 }
+
+/* Buttons */
+[data-appearance="dark"] .btn-secondary {
+  background: #2C2C2C;
+  color: #F2F2F2;
+}
+[data-appearance="dark"] .btn-secondary:hover {
+  background: #333;
+}
+[data-appearance="dark"] .btn-ghost:hover {
+  background: #2C2C2C;
+}
+[data-appearance="dark"] .btn-icon:hover {
+  background: #2C2C2C;
+}
+[data-appearance="dark"] .btn-outline {
+  border-color: #3A3A3A;
+  color: #B0B0B0;
+}
+[data-appearance="dark"] .btn-outline:hover {
+  background: #2C2C2C;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Modals */
+[data-appearance="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.60);
+}
+[data-appearance="dark"] .modal {
+  background: #262626;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+[data-appearance="dark"] .modal-close:hover {
+  background: #333;
+}
+[data-appearance="dark"] .menu-pop {
+  background: #262626;
+  border-color: #3A3A3A;
+}
+
+/* Toast */
 [data-appearance="dark"] .toast {
   background: #F2F2F2;
-  color: #121212;
+  color: #1E1E1E;
 }
 [data-appearance="dark"] .toast.success { background: var(--success); color: #fff; }
 [data-appearance="dark"] .toast.error   { background: var(--error);   color: #fff; }
-[data-appearance="dark"] .btn-secondary {
-  background: #252525;
+
+/* Divider */
+[data-appearance="dark"] .divider {
+  background: #3A3A3A;
 }
-[data-appearance="dark"] .btn-secondary:hover {
-  background: #2A2A2A;
+
+/* Tags */
+[data-appearance="dark"] .tag-accent,
+[data-appearance="dark"] .tag-primary,
+[data-appearance="dark"] .tag-mint,
+[data-appearance="dark"] .tag-rose,
+[data-appearance="dark"] .tag-sky,
+[data-appearance="dark"] .tag-lavender {
+  background: rgba(255,255,255,0.08);
 }
-[data-appearance="dark"] .btn-ghost:hover {
-  background: #252525;
+[data-appearance="dark"] .tag-muted,
+[data-appearance="dark"] .tag-butter,
+[data-appearance="dark"] .tag-gray {
+  background: #2C2C2C;
 }
-[data-appearance="dark"] .btn-icon:hover {
-  background: #252525;
-}
-[data-appearance="dark"] .btn-outline {
-  border-color: #2A2A2A;
-}
-[data-appearance="dark"] .btn-outline:hover {
-  background: #252525;
-  border-color: var(--accent);
-}
-[data-appearance="dark"] .modal-overlay {
-  background: rgba(0, 0, 0, 0.55);
-}
-[data-appearance="dark"] .modal-close:hover {
-  background: #252525;
-}
+
+/* Scrollbar */
 [data-appearance="dark"] ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: #444;
 }
-/* Dark mode body background gradient */
+
+/* Body background gradient — very subtle */
 [data-appearance="dark"] body::before {
   background:
-    radial-gradient(ellipse 70% 55% at 10% 15%, rgba(255,255,255,0.015) 0%, transparent 60%),
-    radial-gradient(ellipse 55% 60% at 90% 88%, rgba(255,255,255,0.015) 0%, transparent 60%);
+    radial-gradient(ellipse 70% 55% at 10% 15%, rgba(255,255,255,0.012) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 60% at 90% 88%, rgba(255,255,255,0.012) 0%, transparent 60%);
 }
 
 /* ---- Reset ---- */
