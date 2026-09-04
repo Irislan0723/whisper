@@ -3591,6 +3591,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     // 动态工具描述（其他已开启工具，每轮注入）
     const dynamicToolDesc = ccToolDescriptions(roundDynamicTools);
 
+
     // ── tool activity compression: write/MCP = summary only, dedup consecutive, 24h cap ──
     const WRITE_TOOL_NAMES = new Set(["add_memory", "update_memory", "delete_memory", "update_self_profile", "save_mood", "write_letter", "add_calendar_event", "update_calendar_event", "delete_calendar_event", "publish_daily_note", "manage_companion_invitation", "manage_transfer", "send_listening_invitation", "respond_listening_invitation"]);
     const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
@@ -3608,32 +3609,78 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
         lastActKey = key;
       }
     }
+    // Agent (CC) 模式：极度压缩工具行动（只 name|ok/fail|target_id）
     const compressedToolActivity = dedupedActivity.slice(-8).map(item => {
-      const isWrite = WRITE_TOOL_NAMES.has(item.name) || item.name.startsWith("mcp_");
-      const suffix = item._count > 1 ? ` (x${item._count})` : "";
-      if (isWrite && item.ok) {
-        return `- ${item.at || ""}|${item.name}|ok|${item.args || ""}${suffix}`;
-      }
-      return `- ${item.at || ""}|${item.name}|${item.ok ? "ok" : "fail"}|${item.args || ""}|${item.result || ""}${suffix}`;
+      const status = item.ok ? "ok" : "fail";
+      const suffix = item._count > 1 ? `(x${item._count})` : "";
+      const target = (() => {
+        try {
+          const a = typeof item.args === "string" ? JSON.parse(item.args) : item.args;
+          if (!a || typeof a !== "object") return "";
+          return a.memory_id || a.eventId || a.id || a.query || "";
+        } catch { return ""; }
+      })();
+      const t = target ? String(target).slice(0, 40) : "";
+      return `- ${item.name}|${status}${t ? "|" + t : ""}${suffix}`;
     });
 
-    // ── 动态上下文（每次调用都不同：时间/天气/日历/记忆/状态/动态工具） ──
+    // ── Agent: 压缩记忆（最多3条，短全文，长截断+id） ──
+    const ccMemoryCompact = (() => {
+      const mems = ensureArray(relatedMemories).slice(0, 3);
+      if (!mems.length) return "";
+      return mems.map(m => {
+        const date = m.createdAt ? new Date(m.createdAt).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" }) : "?";
+        const raw = String(m.content || "").replace(/\s+/g, " ");
+        const text = raw.length <= 150 ? raw : raw.slice(0, 120) + "...[id:" + (m.id || "?") + "]";
+        return `- ${date}|${memorySourceLabel(m)}|${text}`;
+      }).join("\n");
+    })();
+
+    // ── Agent: 精简贴纸提示（只保留候选列表+一行规则） ──
+    const ccStickerCompact = (() => {
+      if (!stickerPromptForDynamic) return "";
+      const lines = stickerPromptForDynamic.split("\n");
+      const candidates = lines.filter(l => l.startsWith("- "));
+      if (!candidates.length) return "";
+      return "【表情包】强烈情绪时可用，格式{{sticker:ID}}，勿滥用\n" + candidates.join("\n");
+    })();
+
+    // ── Agent: 压缩时间 MM/DD HH:mm ──
+    const ccTimeCompact = (() => {
+      const p = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+      const g = (t) => p.find(x => x.type === t)?.value || "";
+      return `${g("month")}/${g("day")} ${g("hour")}:${g("minute")}`;
+    })();
+
+    // ── Agent: 压缩天气（一行：条件+温度） ──
+    const ccWeatherCompact = dailyWeatherText
+      ? dailyWeatherText.split("\n").filter(l => l.startsWith("天气")).join("") || dailyWeatherText.replace(/\n/g, " ").slice(0, 60)
+      : "";
+
+    // ── Agent: 压缩日记状态 ──
+    const ccDiaryCompact = (() => {
+      if (!diaryStatusText) return "";
+      const day = diaryStatusText.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] || "";
+      if (diaryStatusText.includes("已经存在")) return `日记:${day}已写`;
+      return `日记:${day}未写`;
+    })();
+
+    // ── 动态上下文（Agent 模式压缩版） ──
     const ccDynamic = [
-      `当前时间：${nowStr}`,
-      dailyNoteContext ? `【Iris 未读 Moment】\n${dailyNoteContext}` : "",
-      companionStatusText ? `【最近陪伴状态】\n${companionStatusText}` : "",
-      pendingCompanionText ? `【待处理陪伴邀请】\n${pendingCompanionText}` : "",
-      pendingListeningText ? `【待处理一起听邀请】\n${pendingListeningText}` : "",
-      transferStatusText ? `【最近转账状态】\n${transferStatusText}` : "",
-      dailyWeatherText ? `【当前天气】\n${dailyWeatherText}` : "",
-      diaryStatusText ? `【日记状态】\n${diaryStatusText}` : "",
-      compressedToolActivity.length ? `【近期工具行动】\n${compressedToolActivity.join("\n")}` : "",
-      relatedMemoryLookupPerformed && !memoryText ? "【自动记忆检索】未命中相关记忆。" : "",
-      memoryText ? `【相关记忆】\n${memoryText}` : "",
-      canQuoteUserMessage ? `【可引用消息】\n${quoteableMessages.slice(-8).map(m => `- id=${m.id}：${String(m.content || "[图片]").replace(/\s+/g, " ").slice(0, 80)}`).join("\n")}` : "",
-      // dynamic tools: user-toggled non-default tools
-      dynamicToolDesc ? `【当前已开启的额外工具】\n${dynamicToolDesc}` : "",
-      stickerPromptForDynamic || ""
+      `时间：${ccTimeCompact}`,
+      dailyNoteContext ? `【未读Moment】\n${dailyNoteContext}` : "",
+      companionStatusText || "",
+      pendingCompanionText || "",
+      pendingListeningText || "",
+      transferStatusText || "",
+      ccWeatherCompact ? `${ccWeatherCompact}` : "",
+      ccDiaryCompact || "",
+      compressedToolActivity.length ? `【近期工具】\n${compressedToolActivity.join("\n")}` : "",
+      relatedMemoryLookupPerformed && !ccMemoryCompact ? "记忆检索:未命中" : "",
+      ccMemoryCompact ? `【记忆】\n${ccMemoryCompact}` : "",
+      // Agent 模式跳过可引用消息（tmux 自带对话历史）
+      dynamicToolDesc ? `【额外工具】\n${dynamicToolDesc}` : "",
+      ccStickerCompact || ""
     ].filter(Boolean).join("\n");
 
     // ── 首次调用：发完整人设 + 工具；resume：只发动态上下文 ──
