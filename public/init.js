@@ -44,6 +44,35 @@
     document.documentElement.dataset.theme = 'mint';
   }
 
+  /* ---- Appearance (Light / Dark / System) ---- */
+  var appearance = localStorage.getItem('iris-appearance') || 'system';
+  function applyAppearance(mode) {
+    if (mode === 'dark') {
+      document.documentElement.dataset.appearance = 'dark';
+    } else if (mode === 'light') {
+      delete document.documentElement.dataset.appearance;
+    } else {
+      // system: follow prefers-color-scheme
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.dataset.appearance = 'dark';
+      } else {
+        delete document.documentElement.dataset.appearance;
+      }
+    }
+  }
+  applyAppearance(appearance);
+  // Listen for system theme changes when in "system" mode
+  if (window.matchMedia) {
+    try {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+        var current = localStorage.getItem('iris-appearance') || 'system';
+        if (current === 'system') applyAppearance('system');
+      });
+    } catch(e) {}
+  }
+  // Expose globally so more.html settings can trigger it
+  window.irisApplyAppearance = applyAppearance;
+
   /* ---- Custom Fonts ---- */
   try {
     var fonts = JSON.parse(localStorage.getItem('iris-custom-fonts'));

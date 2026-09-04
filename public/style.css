@@ -119,6 +119,86 @@
 /* 自定义 Custom — JS applies vars inline via localStorage */
 /* [data-theme="custom"] uses runtime-injected CSS variables */
 
+/* ---- Dark Appearance Mode ---- */
+/* Applied via data-appearance="dark" on <html>, works with any theme */
+[data-appearance="dark"] {
+  --bg:           #121212;
+  --bg-card:      #1E1E1E;
+  --bg-secondary: #202020;
+  --text:         #F2F2F2;
+  --text-mid:     #A9A9A9;
+  --text-light:   #777777;
+  --border:       rgba(255,255,255,0.08);
+  --shadow-color: 0,0,0;
+  --white:        #1E1E1E;
+}
+/* Top bar, bottom dock, modals use a slightly lighter dark surface */
+[data-appearance="dark"] .top-bar,
+[data-appearance="dark"] .dock,
+[data-appearance="dark"] .dock::after {
+  background: #181818;
+}
+[data-appearance="dark"] .modal,
+[data-appearance="dark"] .menu-pop {
+  background: #1E1E1E;
+}
+[data-appearance="dark"] .card {
+  background: #1E1E1E;
+}
+[data-appearance="dark"] .card:hover {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+[data-appearance="dark"] .input {
+  background: #202020;
+}
+[data-appearance="dark"] .chip {
+  background: #1E1E1E;
+  border-color: #2A2A2A;
+}
+[data-appearance="dark"] .chip.active {
+  border-color: var(--accent);
+}
+[data-appearance="dark"] .toast {
+  background: #F2F2F2;
+  color: #121212;
+}
+[data-appearance="dark"] .toast.success { background: var(--success); color: #fff; }
+[data-appearance="dark"] .toast.error   { background: var(--error);   color: #fff; }
+[data-appearance="dark"] .btn-secondary {
+  background: #252525;
+}
+[data-appearance="dark"] .btn-secondary:hover {
+  background: #2A2A2A;
+}
+[data-appearance="dark"] .btn-ghost:hover {
+  background: #252525;
+}
+[data-appearance="dark"] .btn-icon:hover {
+  background: #252525;
+}
+[data-appearance="dark"] .btn-outline {
+  border-color: #2A2A2A;
+}
+[data-appearance="dark"] .btn-outline:hover {
+  background: #252525;
+  border-color: var(--accent);
+}
+[data-appearance="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.55);
+}
+[data-appearance="dark"] .modal-close:hover {
+  background: #252525;
+}
+[data-appearance="dark"] ::-webkit-scrollbar-thumb {
+  background: #333;
+}
+/* Dark mode body background gradient */
+[data-appearance="dark"] body::before {
+  background:
+    radial-gradient(ellipse 70% 55% at 10% 15%, rgba(255,255,255,0.015) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 60% at 90% 88%, rgba(255,255,255,0.015) 0%, transparent 60%);
+}
+
 /* ---- Reset ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
