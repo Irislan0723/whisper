@@ -3682,11 +3682,13 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     ].filter(Boolean).join("\n");
 
     // ── 首次调用：发完整人设 + 工具；resume：只发动态上下文 ──
-    const ccSend = async (msg, sysPrompt) => {
+    const ccSend = async (msg, sysPrompt, sendImages) => {
+      const body = { message: msg, systemPrompt: sysPrompt || undefined, model, sessionId: sessionId || undefined };
+      if (Array.isArray(sendImages) && sendImages.length) body.images = sendImages;
       const resp = await fetch(baseUrl + "/relay/send", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-relay-token": apiKey },
-        body: JSON.stringify({ message: msg, systemPrompt: sysPrompt || undefined, model, sessionId: sessionId || undefined })
+        body: JSON.stringify(body)
       });
       if (!resp.ok) {
         const errText = await resp.text().catch(() => "");
@@ -3710,7 +3712,8 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
         // （防止 relay 重启后丢失 lastSysPrompt 导致 CC 无法重新启动）
         const fullSystemPrompt = [systemPrompt, defaultToolDesc].filter(Boolean).join("\n\n");
         const firstMsg = ccDynamic ? ccDynamic + "\n---\n" + userText : userText;
-        data = await ccSend(firstMsg, fullSystemPrompt);
+        // round 0 传图片（如有），后续工具结果轮不传图片
+        data = await ccSend(firstMsg, fullSystemPrompt, chatImages.length ? chatImages : undefined);
       } else {
         // 工具结果轮：直接发送结果文本（在已有 session 内）
         data = await ccSend(lastToolResult, null);

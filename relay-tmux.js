@@ -16,7 +16,16 @@ const PROJECT_DIR = "/root/.claude/projects/-opt-cc-relay-data";
 // Swap 配置
 const SWAP_KEEP_TURNS = 15;   // 保留最近 N 个用户回合（每回合含多轮工具交互）
 
+// ── 图片临时存储 ──
+const IMAGE_DIR = join(DATA, "images");
+const IMAGE_MAX_PER_MSG = 6;
+const IMAGE_MAX_BASE64_LEN = 1_600_000; // ~1.2MB decoded
+const IMAGE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const IMAGE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const ALLOWED_IMAGE_MIME = /^image\/(jpeg|jpg|png|webp)$/i;
+
 if (!existsSync(DATA)) mkdirSync(DATA, { recursive: true });
+if (!existsSync(IMAGE_DIR)) mkdirSync(IMAGE_DIR, { recursive: true });
 
 function auth(req, res, next) {
   if (req.headers["x-relay-token"] !== TOKEN)
@@ -181,7 +190,72 @@ async function drain() {
   drain();
 }
 
-async function processMessage({ message, systemPrompt }) {
+// ════════════════════════════════════════
+//  图片处理：base64 → 本地临时文件
+// ════════════════════════════════════════
+const MIME_TO_EXT = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+function decodeAndSaveImages(images) {
+  if (!Array.isArray(images) || !images.length) return [];
+  const saved = [];
+  const batch = images.slice(0, IMAGE_MAX_PER_MSG);
+  for (const item of batch) {
+    if (typeof item !== "string") continue;
+    const match = item.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (!match) { console.warn("[image] 跳过：无效格式"); continue; }
+    const mime = match[1].toLowerCase();
+    if (!ALLOWED_IMAGE_MIME.test(mime)) { console.warn("[image] 跳过：不允许的 MIME", mime); continue; }
+    const b64 = match[2].replace(/\s/g, "");
+    if (b64.length > IMAGE_MAX_BASE64_LEN) { console.warn("[image] 跳过：base64 过大", b64.length); continue; }
+    const ext = MIME_TO_EXT[mime] || "jpg";
+    const filename = `img-${randomUUID()}.${ext}`;
+    const filepath = join(IMAGE_DIR, filename);
+    try {
+      writeFileSync(filepath, Buffer.from(b64, "base64"));
+      saved.push(filepath);
+      console.log(`[image] 已保存: ${filename} (${Math.round(b64.length * 3 / 4 / 1024)} KB)`);
+    } catch (e) {
+      console.warn("[image] 写入失败:", e.message);
+    }
+  }
+  return saved;
+}
+
+function buildImagePrompt(paths) {
+  if (!paths.length) return "";
+  const list = paths.map(p => `- ${p}`).join("\n");
+  return `\n\n本轮用户附带了图片，请先使用 Read 工具逐一读取以下图片文件，理解图片内容后再结合用户文字回复：\n${list}`;
+}
+
+// ── 定时清理过期临时图片 ──
+function cleanupExpiredImages() {
+  try {
+    if (!existsSync(IMAGE_DIR)) return;
+    const now = Date.now();
+    let removed = 0;
+    for (const file of readdirSync(IMAGE_DIR)) {
+      if (!file.startsWith("img-")) continue;
+      const filepath = join(IMAGE_DIR, file);
+      try {
+        const stat = statSync(filepath);
+        if (now - stat.mtimeMs > IMAGE_TTL_MS) {
+          unlinkSync(filepath);
+          removed++;
+        }
+      } catch (e) {
+        if (e?.code !== "ENOENT") console.warn("[image-cleanup] 删除失败:", file, e.message);
+      }
+    }
+    if (removed) console.log(`[image-cleanup] 已清理 ${removed} 个过期图片`);
+  } catch (e) {
+    console.warn("[image-cleanup] 清理异常:", e.message);
+  }
+}
+// 启动时清理一次，之后每 6 小时清理
+cleanupExpiredImages();
+setInterval(cleanupExpiredImages, IMAGE_CLEANUP_INTERVAL_MS);
+
+async function processMessage({ message, systemPrompt, images }) {
   // CC 没跑就启动
   if (!ccReady || !tmuxAlive()) {
     const sp = systemPrompt || lastSysPrompt;
@@ -191,6 +265,12 @@ async function processMessage({ message, systemPrompt }) {
 
   // 如果传了新的系统提示词，存起来（下次轮换用）
   if (systemPrompt) lastSysPrompt = systemPrompt;
+
+  // ── 处理图片：解码为本地文件，追加读取提示到消息 ──
+  const imagePaths = decodeAndSaveImages(images);
+  if (imagePaths.length) {
+    message = message + buildImagePrompt(imagePaths);
+  }
 
   return new Promise(async (resolve, reject) => {
     const id = Date.now().toString();
@@ -399,13 +479,14 @@ async function performSwap() {
 //  主端点（HK 服务端 → relay）
 // ════════════════════════════════════════
 app.post("/relay/send", auth, async (req, res) => {
-  const { message, systemPrompt, model } = req.body;
+  const { message, systemPrompt, model, images } = req.body;
   if (!message) return res.status(400).json({ error: "message required" });
 
-  console.log("[relay] 收到请求, msg:", message.length, "sp:", (systemPrompt || "").length);
+  const imageCount = Array.isArray(images) ? images.length : 0;
+  console.log("[relay] 收到请求, msg:", message.length, "sp:", (systemPrompt || "").length, imageCount ? ("images:" + imageCount) : "");
 
   try {
-    const result = await enqueue({ message, systemPrompt });
+    const result = await enqueue({ message, systemPrompt, images });
     console.log("[relay] 成功, text:", result.text.length);
     res.json({
       text:      result.text,
