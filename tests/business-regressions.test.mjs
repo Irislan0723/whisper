@@ -87,4 +87,6 @@ test("calendar writes wait for their persistent APIs and surface failures", () =
   assert.match(source, /supabase\.from\("calendar_events"\)/);
   assert.match(source, /supabase\.from\("period_details"\)/);
   assert.match(source, /app\.delete\("\/api\/calendar\/period-details\/:date"/);
+  assert.match(source, /time:String\(e\.time \?\? e\.timeStart \?\? ""\)\.trim\(\) \|\| null/);
+  assert.match(source, /time_end:String\(e\.time_end \?\? e\.timeEnd \?\? ""\)\.trim\(\) \|\| null/);
 });
