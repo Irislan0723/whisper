@@ -78,7 +78,7 @@ test("calendar writes wait for their persistent APIs and surface failures", () =
   const periodForm = calendar.slice(calendar.indexOf("async function savePeriodDetailForm"), calendar.indexOf("/* Chip click handlers"));
   assert.match(eventForm, /await fetch\(BASE\+'\/api\/calendar'/);
   assert.match(eventForm, /日程保存失败/);
-  assert.match(periodForm, /await syncCalendarState\(\)/);
+  assert.match(periodForm, /api\/calendar\/period-details\/.*method:'PUT'/);
   assert.match(calendar, /function syncCalendarState\(\)[\s\S]*\/api\/calendar\/state/);
   assert.match(calendar, /id="pdDelete"/);
   assert.match(calendar, /async function deletePeriodDetail\(\)[\s\S]*\/api\/calendar\/period-details/);
@@ -87,6 +87,8 @@ test("calendar writes wait for their persistent APIs and surface failures", () =
   assert.match(source, /supabase\.from\("calendar_events"\)/);
   assert.match(source, /supabase\.from\("period_details"\)/);
   assert.match(source, /app\.delete\("\/api\/calendar\/period-details\/:date"/);
+  assert.match(source, /app\.put\("\/api\/calendar\/period-details\/:date"/);
+  assert.ok(source.indexOf('app.put("/api/calendar/state"') < source.indexOf('app.put("/api/calendar/:id"'), "calendar state route must precede the generic :id route");
   assert.match(source, /time:String\(e\.time \?\? e\.timeStart \?\? ""\)\.trim\(\) \|\| null/);
   assert.match(source, /time_end:String\(e\.time_end \?\? e\.timeEnd \?\? ""\)\.trim\(\) \|\| null/);
 });

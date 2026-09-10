@@ -1251,7 +1251,6 @@ app.post("/api/letters/:id/reply", apiAuth, async (req,res) => { try { const old
 
 app.get("/api/calendar", apiAuth, async (req,res) => { try { let list=(await dbAll("calendar_events","date")).map(eventFromDb); if(req.query.fromDate)list=list.filter(e=>String(e.date)>=req.query.fromDate); if(req.query.toDate)list=list.filter(e=>String(e.date)<=req.query.toDate); list.sort((a,b)=>`${a.date} ${a.time||""}`.localeCompare(`${b.date} ${b.time||""}`)); res.json(list); } catch(e) { res.status(503).json({error:e.message}); } });
 app.post("/api/calendar", apiAuth, async (req,res) => { try { const now=new Date().toISOString(); const item={id:req.body.id||generateId(),title:req.body.title||"",date:req.body.date||"",time:req.body.time||"",time_end:req.body.time_end||"",location:req.body.location||"",note:req.body.note||"",type:req.body.type||"other",color:req.body.color,createdAt:now,updatedAt:now}; if(!item.title)return res.status(400).json({error:"title required"}); if(!item.date)return res.status(400).json({error:"date required"}); res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
-app.put("/api/calendar/:id", apiAuth, async (req,res) => { try { const old=await dbOne("calendar_events",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item={...eventFromDb(old),...req.body,id:req.params.id,updatedAt:new Date().toISOString()}; res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
 app.delete("/api/calendar/:id", apiAuth, async (req,res) => { try { await dbDelete("calendar_events",req.params.id); res.json({ok:true}); } catch(e) { res.status(503).json({error:e.message}); } });
 
 // Calendar pages used to keep settings, courses, events and period details in
@@ -1301,6 +1300,15 @@ app.delete("/api/calendar/period-details/:date", apiAuth, async (req, res) => {
     res.json({ ok:true });
   } catch (e) { res.status(503).json({ error:e.message }); }
 });
+app.put("/api/calendar/period-details/:date", apiAuth, async (req, res) => {
+  try {
+    const detail = periodDetailToDbRow({ ...req.body, date:req.params.date });
+    const { data, error } = await supabase.from("period_details").upsert(detail, { onConflict:"date" }).select().single();
+    dbError("period_details", error);
+    res.json(periodDetailFromDb(data));
+  } catch (e) { res.status(503).json({ error:e.message }); }
+});
+app.put("/api/calendar/:id", apiAuth, async (req,res) => { try { const old=await dbOne("calendar_events",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item={...eventFromDb(old),...req.body,id:req.params.id,updatedAt:new Date().toISOString()}; res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
 
 function normalizeHomeWeatherLocation(value = {}) {
   const lat = Number(value.lat);

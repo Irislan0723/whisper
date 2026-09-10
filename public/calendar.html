@@ -771,7 +771,8 @@ async function savePeriodDetailForm(){
   periodDetails[pdEditDate]={flow:flow,color:color,pain:pain,symptoms:symptoms,note:note};
   saveJSON(PDETAIL_KEY,periodDetails);
   try{
-    await syncCalendarState();
+    var response=await fetch(BASE+'/api/calendar/period-details/'+encodeURIComponent(pdEditDate),{method:'PUT',headers:H,body:JSON.stringify(periodDetails[pdEditDate])});
+    if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
     closeSheet('periodDetailSheet');renderAll();showToast('详情已保存 ✓','success');
   }catch(error){
     if(before)periodDetails[pdEditDate]=before;else delete periodDetails[pdEditDate];
