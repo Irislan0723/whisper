@@ -1207,7 +1207,7 @@ app.get("/companion-audio/:file", (req, res) => {
   res.sendFile(target);
 });
 app.use((req, res, next) => {
-  if (req.path === "/chat.html" || req.path === "/chat-app-20260821-1310.js" || req.path === "/companion.html" || req.path === "/sw.js" || req.path === "/init.js") {
+  if (req.path === "/chat.html" || req.path === "/chat-app-20260821-1310.js" || req.path === "/calendar.html" || req.path === "/companion.html" || req.path === "/sw.js" || req.path === "/init.js") {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");

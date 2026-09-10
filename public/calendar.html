@@ -418,6 +418,7 @@
   </div>
   <textarea class="record-note" id="pdNote" placeholder="其他备注…（可选）" rows="2"></textarea>
   <button class="sheet-btn sheet-btn-primary" id="pdSave">保存详情</button>
+  <button class="sheet-btn sheet-btn-ghost" id="pdDelete" hidden style="color:var(--error)">删除本日详情</button>
   <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('periodDetailSheet')">取消</button>
 </div></div>
 
@@ -726,6 +727,7 @@ function openPeriodDetail(dstr){
   var parts=dstr.split('-');
   $('pdDate').textContent=parseInt(parts[0])+'年'+parseInt(parts[1])+'月'+parseInt(parts[2])+'日';
   var existing=getPeriodDetail(dstr);
+  $('pdDelete').hidden=!existing;
 
   /* Single-select groups */
   ['pdFlow','pdColor','pdPain'].forEach(function(gid){
@@ -765,6 +767,18 @@ async function savePeriodDetailForm(){
     saveJSON(PDETAIL_KEY,periodDetails);renderAll();showToast('详情保存失败：'+(error.message||'请稍后重试'),'error');
   }
 }
+async function deletePeriodDetail(){
+  if(!pdEditDate||!periodDetails[pdEditDate])return;
+  if(!confirm('删除这一天的经期详情？此操作会同步到云端。'))return;
+  var before=Object.assign({},periodDetails[pdEditDate],{symptoms:(periodDetails[pdEditDate].symptoms||[]).slice()});
+  delete periodDetails[pdEditDate];saveJSON(PDETAIL_KEY,periodDetails);
+  try{
+    await syncCalendarState();
+    closeSheet('periodDetailSheet');renderAll();showToast('本日详情已删除','success');
+  }catch(error){
+    periodDetails[pdEditDate]=before;saveJSON(PDETAIL_KEY,periodDetails);renderAll();showToast('删除失败：'+(error.message||'请稍后重试'),'error');
+  }
+}
 
 /* Chip click handlers for period detail */
 ['pdFlow','pdColor','pdPain'].forEach(function(gid){
@@ -779,6 +793,7 @@ $('pdSymptoms').addEventListener('click',function(e){
   chip.classList.toggle('selected');
 });
 $('pdSave').addEventListener('click',savePeriodDetailForm);
+$('pdDelete').addEventListener('click',deletePeriodDetail);
 window.openPeriodDetail=function(d){openPeriodDetail(d)};
 
 /* ===== Render ===== */

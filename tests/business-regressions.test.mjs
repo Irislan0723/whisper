@@ -79,6 +79,9 @@ test("manual calendar forms wait for the shared persistent calendar state API", 
   assert.match(eventForm, /await syncCalendarState\(\)/);
   assert.match(periodForm, /await syncCalendarState\(\)/);
   assert.match(calendar, /function syncCalendarState\(\)[\s\S]*\/api\/calendar\/state/);
+  assert.match(calendar, /id="pdDelete"/);
+  assert.match(calendar, /async function deletePeriodDetail\(\)[\s\S]*await syncCalendarState\(\)/);
+  assert.match(source, /req\.path === "\/calendar\.html"/);
   assert.match(source, /supabase\.from\("calendar_events"\)/);
   assert.match(source, /supabase\.from\("period_details"\)/);
 });
