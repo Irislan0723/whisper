@@ -1250,7 +1250,7 @@ app.post("/api/letters/:id/unlock", apiAuth, async (req,res) => { try { const ol
 app.post("/api/letters/:id/reply", apiAuth, async (req,res) => { try { const old=await dbOne("letters",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item=letterFromDb(old); if(!item.isUnlocked&&item.unlockAt&&new Date(item.unlockAt)>new Date())return res.status(403).json({error:"未解封"}); if(item.reply)return res.status(409).json({error:"已有回信"}); item.reply={content:req.body.content||"",createdAt:new Date().toISOString()};item.updatedAt=new Date().toISOString();res.json(letterFromDb(await dbUpsert("letters",letterToDbRow(item)))); } catch(e){res.status(503).json({error:e.message});} });
 
 app.get("/api/calendar", apiAuth, async (req,res) => { try { let list=(await dbAll("calendar_events","date")).map(eventFromDb); if(req.query.fromDate)list=list.filter(e=>String(e.date)>=req.query.fromDate); if(req.query.toDate)list=list.filter(e=>String(e.date)<=req.query.toDate); list.sort((a,b)=>`${a.date} ${a.time||""}`.localeCompare(`${b.date} ${b.time||""}`)); res.json(list); } catch(e) { res.status(503).json({error:e.message}); } });
-app.post("/api/calendar", apiAuth, async (req,res) => { try { const now=new Date().toISOString(); const item={id:generateId(),title:req.body.title||"",date:req.body.date||"",time:req.body.time||"",note:req.body.note||"",type:req.body.type||"other",createdAt:now,updatedAt:now}; if(!item.title)return res.status(400).json({error:"title required"}); if(!item.date)return res.status(400).json({error:"date required"}); res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
+app.post("/api/calendar", apiAuth, async (req,res) => { try { const now=new Date().toISOString(); const item={id:req.body.id||generateId(),title:req.body.title||"",date:req.body.date||"",time:req.body.time||"",time_end:req.body.time_end||"",location:req.body.location||"",note:req.body.note||"",type:req.body.type||"other",color:req.body.color,createdAt:now,updatedAt:now}; if(!item.title)return res.status(400).json({error:"title required"}); if(!item.date)return res.status(400).json({error:"date required"}); res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
 app.put("/api/calendar/:id", apiAuth, async (req,res) => { try { const old=await dbOne("calendar_events",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item={...eventFromDb(old),...req.body,id:req.params.id,updatedAt:new Date().toISOString()}; res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
 app.delete("/api/calendar/:id", apiAuth, async (req,res) => { try { await dbDelete("calendar_events",req.params.id); res.json({ok:true}); } catch(e) { res.status(503).json({error:e.message}); } });
 
@@ -1291,6 +1291,13 @@ app.put("/api/calendar/state", apiAuth, async (req, res) => {
     if (events.length) { const { error } = await supabase.from("calendar_events").upsert(events.map(eventToDbRow), { onConflict:"id" }); dbError("calendar_events", error); }
     const details = ensureArray(body.periodDetails).filter(detail => detail?.date);
     if (details.length) { const { error } = await supabase.from("period_details").upsert(details.map(periodDetailToDbRow), { onConflict:"date" }); dbError("period_details", error); }
+    res.json({ ok:true });
+  } catch (e) { res.status(503).json({ error:e.message }); }
+});
+app.delete("/api/calendar/period-details/:date", apiAuth, async (req, res) => {
+  try {
+    const { error } = await supabase.from("period_details").delete().eq("date", req.params.date);
+    dbError("period_details", error);
     res.json({ ok:true });
   } catch (e) { res.status(503).json({ error:e.message }); }
 });

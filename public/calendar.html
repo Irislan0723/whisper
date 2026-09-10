@@ -691,23 +691,34 @@ async function saveEventForm(){
   var loc=$('eLocation').value.trim(),note=$('eNote').value.trim();
   var editId=$('eEditId').value;
   var before=eventsData.map(function(event){return Object.assign({},event)});
+  var existingEvent=editId?eventsData.find(function(event){return event.id===editId}):null;
+  var eventColor=existingEvent&&existingEvent.color!==undefined?existingEvent.color:eventsData.length%COURSE_COLORS.length;
   if(editId){
     var ev=eventsData.find(function(e){return e.id===editId});
     if(ev){ev.name=name;ev.date=date;ev.timeStart=ts;ev.timeEnd=te;ev.location=loc;ev.note=note}
   }else{
-    eventsData.push({id:'ev'+Date.now(),name:name,date:date,timeStart:ts,timeEnd:te,location:loc,note:note,color:eventsData.length%COURSE_COLORS.length});
+    eventsData.push({id:'ev'+Date.now(),name:name,date:date,timeStart:ts,timeEnd:te,location:loc,note:note,color:eventColor});
   }
-  saveJSON(EVENTS_KEY,eventsData);
   try{
-    await syncCalendarState();
+    var response=await fetch(BASE+'/api/calendar'+(editId?'/'+encodeURIComponent(editId):''),{method:editId?'PUT':'POST',headers:H,body:JSON.stringify({id:editId||eventsData[eventsData.length-1].id,title:name,date:date,time:ts,time_end:te,location:loc,note:note,type:'other',color:eventColor})});
+    if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
+    var saved=await response.json();
+    if(editId){var savedIndex=eventsData.findIndex(function(event){return event.id===editId});if(savedIndex>=0)eventsData[savedIndex]=saved}
+    else eventsData[eventsData.length-1]=saved;
+    saveJSON(EVENTS_KEY,eventsData);
     closeSheet('eventSheet');renderAll();showToast('日程已保存 ✓','success');
   }catch(error){
     eventsData=before;saveJSON(EVENTS_KEY,eventsData);renderAll();showToast('日程保存失败：'+(error.message||'请稍后重试'),'error');
   }
 }
-function deleteEvent(id){
-  eventsData=eventsData.filter(function(e){return e.id!==id});
-  saveEvents();renderAll();showToast('已删除');
+async function deleteEvent(id){
+  var before=eventsData.map(function(event){return Object.assign({},event)});
+  eventsData=eventsData.filter(function(e){return e.id!==id});saveJSON(EVENTS_KEY,eventsData);renderAll();
+  try{
+    var response=await fetch(BASE+'/api/calendar/'+encodeURIComponent(id),{method:'DELETE',headers:H});
+    if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
+    showToast('日程已删除','success');
+  }catch(error){eventsData=before;saveJSON(EVENTS_KEY,eventsData);renderAll();showToast('日程删除失败：'+(error.message||'请稍后重试'),'error')}
 }
 window.deleteEvent=deleteEvent;
 window.openEventForm=function(d,id){openEventForm(d,id)};
@@ -773,7 +784,8 @@ async function deletePeriodDetail(){
   var before=Object.assign({},periodDetails[pdEditDate],{symptoms:(periodDetails[pdEditDate].symptoms||[]).slice()});
   delete periodDetails[pdEditDate];saveJSON(PDETAIL_KEY,periodDetails);
   try{
-    await syncCalendarState();
+    var response=await fetch(BASE+'/api/calendar/period-details/'+encodeURIComponent(pdEditDate),{method:'DELETE',headers:H});
+    if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
     closeSheet('periodDetailSheet');renderAll();showToast('本日详情已删除','success');
   }catch(error){
     periodDetails[pdEditDate]=before;saveJSON(PDETAIL_KEY,periodDetails);renderAll();showToast('删除失败：'+(error.message||'请稍后重试'),'error');
@@ -1146,13 +1158,21 @@ async function deleteMood(dstr){
 }
 async function savePeriodMark(dstr,phase){
   var rec={date:dstr,type:'period',phase:phase,mood:'',note:''};
-  upsertLocal(rec);renderAll();showToast(phase==='start'?'经期开始已标记 🌙':'经期结束已标记 ✓','success');
-  try{await fetch(BASE+'/api/moods',{method:'POST',headers:H,body:JSON.stringify(normalizeRec(rec))})}catch(e){}
+  var before=records.slice();upsertLocal(rec);renderAll();
+  try{
+    var response=await fetch(BASE+'/api/moods',{method:'POST',headers:H,body:JSON.stringify(normalizeRec(rec))});
+    if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
+    showToast(phase==='start'?'经期开始已标记 🌙':'经期结束已标记 ✓','success');
+  }catch(error){records=before;writeLocal();renderAll();showToast('经期标记保存失败：'+(error.message||'请稍后重试'),'error')}
 }
 async function deletePeriod(dstr){
-  records=records.filter(function(r){return!(r.date===dstr&&r.type==='period')});
-  writeLocal();renderAll();closeSheet('detailSheet');showToast('经期标记已删除','success');
-  try{await fetch(BASE+'/api/moods/'+dstr,{method:'DELETE',headers:H})}catch(e){}
+  var before=records.slice();records=records.filter(function(r){return!(r.date===dstr&&r.type==='period')});
+  writeLocal();renderAll();
+  try{
+    var response=await fetch(BASE+'/api/moods/'+encodeURIComponent(dstr),{method:'DELETE',headers:H});
+    if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
+    closeSheet('detailSheet');showToast('经期标记已删除','success');
+  }catch(error){records=before;writeLocal();renderAll();showToast('经期标记删除失败：'+(error.message||'请稍后重试'),'error')}
 }
 function saveSettingsAction(){
   settings={cycle_length:editCycle,period_length:editPeriod};

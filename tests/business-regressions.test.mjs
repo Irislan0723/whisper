@@ -72,16 +72,19 @@ test("diaries are unique by diary target date without a late-night execution win
   assert.match(source, /if \(targetDiaryDay > today\) throw new Error\("不能提前写未来日期的日记。"\)/);
 });
 
-test("manual calendar forms wait for the shared persistent calendar state API", () => {
+test("calendar writes wait for their persistent APIs and surface failures", () => {
   const calendar = readFileSync(new URL("../public/calendar.html", import.meta.url), "utf8");
   const eventForm = calendar.slice(calendar.indexOf("async function saveEventForm"), calendar.indexOf("function deleteEvent"));
   const periodForm = calendar.slice(calendar.indexOf("async function savePeriodDetailForm"), calendar.indexOf("/* Chip click handlers"));
-  assert.match(eventForm, /await syncCalendarState\(\)/);
+  assert.match(eventForm, /await fetch\(BASE\+'\/api\/calendar'/);
+  assert.match(eventForm, /日程保存失败/);
   assert.match(periodForm, /await syncCalendarState\(\)/);
   assert.match(calendar, /function syncCalendarState\(\)[\s\S]*\/api\/calendar\/state/);
   assert.match(calendar, /id="pdDelete"/);
-  assert.match(calendar, /async function deletePeriodDetail\(\)[\s\S]*await syncCalendarState\(\)/);
+  assert.match(calendar, /async function deletePeriodDetail\(\)[\s\S]*\/api\/calendar\/period-details/);
+  assert.match(calendar, /async function savePeriodMark\(dstr,phase\)[\s\S]*经期标记保存失败/);
   assert.match(source, /req\.path === "\/calendar\.html"/);
   assert.match(source, /supabase\.from\("calendar_events"\)/);
   assert.match(source, /supabase\.from\("period_details"\)/);
+  assert.match(source, /app\.delete\("\/api\/calendar\/period-details\/:date"/);
 });
