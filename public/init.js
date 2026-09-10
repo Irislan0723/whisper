@@ -46,6 +46,41 @@
 
   /* ---- Appearance (Light / Dark / System) ---- */
   var appearance = localStorage.getItem('iris-appearance') || 'system';
+  var systemBarSyncQueued = false;
+  function syncSystemBarColor() {
+    systemBarSyncQueued = false;
+    var root = document.documentElement;
+    var color = '';
+    try {
+      var styles = window.getComputedStyle(root);
+      color = (styles.getPropertyValue('--system-bar-bg') || styles.getPropertyValue('--bg-card')).trim();
+      if (!color) {
+        var bar = document.querySelector('.chat-head, .top-bar, .daily-top, .m-sticky-header');
+        if (bar) color = window.getComputedStyle(bar).backgroundColor;
+      }
+    } catch(e) {}
+    if (!color || color.indexOf('var(') === 0) {
+      color = root.dataset.appearance === 'dark' ? '#181818' : '#ffffff';
+    }
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta && document.head) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    if (meta) meta.setAttribute('content', color);
+    try {
+      if (window.parent !== window) {
+        var parentMeta = window.parent.document.querySelector('meta[name="theme-color"]');
+        if (parentMeta) parentMeta.setAttribute('content', color);
+      }
+    } catch(e) {}
+  }
+  function queueSystemBarColorSync() {
+    if (systemBarSyncQueued) return;
+    systemBarSyncQueued = true;
+    window.requestAnimationFrame(syncSystemBarColor);
+  }
   function applyAppearance(mode) {
     if (mode === 'dark') {
       document.documentElement.dataset.appearance = 'dark';
@@ -59,8 +94,21 @@
         delete document.documentElement.dataset.appearance;
       }
     }
+    queueSystemBarColorSync();
   }
   applyAppearance(appearance);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', queueSystemBarColorSync, { once:true });
+  } else {
+    queueSystemBarColorSync();
+  }
+  window.addEventListener('load', queueSystemBarColorSync, { once:true });
+  if (window.MutationObserver) {
+    new MutationObserver(queueSystemBarColorSync).observe(document.documentElement, {
+      attributes:true,
+      attributeFilter:['data-theme','data-appearance','style']
+    });
+  }
   // Listen for system theme changes when in "system" mode
   if (window.matchMedia) {
     try {
@@ -72,6 +120,7 @@
   }
   // Expose globally so more.html settings can trigger it
   window.irisApplyAppearance = applyAppearance;
+  window.syncSystemBarColor = queueSystemBarColorSync;
 
   /* ---- Custom Fonts ---- */
   try {

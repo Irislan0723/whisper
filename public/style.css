@@ -14,6 +14,8 @@
   --accent-contrast: #ffffff;
   --bg:           #EBF6F7;
   --bg-card:      #ffffff;
+  /* Android/PWA runtime status bar; follows the standard top-bar surface. */
+  --system-bar-bg: var(--bg-card);
   --bg-secondary: #DCE9EA;
   --text:         #4A3F3C;
   --text-mid:     #706562;
@@ -127,6 +129,7 @@
 html[data-appearance="dark"] {
   --bg:           #1E1E1E;
   --bg-card:      #262626;
+  --system-bar-bg:#181818;
   --bg-secondary: #2C2C2C;
   --text:         #F2F2F2;
   --text-mid:     #B0B0B0;
