@@ -2612,6 +2612,13 @@ function defaultDiaryDay(value = new Date()) {
   const today = chatDayKey(value);
   return isCrossDayGracePeriod(value) ? previousChatDay(today) : today;
 }
+function resolveDiaryTargetDay(date, nowDate = new Date()) {
+  const today = chatDayKey(nowDate);
+  const targetDiaryDay = date ? String(date) : defaultDiaryDay(nowDate);
+  if (!isChatDayKey(targetDiaryDay)) throw new Error("日记日期必须是 YYYY-MM-DD。");
+  if (targetDiaryDay > today) throw new Error("不能提前写未来日期的日记。");
+  return { today, targetDiaryDay };
+}
 
 function summaryTranscript(messages = []) {
   return ensureArray(messages).map(message => {
@@ -2836,7 +2843,7 @@ const CHAT_MEMORY_TOOLS = [
   { name: "update_self_profile", description: "完善你自己的某一个自我档案栏位。content 必须是吸收旧内容后的完整新版文字，不是新增的一条记录；保留仍成立的认识，只在多条记忆、持续对话模式或明确自我反思提供足够依据时更新。五个栏位含义：coreSelf=" + SELF_PROFILE_SECTION_GUIDE.coreSelf + " identity=" + SELF_PROFILE_SECTION_GUIDE.identity + " personality=" + SELF_PROFILE_SECTION_GUIDE.personality + " beliefsValues=" + SELF_PROFILE_SECTION_GUIDE.beliefsValues + " loveIntimacy=" + SELF_PROFILE_SECTION_GUIDE.loveIntimacy, parameters: { type: "object", properties: { section: { type: "string", enum: SELF_PROFILE_FIELDS }, content: { type: "string", description: "该栏位合并完善后的完整第一人称正文" }, basis: { type: "string", description: "本次修改依据的记忆或对话模式，简要说明" } }, required: ["section", "content", "basis"], additionalProperties: false } },
   { name: "read_memories", description: "读取最近的长期记忆。需要回忆经历、偏好、承诺或关系背景时使用。", parameters: { type: "object", properties: { category: { type: "string", enum: ["all", "deep", "daily", "diary", "writing"] }, limit: { type: "integer", minimum: 1, maximum: 50 } }, additionalProperties: false } },
   { name: "search_memories", description: "按关键词搜索长期记忆。每次回复最多调用一次；一次搜索为空就视为本轮没有命中，不要换词重复搜索。回答具体人物、事件、约定或偏好前，先搜索而不是猜。", parameters: { type: "object", properties: { query: { type: "string" }, category: { type: "string", enum: ["all", "deep", "daily", "diary", "writing"] }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false } },
-  { name: "add_memory", description: "写入记忆。deep（长期）仅用于稳定的重要资料：Iris 的个人信息、长期偏好、重要人物/关系、明确承诺或长期有效事实；daily（日常）仅用于单独值得未来回看的重要事件或变化，例如考试通过、重要经历、关系变化，普通吃饭和闲聊不要写；diary（日记）只用于一天临近结束时的整日总结，每个日期最多一篇。上海时间 00:00–04:59 默认仍写前一日，绝不能改写成当日新日记；前一日日记已经存在时，普通晚安无需记录，若另有独立且重要的新事件可改用 daily。若 Iris 明确要求补写更早日期，category=diary 且必须填写 date。遇到同一事件先更新旧记忆，不要新增重复项。", parameters: { type: "object", properties: { content: { type: "string" }, category: { type: "string", enum: ["deep", "daily", "diary", "writing"] }, date: { type: "string", description: "日记所属日期 YYYY-MM-DD；不填时，00:00–04:59 默认为前一日，其余时间默认为当日" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 }, pinned: { type: "boolean" } }, required: ["content", "category"], additionalProperties: false } },
+  { name: "add_memory", description: "写入记忆。deep（长期）仅用于稳定的重要资料：Iris 的个人信息、长期偏好、重要人物/关系、明确承诺或长期有效事实；daily（日常）仅用于单独值得未来回看的重要事件或变化，例如考试通过、重要经历、关系变化，普通吃饭和闲聊不要写；diary（日记）仅在 Iris 明确要求写日记时使用，每个目标日期最多一篇，明确请求后可在任意时间写入。date 是日记所属日期 YYYY-MM-DD；不填时，上海时间 00:00–04:59 默认前一日，其余时间默认当日。补写昨天或更早日期时必须传入正确 date。遇到同一事件先更新旧记忆，不要新增重复项。", parameters: { type: "object", properties: { content: { type: "string" }, category: { type: "string", enum: ["deep", "daily", "diary", "writing"] }, date: { type: "string", description: "日记所属日期 YYYY-MM-DD；不填时，00:00–04:59 默认为前一日，其余时间默认为当日" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 }, pinned: { type: "boolean" } }, required: ["content", "category"], additionalProperties: false } },
   { name: "update_memory", description: "修正或补充一条已有记忆。先读取或搜索得到准确 id；不要用它改写自我档案。", parameters: { type: "object", properties: { id: { type: "string" }, content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, pinned: { type: "boolean" } }, required: ["id"], additionalProperties: false } },
   { name: "delete_memory", description: "删除长期记忆。仅当 Iris 在当前消息中明确要求删除时使用，不能自行清理。", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } },
   { name: "read_moods", description: "读取 Iris 或你的心情记录，用于理解近期情绪变化。", parameters: { type: "object", properties: { who: { type: "string", enum: ["all", "iris", "claude"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false } },
@@ -2996,15 +3003,32 @@ function ccToolDescriptions(tools) {
 }
 
 /** 从 CC 回复文本中解析 tool_call 标签 */
+function parseToolArguments(raw) {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
+  const text = String(raw ?? "").trim();
+  if (!text) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (_) {
+    // Do not silently convert a malformed tool payload into {}. That used to
+    // make add_memory report empty content after the original payload was lost.
+    throw new Error("工具参数 JSON 解析失败；请使用合法 JSON 字符串并保留原始记忆内容。");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("工具参数必须是 JSON 对象。");
+  }
+  return parsed;
+}
 function parseCcToolCalls(text) {
   const calls = [];
   const re = /<tool_call\s+name="([^"]+)">([\s\S]*?)<\/tool_call>/g;
   let match;
   while ((match = re.exec(text)) !== null) {
     const name = match[1].trim();
-    let args = {};
-    try { args = JSON.parse(match[2].trim()); } catch (_) {}
-    calls.push({ name, args });
+    let args = {}, parseError = "";
+    try { args = parseToolArguments(match[2]); } catch (error) { parseError = error.message; }
+    calls.push({ name, args, parseError });
   }
   return calls;
 }
@@ -3132,17 +3156,11 @@ async function executeChatTool(name, args = {}, toolState = {}) {
       let targetDiaryDay = "";
       if (candidate.category === "diary") {
         const diaryRequest = String(toolState.userText || "");
-        const isBedtime = /(晚安|准备(睡|休息)|要睡(了)?|先睡|今天.*结束|明天见)/i.test(diaryRequest);
         const isExplicitDiaryRequest = /(补写|补记|写|记录).{0,12}(日记)|日记.{0,12}(补写|补记|写|记录)/i.test(diaryRequest);
         const nowDate = new Date();
-        const today = chatDayKey(nowDate);
-        targetDiaryDay = args.date ? String(args.date) : defaultDiaryDay(nowDate);
-        if (!isChatDayKey(targetDiaryDay)) throw new Error("日记日期必须是 YYYY-MM-DD。");
-        if (targetDiaryDay > today) throw new Error("不能提前写未来日期的日记。");
-        if (isCrossDayGracePeriod(nowDate) && targetDiaryDay === today) throw new Error(`现在仍属于凌晨收尾窗口；日记应归入 ${previousChatDay(today)}，不能新建 ${today} 的日记。`);
-        const isPastBackfill = targetDiaryDay < today && isExplicitDiaryRequest;
-        if (!isPastBackfill && !(isDiaryClosingWindow(nowDate) && (isBedtime || isExplicitDiaryRequest))) {
-          throw new Error("日记只能在当日临近结束时写入；补写更早日期时请明确提出并填写 date。若只是独立的重要事件，请改用 daily。");
+        ({ targetDiaryDay } = resolveDiaryTargetDay(args.date, nowDate));
+        if (!isExplicitDiaryRequest) {
+          throw new Error("日记仅在 Iris 明确要求写日记时写入；独立的重要事件请改用 daily。");
         }
         if (allMemories.some(memory => memory.category === "diary" && diaryDayKey(memory) === targetDiaryDay)) {
           throw new Error(`${targetDiaryDay} 已经有一篇日记；不要新建本日或次日日记。普通晚安无需记录，若另有独立且重要的新事件可改用 daily。`);
@@ -3299,9 +3317,7 @@ function availableToolsForRound(tools, toolState) {
 }
 
 function safeToolArgs(raw) {
-  if (!raw) return {};
-  if (typeof raw === "object") return raw;
-  try { return JSON.parse(raw); } catch { return {}; }
+  return parseToolArguments(raw);
 }
 
 const MAX_GENERATED_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -3430,13 +3446,13 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     }
   }
   let diaryStatusText = "";
-  if (toolsEnabled && isDiaryClosingWindow()) {
+  if (toolsEnabled) {
     try {
       const targetDay = defaultDiaryDay();
       const diaryExists = (await dbAll("memories")).map(memoryFromDb).some(memory => memory.category === "diary" && diaryDayKey(memory) === targetDay);
       diaryStatusText = diaryExists
-        ? `${targetDay} 的日记已经存在。不要再次写 diary，也不要在凌晨改写成当天日记；普通晚安无需记录，只有独立且重要的新事件才考虑写入 daily。`
-        : `${targetDay} 尚无日记。只有 Iris 明确准备结束这一天、说晚安或要求写日记时，才可写入这一日期的唯一一篇 diary。`;
+        ? `${targetDay} 的日记已经存在。不要再次写入这个目标日期；独立且重要的新事件可考虑写入 daily。`
+        : `${targetDay} 尚无日记。仅当 Iris 明确要求写日记时，才可写入这一目标日期的唯一一篇 diary；明确请求可在任意时间执行。`;
     } catch (e) {
       console.warn("diary status unavailable:", e.message);
     }
@@ -3736,6 +3752,11 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       for (const call of toolCalls) {
         if (batchFailed) {
           resultParts.push(`${call.name}: 跳过（本批次前一个工具已失败）`);
+          continue;
+        }
+        if (call.parseError) {
+          resultParts.push(`${call.name}: 失败\n${call.parseError}`);
+          batchFailed = true;
           continue;
         }
         try {

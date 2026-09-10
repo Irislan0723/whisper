@@ -683,19 +683,26 @@ function openEventForm(dateStr,editId){
   $('eEditId').value=editId||'';
   openSheet('eventSheet');
 }
-function saveEventForm(){
+async function saveEventForm(){
   var name=$('eName').value.trim();if(!name){showToast('请填写日程名称');return}
   var date=$('eDate').value;if(!date){showToast('请选择日期');return}
   var ts=$('eTimeStart').value,te=$('eTimeEnd').value;
   var loc=$('eLocation').value.trim(),note=$('eNote').value.trim();
   var editId=$('eEditId').value;
+  var before=eventsData.map(function(event){return Object.assign({},event)});
   if(editId){
     var ev=eventsData.find(function(e){return e.id===editId});
     if(ev){ev.name=name;ev.date=date;ev.timeStart=ts;ev.timeEnd=te;ev.location=loc;ev.note=note}
   }else{
     eventsData.push({id:'ev'+Date.now(),name:name,date:date,timeStart:ts,timeEnd:te,location:loc,note:note,color:eventsData.length%COURSE_COLORS.length});
   }
-  saveEvents();closeSheet('eventSheet');renderAll();showToast('日程已保存 ✓','success');
+  saveJSON(EVENTS_KEY,eventsData);
+  try{
+    await syncCalendarState();
+    closeSheet('eventSheet');renderAll();showToast('日程已保存 ✓','success');
+  }catch(error){
+    eventsData=before;saveJSON(EVENTS_KEY,eventsData);renderAll();showToast('日程保存失败：'+(error.message||'请稍后重试'),'error');
+  }
 }
 function deleteEvent(id){
   eventsData=eventsData.filter(function(e){return e.id!==id});
@@ -740,15 +747,23 @@ function openPeriodDetail(dstr){
   openSheet('periodDetailSheet');
 }
 
-function savePeriodDetailForm(){
+async function savePeriodDetailForm(){
   var flow='',color='',pain='',symptoms=[],note=$('pdNote').value.trim();
   var fc=$('pdFlow').querySelector('.pd-chip.selected');if(fc)flow=fc.dataset.v;
   var cc=$('pdColor').querySelector('.pd-chip.selected');if(cc)color=cc.dataset.v;
   var pc=$('pdPain').querySelector('.pd-chip.selected');if(pc)pain=pc.dataset.v;
   $('pdSymptoms').querySelectorAll('.pd-chip.selected').forEach(function(c){symptoms.push(c.dataset.v)});
   if(!flow&&!color&&!pain&&symptoms.length===0&&!note){showToast('请至少填写一项');return}
+  var before=periodDetails[pdEditDate]?Object.assign({},periodDetails[pdEditDate],{symptoms:(periodDetails[pdEditDate].symptoms||[]).slice()}):null;
   periodDetails[pdEditDate]={flow:flow,color:color,pain:pain,symptoms:symptoms,note:note};
-  savePeriodDetails();closeSheet('periodDetailSheet');renderAll();showToast('详情已保存 ✓','success');
+  saveJSON(PDETAIL_KEY,periodDetails);
+  try{
+    await syncCalendarState();
+    closeSheet('periodDetailSheet');renderAll();showToast('详情已保存 ✓','success');
+  }catch(error){
+    if(before)periodDetails[pdEditDate]=before;else delete periodDetails[pdEditDate];
+    saveJSON(PDETAIL_KEY,periodDetails);renderAll();showToast('详情保存失败：'+(error.message||'请稍后重试'),'error');
+  }
 }
 
 /* Chip click handlers for period detail */
@@ -1191,11 +1206,19 @@ var calendarSyncTimer=null;
 function calendarStatePayload(){
   return{settings:settings,courses:courseData,events:eventsData,periodDetails:Object.keys(periodDetails).map(function(date){return Object.assign({date:date},periodDetails[date])})};
 }
+function syncCalendarState(){
+  clearTimeout(calendarSyncTimer);
+  return fetch(BASE+'/api/calendar/state',{method:'PUT',headers:H,body:JSON.stringify(calendarStatePayload())})
+    .then(function(response){
+      if(!response.ok)return response.json().catch(function(){return{}}).then(function(data){throw new Error(data.error||'同步失败')});
+      localStorage.setItem(CALENDAR_MIGRATION_KEY,'1');
+      return response.json().catch(function(){return{ok:true}});
+    });
+}
 function queueCalendarSync(){
   clearTimeout(calendarSyncTimer);
   calendarSyncTimer=setTimeout(function(){
-    fetch(BASE+'/api/calendar/state',{method:'PUT',headers:H,body:JSON.stringify(calendarStatePayload())})
-      .then(function(r){if(!r.ok)throw new Error('sync failed');localStorage.setItem(CALENDAR_MIGRATION_KEY,'1')})
+    syncCalendarState()
       .catch(function(e){console.warn('日历同步失败，已保留本地副本',e)});
   },350);
 }
