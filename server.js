@@ -291,12 +291,10 @@ function stickerSeed(value) {
   for (const char of String(value || "")) { seed ^= char.charCodeAt(0); seed = Math.imul(seed, 16777619); }
   return () => { seed += 0x6D2B79F5; let t = seed; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-function weightedStickerSample(items, count, random, favoriteIds, signatureIds) {
+function weightedStickerSample(items, count, random) {
   const pool = [...items];
   const selected = [];
-  const favorites = new Set(favoriteIds || []);
-  const signatures = new Set(signatureIds || []);
-  const score = item => Math.max(1, item.aiWeight || 1) * (signatures.has(item.id) ? 6 : favorites.has(item.id) ? 2 : 1);
+  const score = item => Math.max(1, item.aiWeight || 1);
   while (pool.length && selected.length < count) {
     const total = pool.reduce((sum, item) => sum + score(item), 0);
     let cursor = random() * total;
@@ -318,9 +316,7 @@ async function buildStickerPrompt(role, conversation, history) {
   const perPack = enabledPacks.map(packId => weightedStickerSample(
     library.stickers.filter(item => item.packId === packId),
     config.perPackLimit,
-    random,
-    config.favoriteIds,
-    config.signatureIds
+    random
   )).filter(group => group.length);
   const candidates = [];
   // Round-robin keeps a large "all packs" selection from letting the first

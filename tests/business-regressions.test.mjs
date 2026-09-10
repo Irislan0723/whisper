@@ -92,3 +92,22 @@ test("calendar writes wait for their persistent APIs and surface failures", () =
   assert.match(source, /time:String\(e\.time \?\? e\.timeStart \?\? ""\)\.trim\(\) \|\| null/);
   assert.match(source, /time_end:String\(e\.time_end \?\? e\.timeEnd \?\? ""\)\.trim\(\) \|\| null/);
 });
+
+test("appearance controls do not inherit dark variables from their own data attribute", () => {
+  const style = readFileSync(new URL("../public/style.css", import.meta.url), "utf8");
+  const more = readFileSync(new URL("../public/more.html", import.meta.url), "utf8");
+  assert.equal((style.match(/(^|[^\\w-])\\[data-appearance="dark"\\]/gm) || []).length, 0);
+  assert.equal((more.match(/(^|[^\\w-])\\[data-appearance="dark"\\]/gm) || []).length, 0);
+  assert.match(more, /html\[data-appearance="dark"\] \.appearance-option/);
+});
+
+test("sticker library puts package creation first and exposes long-press package deletion", () => {
+  const stickers = readFileSync(new URL("../public/stickers.html", import.meta.url), "utf8");
+  assert.match(stickers, /toolbar\.prepend\(add\)/);
+  assert.match(stickers, /长按删除此表情包/);
+  assert.match(stickers, /\/api\/chat\/sticker-packs\//);
+  assert.match(stickers, /\.role-preferences,\.sticker-badges\{display:none\}/);
+  assert.match(source, /app\.delete\("\/api\/chat\/sticker-packs\/:id"/);
+  const sample = source.slice(source.indexOf("function weightedStickerSample"), source.indexOf("async function buildStickerPrompt"));
+  assert.doesNotMatch(sample, /favoriteIds|signatureIds|招牌/);
+});

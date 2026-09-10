@@ -20,6 +20,7 @@ body{background:var(--bg);color:var(--text)}
 .pack-toolbar{display:flex;align-items:center;gap:8px;margin:0 -3px 14px;overflow:auto;padding:2px 3px 5px;scrollbar-width:none}.pack-toolbar::-webkit-scrollbar{display:none}.pack-chip{flex:none;min-height:34px;padding:0 13px;border:1px solid var(--border);border-radius:999px;background:var(--bg-card);color:var(--text-mid);font:12px var(--font-cn);white-space:nowrap;cursor:pointer}.pack-chip.active{border-color:var(--accent);background:var(--accent);color:var(--accent-contrast)}.pack-chip.add{display:grid;place-items:center;width:34px;padding:0;border-style:dashed;color:var(--accent);font-size:20px}
 .sticker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.sticker-tile{position:relative;aspect-ratio:1;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--bg-card);box-shadow:var(--shadow-xs);cursor:pointer;-webkit-tap-highlight-color:transparent}.sticker-tile img{display:block;width:100%;height:100%;object-fit:cover}.sticker-tile:active{transform:scale(.97)}.sticker-upload{display:grid;place-items:center;border:1.5px dashed var(--accent-light);background:color-mix(in srgb,var(--bg-card) 74%,var(--accent-pale));color:var(--accent);box-shadow:none}.sticker-upload span{display:grid;place-items:center;width:31px;height:31px;margin:auto;border-radius:50%;background:var(--bg-card);font:300 27px/1 var(--font-en)}.sticker-upload small{position:absolute;bottom:12px;width:100%;color:var(--text-mid);font:11px var(--font-cn);text-align:center}.sticker-more{position:absolute;top:5px;right:5px;width:25px;height:25px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.86);color:var(--text-mid);font-size:17px;line-height:1;cursor:pointer;opacity:0}.sticker-tile:hover .sticker-more,.sticker-tile:focus-within .sticker-more{opacity:1}.sticker-badges{position:absolute;right:5px;bottom:5px;display:flex;gap:3px}.sticker-badge{display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:rgba(74,63,60,.74);color:#fff;font:11px var(--font-cn)}.empty-library{grid-column:1/-1;padding:45px 18px;color:var(--text-light);font:13px var(--font-cn);text-align:center}.empty-library strong{display:block;margin-bottom:6px;color:var(--text-mid);font:400 20px var(--font-d)}
 .sheet{position:fixed;z-index:800;inset:0;display:none;align-items:flex-end;background:rgba(40,33,31,.25);backdrop-filter:blur(5px)}.sheet.open{display:flex}.sheet-panel{width:100%;max-height:min(84dvh,720px);overflow:auto;padding:10px 20px calc(22px + env(safe-area-inset-bottom));border-radius:28px 28px 0 0;background:var(--bg-card);box-shadow:0 -12px 38px rgba(var(--shadow-color),.16)}.sheet-grab{width:42px;height:5px;margin:0 auto 16px;border-radius:99px;background:var(--border)}.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}.sheet-head h2{margin:0;font:400 24px var(--font-d)}.sheet-close{width:32px;height:32px;border:0;border-radius:50%;background:var(--bg-secondary);color:var(--text-mid);font-size:20px;cursor:pointer}.sticker-editor{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start}.sticker-editor-preview{width:96px;height:96px;overflow:hidden;border-radius:16px;background:var(--bg-secondary);border:1px solid var(--border)}.sticker-editor-preview img{width:100%;height:100%;object-fit:cover}.field{margin:0 0 12px}.field label{display:block;margin-bottom:5px;color:var(--text-light);font:12px var(--font-cn)}.field input,.field textarea,.field select{width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font:13px var(--font-cn)}.field textarea{min-height:72px;resize:vertical}.role-preferences{display:grid;gap:8px;margin:16px 0}.role-preferences>span{color:var(--text-light);font:12px var(--font-cn)}.role-preference-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center;padding:8px 9px;border:1px solid var(--border);border-radius:12px;background:var(--bg)}.role-preference-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font:13px var(--font-cn);font-weight:400}.role-preference-row label{display:flex;align-items:center;gap:4px;color:var(--text-mid);font:11px var(--font-cn);white-space:nowrap}.role-preference-row input{accent-color:var(--accent)}.sheet-actions{display:flex;gap:8px;margin-top:16px}.sheet-actions button{flex:1;min-height:43px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-contrast);font:14px var(--font-cn);cursor:pointer}.sheet-actions .delete{background:#fff2f2;color:var(--error);border:1px solid #f2cccc}.sheet-actions button:disabled{opacity:.5}.new-pack{display:grid;gap:10px}.new-pack input{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font:14px var(--font-cn)}.new-pack-actions{display:flex;gap:8px}.new-pack-actions button{flex:1;padding:11px;border:0;border-radius:11px;background:var(--accent);color:var(--accent-contrast);font:13px var(--font-cn)}.new-pack-actions .quiet{background:var(--bg-secondary);color:var(--text-mid)}
+.role-preferences,.sticker-badges{display:none}
 @media(max-width:380px){.stickers-page{padding-inline:14px}.sticker-grid{gap:8px}.sticker-editor{grid-template-columns:78px 1fr}.sticker-editor-preview{width:78px;height:78px}}
 </style>
 </head>
@@ -48,6 +49,40 @@ async function saveEditor(){if(!editing)return;const button=$('saveSticker');but
 async function upload(files){const picked=Array.from(files).slice(0,20);for(const file of picked){if(file.size>5*1024*1024){alert(file.name+' 超过 5MB，已跳过');continue}const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('图片读取失败'));r.readAsDataURL(file)});const saved=await api('/api/chat/stickers',{method:'POST',body:JSON.stringify({dataUrl,name:file.name.replace(/\.[^.]+$/,''),packId:activePack==='all'||activePack==='none'?null:activePack})});library.stickers.push(saved)}render()}
 async function init(){updateTop();try{const [data,roleData]=await Promise.all([api('/api/chat/stickers'),api('/api/chat/roles')]);library=data;roles=roleData.roles||[];render()}catch(error){$('stickerGrid').innerHTML='<div class="empty-library"><strong>暂时无法打开表情包库</strong>'+esc(error.message)+'</div>'}}
 $('stickerFile').onchange=async e=>{try{await upload(e.target.files)}catch(error){alert(error.message)}finally{e.target.value=''}};$('createPack').onclick=async()=>{const name=$('packName').value.trim();if(!name)return $('packName').focus();try{const saved=await api('/api/chat/sticker-packs',{method:'POST',body:JSON.stringify({name})});library.packs.push(saved);activePack=saved.id;closeSheet('packSheet');render()}catch(error){alert(error.message)}};$('saveSticker').onclick=saveEditor;$('deleteSticker').onclick=async()=>{if(!editing||!confirm('删除这张表情包？历史聊天中的图片不会受影响。'))return;try{await api('/api/chat/stickers/'+encodeURIComponent(editing.id),{method:'DELETE'});library.stickers=library.stickers.filter(item=>item.id!==editing.id);closeSheet('editorSheet');render()}catch(error){alert(error.message)}};document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>closeSheet(button.dataset.close));document.querySelectorAll('.sheet').forEach(sheet=>sheet.onclick=e=>{if(e.target===sheet)closeSheet(sheet.id)});init()})();
+</script>
+<script>
+/* Package controls are intentionally outside the editor: the add affordance
+   stays first, and long-press deletes a pack without deleting its stickers. */
+(function(){
+  var toolbar=document.getElementById('packToolbar');
+  if(!toolbar)return;
+  var weightLabel=document.querySelector('label[for="editWeight"]');if(weightLabel)weightLabel.textContent='基础抽取概率';
+  function request(path,options){
+    options=options||{};
+    return fetch(path,{method:options.method||'GET',headers:{'x-api-key':'iris-memory-2024','Content-Type':'application/json'}}).then(function(response){
+      return response.json().catch(function(){return{}}).then(function(data){if(!response.ok)throw new Error(data.error||'操作失败');return data});
+    });
+  }
+  function removePack(id,label){
+    if(!confirm('删除“'+label+'”吗？包内表情会保留，并移到“未分类”。'))return;
+    request('/api/chat/sticker-packs/'+encodeURIComponent(id),{method:'DELETE'}).then(function(){location.reload()}).catch(function(error){alert(error.message)});
+  }
+  function bindPackDelete(button){
+    if(button.dataset.packDeleteBound==='1')return;
+    button.dataset.packDeleteBound='1';button.title='长按删除此表情包';
+    var timer=null,startX=0,startY=0;
+    function cancel(){if(timer){clearTimeout(timer);timer=null}}
+    button.onpointerdown=function(event){if(event.button>0)return;startX=event.clientX;startY=event.clientY;timer=setTimeout(function(){timer=null;removePack(button.dataset.pack,button.textContent.trim())},600)};
+    button.onpointermove=function(event){if(Math.abs(event.clientX-startX)>10||Math.abs(event.clientY-startY)>10)cancel()};
+    button.onpointerup=cancel;button.onpointercancel=cancel;button.onpointerleave=cancel;
+    button.oncontextmenu=function(event){event.preventDefault();removePack(button.dataset.pack,button.textContent.trim())};
+  }
+  function refresh(){
+    var add=document.getElementById('addPack');if(add&&toolbar.firstElementChild!==add)toolbar.prepend(add);
+    toolbar.querySelectorAll('[data-pack]').forEach(function(button){if(button.dataset.pack!=='all'&&button.dataset.pack!=='none')bindPackDelete(button)});
+  }
+  new MutationObserver(refresh).observe(toolbar,{childList:true});refresh();
+})();
 </script>
 </body>
 </html>
