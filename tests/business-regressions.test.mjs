@@ -96,8 +96,8 @@ test("calendar writes wait for their persistent APIs and surface failures", () =
 test("appearance controls do not inherit dark variables from their own data attribute", () => {
   const style = readFileSync(new URL("../public/style.css", import.meta.url), "utf8");
   const more = readFileSync(new URL("../public/more.html", import.meta.url), "utf8");
-  assert.equal((style.match(/(^|[^\\w-])\\[data-appearance="dark"\\]/gm) || []).length, 0);
-  assert.equal((more.match(/(^|[^\\w-])\\[data-appearance="dark"\\]/gm) || []).length, 0);
+  assert.equal((style.match(/(^|[^\w-])\\[data-appearance="dark"\\]/gm) || []).length, 0);
+  assert.equal((more.match(/(^|[^\w-])\\[data-appearance="dark"\\]/gm) || []).length, 0);
   assert.match(more, /html\[data-appearance="dark"\] \.appearance-option/);
 });
 
@@ -110,4 +110,20 @@ test("sticker library puts package creation first and exposes long-press package
   assert.match(source, /app\.delete\("\/api\/chat\/sticker-packs\/:id"/);
   const sample = source.slice(source.indexOf("function weightedStickerSample"), source.indexOf("async function buildStickerPrompt"));
   assert.doesNotMatch(sample, /favoriteIds|signatureIds|招牌/);
+});
+
+test("global music player is opt-in and chat dark mode owns its page surfaces", () => {
+  const init = readFileSync(new URL("../public/init.js", import.meta.url), "utf8");
+  const listening = readFileSync(new URL("../public/listening.html", import.meta.url), "utf8");
+  const app = readFileSync(new URL("../public/app.html", import.meta.url), "utf8");
+  const chat = readFileSync(new URL("../public/chat.html", import.meta.url), "utf8");
+  assert.match(init, /listen_global_player_default_off_v2/);
+  assert.match(init, /enabled=playerFlag==='1'&&localStorage\.getItem\('listen_global_player_hidden'\)!=='1'/);
+  assert.match(listening, /toggle\.checked=localStorage\.getItem\('listen_global_player_enabled'\)==='1'/);
+  assert.match(listening, /listen_global_player_enabled',toggle\.checked\?'1':'0'/);
+  assert.match(app, /listen_global_player_enabled','0'/);
+  assert.equal((chat.match(/(^|[^\w-])\[data-appearance="dark"\]/gm) || []).length, 0);
+  assert.match(chat, /html\[data-appearance="dark"\] \.chat-main\{background:#1E1E1E!important;background-image:none!important\}/);
+  assert.match(chat, /html\[data-appearance="dark"\] \.composer\{background:#181818!important\}/);
+  assert.match(chat, /\.message-group\.user \.avatar\{border:0!important/);
 });

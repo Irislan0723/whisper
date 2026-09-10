@@ -108,7 +108,7 @@
    app shell while the listening document (and its audio element) stays alive. */
 (function(){
   var enabled=false;
-  try { var playerFlag=localStorage.getItem('listen_global_player_enabled'); enabled=playerFlag==='1'||(playerFlag===null&&localStorage.getItem('listen_global_player_hidden')!=='1'); if(enabled&&playerFlag!== '1') localStorage.setItem('listen_global_player_enabled','1'); } catch(e) {}
+  try { var playerFlag=localStorage.getItem('listen_global_player_enabled'); if(localStorage.getItem('listen_global_player_default_off_v2')!=='1'){ localStorage.setItem('listen_global_player_default_off_v2','1'); if(playerFlag==='1'){ localStorage.setItem('listen_global_player_enabled','0'); playerFlag='0'; } } enabled=playerFlag==='1'&&localStorage.getItem('listen_global_player_hidden')!=='1'; } catch(e) {}
   var path=location.pathname||'';
   if(enabled&&window.top===window&&!/\/app\.html$/i.test(path)){
     var view=path.split('/').pop()+(location.search||'')+(location.hash||'');
