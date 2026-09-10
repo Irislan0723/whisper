@@ -287,7 +287,7 @@
     document.body.appendChild(root); return root;
   }
   function showBanner(payload) {
-    if (/\/chat\.html$/i.test(location.pathname)) return;
+    if (inChatRoom()) return;
     var stack = ensureBanner(), url = payload.url || '/chat.html', root = document.createElement('div');
     stack.querySelectorAll('.iris-reply-banner.show').forEach(function(old){ old.classList.remove('show'); old.classList.add('receding'); setTimeout(function(){ old.remove(); }, 300); });
     root.className = 'iris-reply-banner'; root.setAttribute('role','button'); root.tabIndex = 0; root.setAttribute('aria-live','polite');
@@ -313,7 +313,13 @@
   // Chat has already rendered this message, so it must never be replayed as a
   // reminder when the reader goes to another PWA page.
   function markMessageSeen(message){ saveInboxCursor(messageCursor(message)); }
-  function inChatRoom(){ return /\/chat\.html$/i.test(location.pathname); }
+  function inChatRoom(){
+    if (/\/chat\.html$/i.test(location.pathname)) return true;
+    try {
+      var view = document.getElementById('viewFrame');
+      return !!(view && /\/chat\.html$/i.test(view.contentWindow.location.pathname));
+    } catch (error) { return false; }
+  }
   function inboxSchedule(delay){ clearTimeout(inboxTimer); inboxTimer = setTimeout(inboxPoll, delay); }
   function inboxPayloadGroups(messages, mode) {
     if (mode === 'each') return messages.map(function(message){ return [message]; });

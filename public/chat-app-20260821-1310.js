@@ -1584,7 +1584,6 @@ function enhanceChatFixesV21(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhanceChatFixesV21);else enhanceChatFixesV21();
 
 /* V22: restore the last room and keep the chat stable around mobile keyboards. */
-const LAST_OPEN_ROOM_KEY_V22='iris-last-open-room';
 function syncMobileViewportV22(){
   const viewport=window.visualViewport,root=document.documentElement;
   if(!viewport){root.style.setProperty('--chat-vv-top','0px');root.style.setProperty('--chat-keyboard','0px');return}
@@ -1608,7 +1607,6 @@ function injectChatFixesV22Styles(){
 const openConversationV22Base=openConversation;
 openConversation=async function(id){
   await openConversationV22Base(id);
-  if(current?.id)localStorage.setItem(LAST_OPEN_ROOM_KEY_V22,current.id);
   syncMobileViewportV22();
 };
 const sendUserBubbleV22Base=sendUserBubble;
@@ -1622,8 +1620,7 @@ sendUserBubble=async function(){
 const initV22Base=init;
 init=async function(){
   await initV22Base();
-  const lastId=localStorage.getItem(LAST_OPEN_ROOM_KEY_V22);
-  if(lastId&&conversations.some(item=>item.id===lastId&&!item.archived))await openConversation(lastId);
+  syncMobileViewportV22();
 };
 function enhanceChatFixesV22(){
   injectChatFixesV22Styles();syncMobileViewportV22();
@@ -1632,10 +1629,9 @@ function enhanceChatFixesV22(){
   if(!document.documentElement.dataset.chatViewportV22){
     document.documentElement.dataset.chatViewportV22='true';
     window.addEventListener('resize',syncMobileViewportV22);
-    window.addEventListener('pagehide',()=>{if(current?.id)localStorage.setItem(LAST_OPEN_ROOM_KEY_V22,current.id)});
     $('chatInput').addEventListener('focus',scrollLatestForKeyboardV22);
     $('sendBtn').onclick=sendUserBubble;
-    $('newChatBtn').onclick=()=>{localStorage.removeItem(LAST_OPEN_ROOM_KEY_V22);showLanding()};
+    $('newChatBtn').onclick=()=>showLanding();
   }
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhanceChatFixesV22);else enhanceChatFixesV22();
@@ -1900,9 +1896,9 @@ const rawInvitationCardsV33=new Map();
 function rawInvitationFromGroupV33(group){const combined=(group?.messages||[]).map(item=>String(item.content||'')).join('\n');const match=combined.match(/<companion-(invitation|accept|decline)\s+scene=["'](study|vocabulary|exercise|sleep|bath|custom)["']\s*>([\s\S]*?)<\/companion-\1>/i);if(!match)return null;return {clean:`${combined.slice(0,match.index)}${combined.slice(match.index+match[0].length)}`.replace(/\n{3,}/g,'\n\n').trim(),item:{id:'raw-'+String(group.messages?.[0]?.id||''),from:'ta',scene:match[2].toLowerCase(),status:match[1].toLowerCase()==='accept'?'accepted':match[1].toLowerCase()==='decline'?'declined':'pending',message:String(match[3]||'').trim()}}}
 const renderGroupV33Base=renderGroup;
 renderGroup=function(group,role){const raw=group?.role==='claude'&&!(group.messages?.[0]?.companionInvitation)&&rawInvitationFromGroupV33(group);if(!raw)return renderGroupV33Base(group,role);const id=String(group.messages?.[0]?.id||'');rawInvitationCardsV33.set(id,raw.item);const clean=raw.clean?renderGroupV33Base({...group,messages:[{...group.messages[0],content:raw.clean}]},role):'';return clean+'<div class="companion-invitation-row-v32">'+companionInvitationMarkupV32({id,companionInvitation:raw.item})+'</div>'};
-function restoreLastRouteV33(){const requested=new URLSearchParams(location.search).get('conversation');if(requested)return;let route;try{route=JSON.parse(localStorage.getItem('iris-last-route-v33')||'null')}catch{}if(!route)return;let attempts=0;const resume=async()=>{if(++attempts>80)return;if(!conversations.length){setTimeout(resume,150);return}if(route.kind==='companion'&&route.session){location.replace('companion.html?session='+encodeURIComponent(route.session)+'&chat='+encodeURIComponent(route.chat||''));return}if(route.kind==='chat'&&route.conversation&&conversations.some(item=>item.id===route.conversation&&!item.archived)){await openConversation(route.conversation);return}const lastId=localStorage.getItem(LAST_OPEN_ROOM_KEY_V22);if(lastId&&conversations.some(item=>item.id===lastId&&!item.archived))await openConversation(lastId)};resume()}
+function restoreLastRouteV33(){}
 const openConversationV33Base=openConversation;
-openConversation=async function(id){await openConversationV33Base(id);if(current?.id)localStorage.setItem('iris-last-route-v33',JSON.stringify({kind:'chat',conversation:current.id,at:Date.now()}))};
+openConversation=async function(id){await openConversationV33Base(id)};
 document.addEventListener('click',event=>{const button=event.target.closest('[data-companion-invitation-enter],[data-companion-invitation-setup]');if(!button)return;const id=String(button.dataset.companionInvitationEnter||button.dataset.companionInvitationSetup||'');const raw=rawInvitationCardsV33.get(id);if(!raw)return;event.preventDefault();event.stopImmediatePropagation();enterCompanionInvitationV32({companionInvitation:raw})},true);
 restoreLastRouteV33();
 
@@ -1971,8 +1967,6 @@ requestAiReply=async function(){
 };
 function attachReplyV36(){const button=$('askReplyBtn');if(button)button.onclick=requestAiReply}
 function markChatLandingV36(){
-  localStorage.removeItem(LAST_OPEN_ROOM_KEY_V22);
-  localStorage.setItem('iris-last-route-v33',JSON.stringify({kind:'landing',at:Date.now()}));
   showLanding();
 }
 function attachChatLandingV36(){

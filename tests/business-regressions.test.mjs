@@ -127,3 +127,15 @@ test("global music player is opt-in and chat dark mode owns its page surfaces", 
   assert.match(chat, /html\[data-appearance="dark"\] \.composer\{background:#181818!important\}/);
   assert.match(chat, /\.message-group\.user \.avatar\{border:0!important/);
 });
+
+test("chat suppresses in-app banners while visible and does not reopen a room automatically", () => {
+  const init = readFileSync(new URL("../public/init.js", import.meta.url), "utf8");
+  const chatApp = readFileSync(new URL("../public/chat-app-20260821-1310.js", import.meta.url), "utf8");
+  assert.match(init, /function showBanner\(payload\) \{\s*if \(inChatRoom\(\)\) return;/);
+  assert.match(init, /document\.getElementById\('viewFrame'\)/);
+  assert.match(init, /view\.contentWindow\.location\.pathname/);
+  assert.doesNotMatch(chatApp, /LAST_OPEN_ROOM_KEY_V22/);
+  assert.doesNotMatch(chatApp, /if\(lastId&&conversations\.some\(item=>item\.id===lastId/);
+  assert.match(chatApp, /function restoreLastRouteV33\(\)\{\}/);
+  assert.doesNotMatch(chatApp, /location\.replace\('companion\.html\?session='/);
+});
