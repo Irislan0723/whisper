@@ -218,6 +218,7 @@
 .semester-setting{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:10px 12px;background:var(--bg);border-radius:var(--r-sm)}
 .semester-label{font-size:12px;color:var(--text-mid);flex-shrink:0}
 .semester-input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-family:var(--font-cn);font-size:12px;color:var(--text);background:var(--bg-card);outline:none;box-sizing:border-box}
+.course-manage-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:-4px 0 10px}.sheet-btn-quiet{background:var(--bg-secondary);color:var(--text-mid);font-size:12px}.course-help{margin:-2px 0 12px;color:var(--text-light);font-size:12px;line-height:1.55}.period-time-row{display:grid;grid-template-columns:52px 1fr 1fr 32px;gap:6px;align-items:end;margin-bottom:9px}.period-time-row .form-input{padding:8px}.period-time-row button{height:35px;border:0;border-radius:8px;background:var(--accent-pale);color:var(--accent);cursor:pointer}.timetable-image-preview{display:flex;align-items:center;gap:9px;margin:-3px 0 10px;padding:8px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg)}.timetable-image-preview img{width:42px;height:42px;object-fit:cover;border-radius:7px}.timetable-image-preview span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-mid);font-size:12px}.timetable-image-preview button{border:0;background:transparent;color:var(--accent);font:12px var(--font-cn);cursor:pointer}
 
 /* ---- Extra ---- */
 .extra-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-mid);background:var(--bg);padding:5px 10px;border-radius:var(--r-sm);margin-top:6px;line-height:1.5;white-space:pre-wrap}
@@ -338,6 +339,7 @@
 
 <div class="sheet-overlay" id="courseSheet"><div class="sheet-card"><div class="sheet-handle"></div>
   <div class="sheet-title-row"><span class="sheet-title" id="courseSheetTitle">添加课程</span><button class="sheet-close" onclick="closeSheet('courseSheet')">✕</button></div>
+  <div class="form-row"><label class="form-label">所属学期</label><input class="form-input" id="cTerm" placeholder="例：2026-2027-1"></div>
   <div class="form-row"><label class="form-label">课程名称</label><input class="form-input" id="cName" placeholder="例：数据新闻与信息可视化"></div>
   <div class="form-row-inline">
     <div class="form-row"><label class="form-label">星期</label><select class="form-select" id="cDay"><option value="1">星期一</option><option value="2">星期二</option><option value="3">星期三</option><option value="4">星期四</option><option value="5">星期五</option><option value="6">星期六</option><option value="7">星期日</option></select></div>
@@ -347,8 +349,11 @@
     <div class="form-row"><label class="form-label">周数起</label><input class="form-input" id="cWeekStart" type="number" min="1" placeholder="1"></div>
     <div class="form-row"><label class="form-label">周数止</label><input class="form-input" id="cWeekEnd" type="number" min="1" placeholder="16"></div>
   </div>
+  <div class="form-row"><label class="form-label">周类型</label><select class="form-select" id="cWeekType"><option value="all">每周</option><option value="odd">单周</option><option value="even">双周</option><option value="list">指定周</option></select></div>
+  <div class="form-row" id="cWeeksRow" hidden><label class="form-label">指定周</label><input class="form-input" id="cWeeks" placeholder="例：1,2,4,7,9-12"></div>
   <div class="form-row"><label class="form-label">教室/地点</label><input class="form-input" id="cLocation" placeholder="例：文渊楼411"></div>
   <div class="form-row"><label class="form-label">教师</label><input class="form-input" id="cTeacher" placeholder="选填"></div>
+  <div class="form-row"><label class="form-label">备注</label><input class="form-input" id="cNote" placeholder="选填"></div>
   <input type="hidden" id="cEditId">
   <button class="sheet-btn sheet-btn-primary" id="courseSave" style="margin-top:4px">保存课程</button>
   <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('courseSheet')">取消</button>
@@ -356,10 +361,33 @@
 
 <div class="sheet-overlay" id="courseListSheet"><div class="sheet-card"><div class="sheet-handle"></div>
   <div class="sheet-title-row"><span class="sheet-title">我的课表</span><button class="sheet-close" onclick="closeSheet('courseListSheet')">✕</button></div>
+  <div class="semester-setting"><span class="semester-label">学期名称</span><input class="semester-input" id="semesterTerm" placeholder="2026-2027-1"></div>
   <div class="semester-setting"><span class="semester-label">学期开始</span><input class="semester-input" id="semesterStart" type="date"></div>
+  <div class="semester-setting"><span class="semester-label">总周数</span><input class="semester-input" id="semesterWeeks" type="number" min="1" max="60"></div>
+  <div class="course-manage-actions"><button class="sheet-btn sheet-btn-quiet" id="periodTimesOpen">节次时间</button><button class="sheet-btn sheet-btn-quiet" id="timetableImportOpen">导入课表</button></div>
   <div id="courseListBody"></div>
   <button class="sheet-btn sheet-btn-primary" onclick="openCourseEditor()" style="margin-top:10px">+ 添加课程</button>
   <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('courseListSheet')">关闭</button>
+</div></div>
+
+<div class="sheet-overlay" id="periodTimesSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title">节次时间设置</span><button class="sheet-close" onclick="closeSheet('periodTimesSheet')">✕</button></div>
+  <p class="course-help">课程只保存第几节；这里统一设置对应的上、下课时间。</p>
+  <div id="periodTimesBody"></div>
+  <button class="sheet-btn sheet-btn-quiet" id="periodTimeAdd">+ 添加时段</button>
+  <button class="sheet-btn sheet-btn-primary" id="periodTimesSave">保存节次时间</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('periodTimesSheet')">取消</button>
+</div></div>
+
+<div class="sheet-overlay" id="timetableImportSheet"><div class="sheet-card"><div class="sheet-handle"></div>
+  <div class="sheet-title-row"><span class="sheet-title">导入课表</span><button class="sheet-close" onclick="closeSheet('timetableImportSheet')">✕</button></div>
+  <p class="course-help">可粘贴 JSON，或每行使用：课程名 | 周三 | 9-10节 | 1-16周 单周 | 地点 | 教师 | 备注</p>
+  <textarea class="record-note" id="timetableImportText" rows="7" placeholder="短视频与微电影创作 | 周一 | 3-4节 | 1-16周 | 文浚楼439 | 胡蓉"></textarea>
+  <input id="timetableImageInput" type="file" accept="image/*" hidden>
+  <div class="timetable-image-preview" id="timetableImagePreview" hidden><img id="timetableImageThumb" alt="待导入课表图片"><span id="timetableImageName"></span><button type="button" id="timetableImageRemove">移除</button></div>
+  <button class="sheet-btn sheet-btn-quiet" id="timetableImagePick">上传课表图片，让 Rei 导入</button>
+  <button class="sheet-btn sheet-btn-primary" id="timetableImportSave">导入粘贴课表</button>
+  <button class="sheet-btn sheet-btn-ghost" onclick="closeSheet('timetableImportSheet')">取消</button>
 </div></div>
 
 <div class="sheet-overlay" id="eventSheet"><div class="sheet-card"><div class="sheet-handle"></div>
@@ -465,7 +493,7 @@ var ANN_MONTH=2,ANN_DAY=14;
 var now=new Date(),TY=now.getFullYear(),TM=now.getMonth(),TD=now.getDate();
 var curYear=TY,curMonth=TM,curTab='mood',selDay=0,selMood='',selWho='iris';
 var records=[],settings=loadJSON(SETTINGS_KEY)||{cycle_length:28,period_length:5};
-var courseData=loadJSON(COURSE_KEY)||{semester_start:'2026-09-07',courses:[]};
+var courseData=loadJSON(COURSE_KEY)||{term:'',semester_start:'2026-09-07',totalWeeks:16,periodTimes:[],courses:[]};
 var eventsData=loadJSON(EVENTS_KEY)||[];
 var periodDetails=loadJSON(PDETAIL_KEY)||{};
 var pickerYear=TY,editCycle=28,editPeriod=5;
@@ -611,19 +639,31 @@ function getSemesterWeek(dateStr){
   var diff=Math.floor((d-ss)/864e5);
   return diff>=0?Math.floor(diff/7)+1:-1;
 }
+function courseOccursInWeek(c,week){
+  if(week<c.weekStart||week>c.weekEnd)return false;
+  if(c.weekType==='odd')return week%2===1;
+  if(c.weekType==='even')return week%2===0;
+  if(c.weekType==='list')return Array.isArray(c.weeks)&&c.weeks.indexOf(week)>=0;
+  return true;
+}
 function getCoursesForDate(dateStr){
   var d=new Date(dateStr+'T00:00:00');
   var dow=d.getDay();dow=dow===0?7:dow;
   var week=getSemesterWeek(dateStr);
   if(week<1)return[];
-  return courseData.courses.filter(function(c){
-    return c.day===dow&&week>=c.weekStart&&week<=c.weekEnd;
-  });
+  return courseData.courses.filter(function(c){return (!courseData.term||!c.term||c.term===courseData.term)&&c.day===dow&&courseOccursInWeek(c,week)});
 }
 function saveCourses(){saveJSON(COURSE_KEY,courseData);queueCalendarSync()}
+function parseWeeksInput(value){
+  var result={};String(value||'').split(/[，,\s]+/).forEach(function(part){var m=part.match(/^(\d+)\s*[-~—至]\s*(\d+)$/);if(m){for(var w=parseInt(m[1]);w<=parseInt(m[2])&&w<=60;w++)if(w>=1)result[w]=1}else if(/^\d+$/.test(part)&&parseInt(part)>=1&&parseInt(part)<=60)result[parseInt(part)]=1});return Object.keys(result).map(Number).sort(function(a,b){return a-b})
+}
+function weeksLabel(c){var labels={all:'每周',odd:'单周',even:'双周',list:'指定周'};return labels[c.weekType||'all']+(c.weekType==='list'?' '+(c.weeks||[]).join(','):'')}
+function normalizeCourseForUi(c){return Object.assign({},c,{name:c.name||c.courseName||'',day:Number(c.day||c.weekday||1),startP:Number(c.startP||c.periodStart||1),endP:Number(c.endP||c.periodEnd||1),weekStart:Number(c.weekStart||1),weekEnd:Number(c.weekEnd||16),weekType:c.weekType||'all',weeks:Array.isArray(c.weeks)?c.weeks:[],term:c.term||'',note:c.note||''})}
+function loadTimetable(){return fetch(BASE+'/api/timetable',{headers:H}).then(function(r){if(!r.ok)throw new Error('课表读取失败');return r.json()}).then(function(data){var s=data.settings||{};courseData={term:s.term||'',semester_start:s.semesterStart||'',totalWeeks:s.totalWeeks||16,periodTimes:s.periodTimes||[],courses:(data.courses||[]).map(normalizeCourseForUi)};saveJSON(COURSE_KEY,courseData);return courseData})}
 function openCourseForm(editId){
-  var c=editId?courseData.courses.find(function(x){return x.id===editId}):null;
+  var c=editId?courseData.courses.find(function(x){return x.id===editId}):null;c=c&&normalizeCourseForUi(c);
   $('courseSheetTitle').textContent=c?'编辑课程':'添加课程';
+  $('cTerm').value=c?c.term:(courseData.term||'');
   $('cName').value=c?c.name:'';
   $('cDay').value=c?c.day:1;
   $('cStart').value=c?c.startP:'';
@@ -632,42 +672,50 @@ function openCourseForm(editId){
   $('cWeekEnd').value=c?c.weekEnd:'';
   $('cLocation').value=c?c.location:'';
   $('cTeacher').value=c?c.teacher:'';
+  $('cWeekType').value=c?c.weekType:'all';
+  $('cWeeks').value=c&&c.weeks.length?c.weeks.join(','):'';
+  $('cWeeksRow').hidden=$('cWeekType').value!=='list';
+  $('cNote').value=c?c.note:'';
   $('cEditId').value=editId||'';
   closeSheet('courseListSheet');
   openSheet('courseSheet');
 }
-function saveCourseForm(){
+async function saveCourseForm(){
   var name=$('cName').value.trim();if(!name){showToast('请填写课程名称');return}
   var day=parseInt($('cDay').value),sp=parseInt($('cStart').value)||1,ep=parseInt($('cEnd').value)||sp;
   var ws=parseInt($('cWeekStart').value)||1,we=parseInt($('cWeekEnd').value)||16;
-  var loc=$('cLocation').value.trim(),teacher=$('cTeacher').value.trim();
+  var loc=$('cLocation').value.trim(),teacher=$('cTeacher').value.trim(),term=$('cTerm').value.trim(),weekType=$('cWeekType').value,weeks=parseWeeksInput($('cWeeks').value),note=$('cNote').value.trim();
+  if(we<ws){showToast('周数止不能小于周数起');return}if(ep<sp){showToast('结束节次不能小于起始节次');return}if(weekType==='list'&&!weeks.length){showToast('请填写指定周');return}
   var editId=$('cEditId').value;
-  if(editId){
-    var c=courseData.courses.find(function(x){return x.id===editId});
-    if(c){c.name=name;c.day=day;c.startP=sp;c.endP=ep;c.weekStart=ws;c.weekEnd=we;c.location=loc;c.teacher=teacher}
-  }else{
-    courseData.courses.push({id:'c'+Date.now(),name:name,day:day,startP:sp,endP:ep,weekStart:ws,weekEnd:we,location:loc,teacher:teacher,color:courseData.courses.length%COURSE_COLORS.length});
-  }
-  saveCourses();closeSheet('courseSheet');renderAll();showToast('课程已保存 ✓','success');
+  var body={courseName:name,term:term,weekday:day,periodStart:sp,periodEnd:ep,weekStart:ws,weekEnd:we,weekType:weekType,weeks:weeks,location:loc,teacher:teacher,note:note,color:editId?(courseData.courses.find(function(x){return x.id===editId})||{}).color:courseData.courses.length%COURSE_COLORS.length};
+  try{var r=await fetch(BASE+'/api/timetable/courses'+(editId?'/'+encodeURIComponent(editId):''),{method:editId?'PUT':'POST',headers:H,body:JSON.stringify(body)});if(!r.ok){var d=await r.json().catch(function(){return{}});throw new Error(d.error||'保存失败')}var saved=normalizeCourseForUi(await r.json());if(editId){var i=courseData.courses.findIndex(function(c){return c.id===editId});if(i>=0)courseData.courses[i]=saved}else courseData.courses.push(saved);saveJSON(COURSE_KEY,courseData);closeSheet('courseSheet');renderAll();showToast('课程已保存 ✓','success')}catch(e){showToast('课程保存失败：'+e.message,'error')}
 }
-function deleteCourse(id){
-  courseData.courses=courseData.courses.filter(function(c){return c.id!==id});
-  saveCourses();renderCourseList();renderAll();showToast('已删除');
+async function deleteCourse(id){
+  if(!confirm('删除这门课程？'))return;var before=courseData.courses.slice();courseData.courses=courseData.courses.filter(function(c){return c.id!==id});saveJSON(COURSE_KEY,courseData);renderCourseList();renderAll();
+  try{var r=await fetch(BASE+'/api/timetable/courses/'+encodeURIComponent(id),{method:'DELETE',headers:H});if(!r.ok){var d=await r.json().catch(function(){return{}});throw new Error(d.error||'删除失败')}showToast('课程已删除','success')}catch(e){courseData.courses=before;saveJSON(COURSE_KEY,courseData);renderCourseList();renderAll();showToast('课程删除失败：'+e.message,'error')}
 }
 window.deleteCourse=deleteCourse;
 function renderCourseList(){
-  $('semesterStart').value=courseData.semester_start;
+  $('semesterTerm').value=courseData.term||'';$('semesterStart').value=courseData.semester_start;$('semesterWeeks').value=courseData.totalWeeks||16;
   var body=$('courseListBody');
-  if(courseData.courses.length===0){body.innerHTML='<div class="schedule-empty">还没有添加课程</div>';return}
+  var visibleCourses=courseData.courses.filter(function(c){return !courseData.term||!c.term||c.term===courseData.term});
+  if(visibleCourses.length===0){body.innerHTML='<div class="schedule-empty">当前学期还没有添加课程</div>';return}
   var dayNames=['','周一','周二','周三','周四','周五','周六','周日'];
-  body.innerHTML=courseData.courses.map(function(c){
+  body.innerHTML=visibleCourses.map(function(c){
     return '<div class="course-list-item">'+
       '<div class="course-list-color" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'+
       '<div class="course-list-info"><div class="course-list-name">'+escHtml(c.name)+'</div>'+
-      '<div class="course-list-detail">'+dayNames[c.day]+' 第'+c.startP+'-'+c.endP+'节 · '+c.weekStart+'-'+c.weekEnd+'周'+(c.location?' · '+escHtml(c.location):'')+'</div></div>'+
+      '<div class="course-list-detail">'+dayNames[c.day]+' 第'+c.startP+'-'+c.endP+'节 · '+c.weekStart+'-'+c.weekEnd+'周 · '+weeksLabel(c)+(c.location?' · '+escHtml(c.location):'')+'</div></div>'+
       '<button class="course-list-del" onclick="deleteCourse(\''+c.id+'\')">删除</button></div>';
   }).join('');
 }
+function renderPeriodTimes(){var times=courseData.periodTimes&&courseData.periodTimes.length?courseData.periodTimes:[{periodStart:1,periodEnd:2,startTime:'08:20',endTime:'09:50'}];$('periodTimesBody').innerHTML=times.map(function(item,i){return'<div class="period-time-row"><input class="form-input" data-pt-start value="'+item.periodStart+'" type="number" min="1" title="开始节次"><input class="form-input" data-pt-end value="'+item.periodEnd+'" type="number" min="1" title="结束节次"><input class="form-input" data-pt-time value="'+item.startTime+'-'+item.endTime+'" placeholder="08:20-09:50"><button type="button" data-pt-remove="'+i+'">×</button></div>'}).join('');$('periodTimesBody').querySelectorAll('[data-pt-remove]').forEach(function(btn){btn.onclick=function(){times.splice(Number(btn.dataset.ptRemove),1);courseData.periodTimes=times;renderPeriodTimes()}})}
+function openPeriodTimes(){renderPeriodTimes();openSheet('periodTimesSheet')}
+async function savePeriodTimes(){var rows=[];var valid=true;$('periodTimesBody').querySelectorAll('.period-time-row').forEach(function(row){var pair=row.querySelector('[data-pt-time]').value.split('-');var item={periodStart:parseInt(row.querySelector('[data-pt-start]').value),periodEnd:parseInt(row.querySelector('[data-pt-end]').value),startTime:(pair[0]||'').trim(),endTime:(pair[1]||'').trim()};if(!item.periodStart||!item.periodEnd||!/^\d{2}:\d{2}$/.test(item.startTime)||!/^\d{2}:\d{2}$/.test(item.endTime))valid=false;rows.push(item)});if(!valid||!rows.length){showToast('请填写有效节次和时间，例如 08:20-09:50');return}try{var r=await fetch(BASE+'/api/timetable/settings',{method:'PUT',headers:H,body:JSON.stringify({term:courseData.term,semesterStart:courseData.semester_start,totalWeeks:courseData.totalWeeks,periodTimes:rows})});if(!r.ok){var d=await r.json().catch(function(){return{}});throw new Error(d.error||'保存失败')}var s=await r.json();courseData.periodTimes=s.periodTimes;saveJSON(COURSE_KEY,courseData);closeSheet('periodTimesSheet');showToast('节次时间已保存 ✓','success')}catch(e){showToast('节次时间保存失败：'+e.message,'error')}}
+async function saveSemesterSettings(){try{var r=await fetch(BASE+'/api/timetable/settings',{method:'PUT',headers:H,body:JSON.stringify({term:$('semesterTerm').value.trim(),semesterStart:$('semesterStart').value,totalWeeks:parseInt($('semesterWeeks').value)||16,periodTimes:courseData.periodTimes||[]})});if(!r.ok){var d=await r.json().catch(function(){return{}});throw new Error(d.error||'保存失败')}var s=await r.json();courseData.term=s.term;courseData.semester_start=s.semesterStart;courseData.totalWeeks=s.totalWeeks;courseData.periodTimes=s.periodTimes;saveJSON(COURSE_KEY,courseData);renderAll();showToast('学期设置已保存 ✓','success')}catch(e){showToast('学期设置保存失败：'+e.message,'error')}}
+function openTimetableImport(){$('timetableImportText').value='';clearTimetableImage();openSheet('timetableImportSheet')}
+async function importTimetableText(){var text=$('timetableImportText').value.trim();if(!text){showToast('请粘贴课表文本');return}try{var r=await fetch(BASE+'/api/timetable/import',{method:'POST',headers:H,body:JSON.stringify({term:courseData.term,termStartDate:courseData.semester_start,totalWeeks:courseData.totalWeeks,text:text})});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error((d.failedCourses&&d.failedCourses[0]&&d.failedCourses[0].error)||d.error||'导入失败');await loadTimetable();closeSheet('timetableImportSheet');renderAll();showToast('已导入 '+d.importedCount+' 门课程'+(d.skippedCount?'，跳过 '+d.skippedCount+' 门重复课程':'') ,'success')}catch(e){showToast('课表导入失败：'+e.message,'error')}}
+var timetableImageData='';function clearTimetableImage(){timetableImageData='';$('timetableImageInput').value='';$('timetableImagePreview').hidden=true}$('timetableImagePick').addEventListener('click',function(){$('timetableImageInput').click()});$('timetableImageRemove').addEventListener('click',clearTimetableImage);$('timetableImageInput').addEventListener('change',function(e){var file=e.target.files&&e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(){timetableImageData=reader.result;$('timetableImageThumb').src=timetableImageData;$('timetableImageName').textContent=file.name;$('timetableImagePreview').hidden=false;localStorage.setItem('iris_timetable_import_draft_v1',JSON.stringify({image:timetableImageData,name:file.name,text:'请识别这张课表截图。若课程名称、单双周、周数、地点或教师有不确定之处先问我；确认后请一次调用 import_timetable 导入整张课表，不要创建普通日程。'}));location.href='chat.html'};reader.readAsDataURL(file)});
 
 /* ===== Custom Events ===== */
 function saveEvents(){saveJSON(EVENTS_KEY,eventsData);queueCalendarSync()}
@@ -1235,7 +1283,13 @@ $('settingsSave').addEventListener('click',saveSettingsAction);
 $('settingsSave').addEventListener('click',function(){queueCalendarSync()});
 $('courseSave').addEventListener('click',saveCourseForm);
 $('eventSave').addEventListener('click',saveEventForm);
-$('semesterStart').addEventListener('change',function(){courseData.semester_start=this.value;saveCourses();renderAll()});
+$('cWeekType').addEventListener('change',function(){$('cWeeksRow').hidden=this.value!=='list'});
+['semesterTerm','semesterStart','semesterWeeks'].forEach(function(id){$(id).addEventListener('change',saveSemesterSettings)});
+$('periodTimesOpen').addEventListener('click',openPeriodTimes);
+$('timetableImportOpen').addEventListener('click',openTimetableImport);
+$('periodTimeAdd').addEventListener('click',function(){(courseData.periodTimes||(courseData.periodTimes=[])).push({periodStart:1,periodEnd:2,startTime:'08:20',endTime:'09:50'});renderPeriodTimes()});
+$('periodTimesSave').addEventListener('click',savePeriodTimes);
+$('timetableImportSave').addEventListener('click',importTimetableText);
 
 /* ===== Load Data ===== */
 var calendarSyncTimer=null;
@@ -1261,7 +1315,7 @@ function queueCalendarSync(){
 function applyRemoteCalendarState(state){
   if(!state)return;
   if(state.settings){settings={cycle_length:state.settings.cycle_length||28,period_length:state.settings.period_length||5};saveJSON(SETTINGS_KEY,settings)}
-  if(state.courses){courseData={semester_start:state.courses.semester_start||'',courses:Array.isArray(state.courses.courses)?state.courses.courses:[]};saveJSON(COURSE_KEY,courseData)}
+  if(state.courses){courseData={term:state.courses.term||'',semester_start:state.courses.semesterStart||state.courses.semester_start||'',totalWeeks:state.courses.totalWeeks||16,periodTimes:state.courses.periodTimes||[],courses:Array.isArray(state.courses.courses)?state.courses.courses.map(normalizeCourseForUi):[]};saveJSON(COURSE_KEY,courseData)}
   if(Array.isArray(state.events)){eventsData=state.events;saveJSON(EVENTS_KEY,eventsData)}
   if(Array.isArray(state.periodDetails)){periodDetails={};state.periodDetails.forEach(function(item){if(item&&item.date){var copy=Object.assign({},item);delete copy.date;periodDetails[item.date]=copy}});saveJSON(PDETAIL_KEY,periodDetails)}
 }

@@ -363,8 +363,109 @@ function letterFromDb(r) { return { id:r.id, from:r.from_person, to:r.to_person,
 function letterToDbRow(l) { return { id:l.id, from_person:l.from, to_person:l.to, content:l.content || "", mood_tag:l.moodTag || "happy", unlock_at:l.unlockAt || null, password_hash:l.password || null, hide_until_unlock:!!l.hideUntilUnlock, allow_reply:l.allowReply !== false, is_unlocked:!!l.isUnlocked, reply:l.reply || null, created_at:l.createdAt, updated_at:l.updatedAt }; }
 function eventFromDb(r) { return { ...r, name:r.title, timeStart:r.time || "", timeEnd:r.time_end || "", location:r.location || "", createdAt:r.created_at, updatedAt:r.updated_at }; }
 function eventToDbRow(e) { return { id:e.id, title:e.title || e.name || "", date:e.date, time:String(e.time ?? e.timeStart ?? "").trim() || null, time_end:String(e.time_end ?? e.timeEnd ?? "").trim() || null, location:e.location || "", note:e.note || "", type:e.type || "other", color:Number.isFinite(Number(e.color)) ? Number(e.color) : null, source:e.source || "calendar", created_at:e.createdAt || e.created_at || new Date().toISOString(), updated_at:e.updatedAt || e.updated_at || new Date().toISOString() }; }
-function courseFromDb(r) { return { id:r.id, name:r.name || "", day:r.day, startP:r.start_period, endP:r.end_period, weekStart:r.week_start, weekEnd:r.week_end, location:r.location || "", teacher:r.teacher || "", color:r.color ?? 0 }; }
-function courseToDbRow(c) { return { id:String(c.id || generateId()), name:String(c.name || ""), day:Number(c.day || 1), start_period:Number(c.startP || c.start_period || 1), end_period:Number(c.endP || c.end_period || 1), week_start:Number(c.weekStart || c.week_start || 1), week_end:Number(c.weekEnd || c.week_end || 16), location:String(c.location || ""), teacher:String(c.teacher || ""), color:Number.isFinite(Number(c.color)) ? Number(c.color) : null, updated_at:new Date().toISOString() }; }
+const TIMETABLE_WEEK_TYPES = new Set(["all", "odd", "even", "list"]);
+const DEFAULT_PERIOD_TIMES = Object.freeze([
+  { periodStart:1, periodEnd:2, startTime:"08:20", endTime:"09:50" },
+  { periodStart:3, periodEnd:4, startTime:"10:10", endTime:"11:45" },
+  { periodStart:5, periodEnd:6, startTime:"14:00", endTime:"15:30" },
+  { periodStart:7, periodEnd:8, startTime:"15:50", endTime:"17:20" },
+  { periodStart:9, periodEnd:10, startTime:"19:00", endTime:"20:30" }
+]);
+function normalizeWeekList(value) {
+  const values = ensureArray(value).map(Number).filter(Number.isInteger).filter(number => number >= 1 && number <= 60);
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+function courseFromDb(r) {
+  const weekType = TIMETABLE_WEEK_TYPES.has(r.week_type) ? r.week_type : "all";
+  const courseName = r.name || "";
+  const weekday = Number(r.day || 1);
+  const periodStart = Number(r.start_period || 1);
+  const periodEnd = Number(r.end_period || periodStart);
+  const weekStart = Number(r.week_start || 1);
+  const weekEnd = Number(r.week_end || 16);
+  return {
+    id:r.id, term:r.term || "", courseName, weekday, periodStart, periodEnd, weekStart, weekEnd,
+    weekType, weeks:weekType === "list" ? normalizeWeekList(r.weeks) : [],
+    location:r.location || "", teacher:r.teacher || "", note:r.note || "", color:r.color ?? 0,
+    createdAt:r.created_at || null, updatedAt:r.updated_at || null,
+    // Legacy calendar.html aliases. Keep these until all old local data has migrated.
+    name:courseName, day:weekday, startP:periodStart, endP:periodEnd
+  };
+}
+function timetableCourseError(course) {
+  const name = String(course?.courseName ?? course?.name ?? "").trim();
+  const weekday = Number(course?.weekday ?? course?.day);
+  const periodStart = Number(course?.periodStart ?? course?.startP ?? course?.start_period);
+  const periodEnd = Number(course?.periodEnd ?? course?.endP ?? course?.end_period);
+  const weekStart = Number(course?.weekStart ?? course?.week_start ?? 1);
+  const weekEnd = Number(course?.weekEnd ?? course?.week_end ?? 16);
+  const weekType = String(course?.weekType ?? course?.week_type ?? "all");
+  const weeks = normalizeWeekList(course?.weeks);
+  if (!name) return "课程名称不能为空";
+  if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return "星期必须是 1-7";
+  if (!Number.isInteger(periodStart) || !Number.isInteger(periodEnd) || periodStart < 1 || periodEnd < periodStart || periodEnd > 30) return "节次范围无效";
+  if (!Number.isInteger(weekStart) || !Number.isInteger(weekEnd) || weekStart < 1 || weekEnd < weekStart || weekEnd > 60) return "教学周范围无效";
+  if (!TIMETABLE_WEEK_TYPES.has(weekType)) return "周类型必须为 all、odd、even 或 list";
+  if (weekType === "list" && !weeks.length) return "指定周课程至少需要一个周数";
+  if (weeks.some(week => week < weekStart || week > weekEnd)) return "指定周必须处于起止周范围内";
+  return "";
+}
+function normalizeTimetableCourse(course, fallback = {}) {
+  const error = timetableCourseError(course);
+  if (error) throw new Error(error);
+  const weekType = String(course.weekType ?? course.week_type ?? "all");
+  const periodStart = Number(course.periodStart ?? course.startP ?? course.start_period);
+  const periodEnd = Number(course.periodEnd ?? course.endP ?? course.end_period);
+  return {
+    id:String(course.id || fallback.id || generateId()),
+    term:String(course.term ?? fallback.term ?? "").trim().slice(0,80),
+    courseName:String(course.courseName ?? course.name).trim().slice(0,160),
+    weekday:Number(course.weekday ?? course.day), periodStart, periodEnd,
+    weekStart:Number(course.weekStart ?? course.week_start ?? 1), weekEnd:Number(course.weekEnd ?? course.week_end ?? 16),
+    weekType, weeks:weekType === "list" ? normalizeWeekList(course.weeks) : [],
+    location:String(course.location || "").trim().slice(0,160), teacher:String(course.teacher || "").trim().slice(0,100),
+    note:String(course.note || "").trim().slice(0,1200), color:Number.isFinite(Number(course.color)) ? Number(course.color) : (fallback.color ?? null),
+    createdAt:course.createdAt || fallback.createdAt || null
+  };
+}
+function courseToDbRow(c, fallback = {}) {
+  const course = normalizeTimetableCourse(c, fallback);
+  return {
+    id:course.id, term:course.term, name:course.courseName, day:course.weekday,
+    start_period:course.periodStart, end_period:course.periodEnd, week_start:course.weekStart, week_end:course.weekEnd,
+    week_type:course.weekType, weeks:course.weeks, location:course.location, teacher:course.teacher, note:course.note,
+    color:course.color, ...(course.createdAt ? { created_at:course.createdAt } : {}), updated_at:new Date().toISOString()
+  };
+}
+function normalizePeriodTimes(value) {
+  const source = ensureArray(value);
+  const result = source.map((item, index) => ({
+    periodStart:Number(item?.periodStart ?? item?.start), periodEnd:Number(item?.periodEnd ?? item?.end),
+    startTime:String(item?.startTime || "").trim(), endTime:String(item?.endTime || "").trim(), index
+  })).filter(item => Number.isInteger(item.periodStart) && Number.isInteger(item.periodEnd) && item.periodStart >= 1 && item.periodEnd >= item.periodStart && item.periodEnd <= 30 && /^\d{2}:\d{2}$/.test(item.startTime) && /^\d{2}:\d{2}$/.test(item.endTime) && item.startTime < item.endTime)
+    .sort((a, b) => a.periodStart - b.periodStart || a.periodEnd - b.periodEnd);
+  if (result.length !== source.length) throw new Error("节次时间格式无效，请使用 08:20 这样的时间");
+  if (result.some((item, index) => index && item.periodStart <= result[index - 1].periodEnd)) throw new Error("节次时间不能重叠");
+  return result.map(({ index, ...item }) => item);
+}
+function timetableSettingsFromMeta(value = {}) {
+  const term = String(value.term || "").trim().slice(0,80);
+  const semesterStart = /^\d{4}-\d{2}-\d{2}$/.test(String(value.semester_start || "")) ? String(value.semester_start) : "";
+  const totalWeeks = Math.max(1, Math.min(60, Math.round(Number(value.total_weeks || 16)) || 16));
+  let periodTimes = DEFAULT_PERIOD_TIMES.map(item => ({ ...item }));
+  try { if (Array.isArray(value.period_times) && value.period_times.length) periodTimes = normalizePeriodTimes(value.period_times); } catch (_) {}
+  return { term, semesterStart, totalWeeks, periodTimes };
+}
+function timetableCourseSignature(course) {
+  return [course.term || "", course.courseName.trim().toLowerCase(), course.weekday, course.periodStart, course.periodEnd, course.weekStart, course.weekEnd, course.weekType, normalizeWeekList(course.weeks).join(","), course.location.trim().toLowerCase(), course.teacher.trim().toLowerCase()].join("|");
+}
+function courseOccursInTeachingWeek(course, week) {
+  if (!Number.isInteger(week) || week < course.weekStart || week > course.weekEnd) return false;
+  if (course.weekType === "odd") return week % 2 === 1;
+  if (course.weekType === "even") return week % 2 === 0;
+  if (course.weekType === "list") return normalizeWeekList(course.weeks).includes(week);
+  return true;
+}
 function periodDetailFromDb(r) { return { date:r.date, flow:r.flow || "", color:r.color || "", pain:r.pain ?? "", symptoms:ensureArray(r.symptoms), note:r.note || "" }; }
 function periodDetailToDbRow(d) { return { date:d.date, flow:d.flow || null, color:d.color || null, pain:d.pain === "" || d.pain === undefined ? null : Number(d.pain), symptoms:ensureArray(d.symptoms), note:d.note || "", updated_at:new Date().toISOString() }; }
 function momentFromDb(r) { return { id:r.id, author:r.author, text:r.text || "", images:ensureArray(r.images), location:r.location || "", createdAt:r.created_at, publishAt:r.publish_at, isPrivate:!!r.is_private, pinned:!!r.pinned, likes:ensureArray(r.likes), comments:ensureArray(r.comments), updatedAt:r.updated_at }; }
@@ -1007,6 +1108,43 @@ function createMcpServer() {
     }
   );
 
+  server.tool(
+    "read_timetable",
+    "Read the current structured timetable. This is separate from ordinary calendar events.",
+    { term: z.string().optional() },
+    async ({ term }) => {
+      try { return { content:[{ type:"text", text:JSON.stringify(await executeChatTool("read_timetable", { term }), null, 2) }] }; }
+      catch (e) { return { content:[{ type:"text", text:"Error: " + e.message }] }; }
+    }
+  );
+  server.tool(
+    "import_timetable",
+    "Import multiple structured courses in one operation. Do not turn recurring courses into ordinary calendar events. Ask for clarification instead of guessing missing week rules, locations, or teachers.",
+    { term:z.string().optional(), termStartDate:z.string().optional(), totalWeeks:z.number().optional(), courses:z.array(z.object({ courseName:z.string(), weekday:z.number(), periodStart:z.number(), periodEnd:z.number(), weekStart:z.number().optional(), weekEnd:z.number().optional(), weekType:z.enum(["all","odd","even","list"]).optional(), weeks:z.array(z.number()).optional(), location:z.string().optional(), teacher:z.string().optional(), note:z.string().optional() })) },
+    async (args) => {
+      try { return { content:[{ type:"text", text:JSON.stringify(await executeChatTool("import_timetable", args), null, 2) }] }; }
+      catch (e) { return { content:[{ type:"text", text:"Error: " + e.message }] }; }
+    }
+  );
+  server.tool(
+    "update_timetable_course",
+    "Update one timetable course by ID. Read the timetable first to obtain the exact ID.",
+    { id:z.string(), courseName:z.string().optional(), weekday:z.number().optional(), periodStart:z.number().optional(), periodEnd:z.number().optional(), weekStart:z.number().optional(), weekEnd:z.number().optional(), weekType:z.enum(["all","odd","even","list"]).optional(), weeks:z.array(z.number()).optional(), location:z.string().optional(), teacher:z.string().optional(), note:z.string().optional() },
+    async ({ id, ...changes }) => {
+      try { return { content:[{ type:"text", text:JSON.stringify(await executeChatTool("update_timetable_course", { id, ...changes }), null, 2) }] }; }
+      catch (e) { return { content:[{ type:"text", text:"Error: " + e.message }] }; }
+    }
+  );
+  server.tool(
+    "delete_timetable_course",
+    "Delete one timetable course by ID, only after Iris explicitly requested deleting that exact course.",
+    { id:z.string() },
+    async ({ id }) => {
+      try { const old=await dbOne("calendar_courses", id); if (!old) return { content:[{ type:"text", text:"Not found." }] }; await dbDelete("calendar_courses", id); return { content:[{ type:"text", text:JSON.stringify({ ok:true, id }) }] }; }
+      catch (e) { return { content:[{ type:"text", text:"Error: " + e.message }] }; }
+    }
+  );
+
 server.tool(
   "get_weather",
   "查询城市实时天气",
@@ -1265,7 +1403,11 @@ app.get("/api/calendar/state", apiAuth, async (req, res) => {
     res.json({
       settings: settingsResult.data ? { cycle_length:settingsResult.data.cycle_length, period_length:settingsResult.data.period_length } : null,
       periodDetails: (detailsResult.data || []).map(periodDetailFromDb),
-      courses: { semester_start: metaResult.data?.value?.semester_start || "", courses:(coursesResult.data || []).map(courseFromDb) },
+      courses: {
+        semester_start: metaResult.data?.value?.semester_start || "",
+        ...timetableSettingsFromMeta(metaResult.data?.value || {}),
+        courses:(coursesResult.data || []).map(courseFromDb)
+      },
       events: (eventsResult.data || []).map(eventFromDb)
     });
   } catch (e) { res.status(503).json({ error:e.message }); }
@@ -1281,13 +1423,143 @@ app.put("/api/calendar/state", apiAuth, async (req, res) => {
     const courseData = body.courses || {};
     const courses = ensureArray(courseData.courses).filter(course => course?.name);
     if (courses.length) { const { error } = await supabase.from("calendar_courses").upsert(courses.map(courseToDbRow), { onConflict:"id" }); dbError("calendar_courses", error); }
-    if (courseData.semester_start !== undefined) { const { error } = await supabase.from("calendar_meta").upsert({ id:"semester", value:{ semester_start:String(courseData.semester_start || "") }, updated_at:new Date().toISOString() }, { onConflict:"id" }); dbError("calendar_meta", error); }
+    if (courseData.semester_start !== undefined || courseData.term !== undefined || courseData.totalWeeks !== undefined || courseData.periodTimes !== undefined) {
+      const { data:existingMeta, error:metaReadError } = await supabase.from("calendar_meta").select("value").eq("id", "semester").maybeSingle(); dbError("calendar_meta", metaReadError);
+      const current = timetableSettingsFromMeta(existingMeta?.value || {});
+      const requested = {
+        term:courseData.term ?? current.term,
+        semester_start:courseData.semester_start ?? courseData.semesterStart ?? current.semesterStart,
+        total_weeks:courseData.totalWeeks ?? current.totalWeeks,
+        period_times:courseData.periodTimes ?? current.periodTimes
+      };
+      const normalized = timetableSettingsFromMeta(requested);
+      if (courseData.periodTimes !== undefined) normalized.periodTimes = normalizePeriodTimes(courseData.periodTimes);
+      const { error } = await supabase.from("calendar_meta").upsert({ id:"semester", value:{ ...(existingMeta?.value || {}), term:normalized.term, semester_start:normalized.semesterStart, total_weeks:normalized.totalWeeks, period_times:normalized.periodTimes }, updated_at:new Date().toISOString() }, { onConflict:"id" }); dbError("calendar_meta", error);
+    }
     const events = ensureArray(body.events).filter(event => event?.date && (event?.title || event?.name));
     if (events.length) { const { error } = await supabase.from("calendar_events").upsert(events.map(eventToDbRow), { onConflict:"id" }); dbError("calendar_events", error); }
     const details = ensureArray(body.periodDetails).filter(detail => detail?.date);
     if (details.length) { const { error } = await supabase.from("period_details").upsert(details.map(periodDetailToDbRow), { onConflict:"date" }); dbError("period_details", error); }
     res.json({ ok:true });
   } catch (e) { res.status(503).json({ error:e.message }); }
+});
+
+function parseWeekExpression(value) {
+  const result = new Set();
+  String(value || "").split(/[,，\s]+/).filter(Boolean).forEach(token => {
+    const match = /^(\d+)\s*[-~—至]\s*(\d+)$/.exec(token);
+    if (match) { const start=Number(match[1]), end=Number(match[2]); for (let week=start; week<=end && week<=60; week+=1) if (week>=1) result.add(week); }
+    else if (/^\d+$/.test(token)) result.add(Number(token));
+  });
+  return normalizeWeekList([...result]);
+}
+function importWeekRule(raw) {
+  const text = String(raw || "");
+  const numbers = [...text.matchAll(/(\d+)\s*[-~—至]\s*(\d+)|\b(\d+)\b/g)].flatMap(match => match[3] ? [Number(match[3])] : [Number(match[1]), Number(match[2])]).filter(Number.isFinite);
+  const weeks = parseWeekExpression(text.replace(/[^\d,，\s\-~—至]/g, " "));
+  const weekStart = numbers.length ? Math.min(...numbers) : 1;
+  const weekEnd = numbers.length ? Math.max(...numbers) : 16;
+  const weekType = /单双|单周|奇数/.test(text) ? "odd" : /双周|偶数/.test(text) ? "even" : /指定|,|，/.test(text) ? "list" : "all";
+  return { weekStart, weekEnd, weekType, weeks:weekType === "list" ? weeks : [] };
+}
+function parseTimetableImportText(text) {
+  const value = String(text || "").trim();
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : ensureArray(parsed.courses);
+  } catch (_) {}
+  return value.split(/\r?\n/).map((line, index) => {
+    const fields = line.split(/[|｜\t]/).map(item => item.trim());
+    if (fields.length < 4 || !fields[0]) throw new Error(`第 ${index + 1} 行无法识别；请使用“课程名 | 周三 | 9-10节 | 1-16周 | 地点 | 教师”格式`);
+    const weekdayMap = { "周一":1, "星期一":1, "周二":2, "星期二":2, "周三":3, "星期三":3, "周四":4, "星期四":4, "周五":5, "星期五":5, "周六":6, "星期六":6, "周日":7, "星期日":7, "周天":7 };
+    const period = fields[2].match(/(\d+)\s*[-~—至]\s*(\d+)/);
+    if (!period || !weekdayMap[fields[1]]) throw new Error(`第 ${index + 1} 行的星期或节次无法识别`);
+    return { courseName:fields[0], weekday:weekdayMap[fields[1]], periodStart:Number(period[1]), periodEnd:Number(period[2]), ...importWeekRule(fields[3]), location:fields[4] || "", teacher:fields[5] || "", note:fields[6] || "" };
+  }).filter(Boolean);
+}
+async function readTimetableState(term = "") {
+  const [{ data:meta, error:metaError }, { data:rows, error:courseError }] = await Promise.all([
+    supabase.from("calendar_meta").select("value").eq("id", "semester").maybeSingle(),
+    supabase.from("calendar_courses").select("*").order("updated_at", { ascending:true })
+  ]);
+  dbError("calendar_meta", metaError); dbError("calendar_courses", courseError);
+  const settings = timetableSettingsFromMeta(meta?.value || {});
+  const selectedTerm = String(term || settings.term || "");
+  const courses = (rows || []).map(courseFromDb).filter(course => !selectedTerm || course.term === selectedTerm || !course.term);
+  return { settings, courses };
+}
+async function saveTimetableSettings(input = {}) {
+  const { data:existing, error:readError } = await supabase.from("calendar_meta").select("value").eq("id", "semester").maybeSingle();
+  dbError("calendar_meta", readError);
+  const current = timetableSettingsFromMeta(existing?.value || {});
+  const raw = {
+    term:input.term ?? current.term,
+    semester_start:input.semesterStart ?? input.termStartDate ?? input.semester_start ?? current.semesterStart,
+    total_weeks:input.totalWeeks ?? input.total_weeks ?? current.totalWeeks,
+    period_times:input.periodTimes ?? input.period_times ?? current.periodTimes
+  };
+  const settings = timetableSettingsFromMeta(raw);
+  if (input.periodTimes !== undefined || input.period_times !== undefined) settings.periodTimes = normalizePeriodTimes(raw.period_times);
+  if (!settings.semesterStart) throw new Error("学期开始日期必须使用 YYYY-MM-DD");
+  const { error } = await supabase.from("calendar_meta").upsert({ id:"semester", value:{ ...(existing?.value || {}), term:settings.term, semester_start:settings.semesterStart, total_weeks:settings.totalWeeks, period_times:settings.periodTimes }, updated_at:new Date().toISOString() }, { onConflict:"id" });
+  dbError("calendar_meta", error);
+  return settings;
+}
+async function importTimetableCourses(input = {}) {
+  const body = input || {}; const previous = await readTimetableState(body.term);
+  let source;
+  try { source = Array.isArray(body.courses) ? body.courses : parseTimetableImportText(body.text); }
+  catch (cause) { const error=new Error(cause.message || "课表文本格式无法识别"); error.status=400; throw error; }
+  if (!source.length) { const error=new Error("请提供至少一门课程"); error.status=400; throw error; }
+  if (source.length > 100) { const error=new Error("一次最多导入 100 门课程"); error.status=400; throw error; }
+  const settingsInput = { term:body.term ?? previous.settings.term, termStartDate:body.termStartDate ?? body.semesterStart ?? previous.settings.semesterStart, totalWeeks:body.totalWeeks ?? previous.settings.totalWeeks };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(settingsInput.termStartDate || ""))) { const error=new Error("请先设置学期开始日期（YYYY-MM-DD）"); error.status=400; throw error; }
+  const normalized = []; const failedCourses = [];
+  source.forEach((course, index) => { try { normalized.push(normalizeTimetableCourse({ ...course, term:course.term ?? settingsInput.term })); } catch (e) { failedCourses.push({ index, courseName:String(course?.courseName ?? course?.name ?? ""), error:e.message }); } });
+  if (failedCourses.length) { const error=new Error("课程校验失败，未写入任何课程"); error.status=400; error.failedCourses=failedCourses; throw error; }
+  const existing = new Set(previous.courses.map(course => timetableCourseSignature({ ...course, term:course.term || settingsInput.term })));
+  const payloadSignatures = new Set(); const rows = []; let skippedCount = 0;
+  normalized.forEach(course => { const signature=timetableCourseSignature(course); if (existing.has(signature) || payloadSignatures.has(signature)) { skippedCount += 1; return; } payloadSignatures.add(signature); rows.push(courseToDbRow(course)); });
+  // A PostgREST bulk upsert is one database statement: validation is completed
+  // before it runs, so a malformed course cannot result in a partial course batch.
+  if (rows.length) { const { error } = await supabase.from("calendar_courses").upsert(rows, { onConflict:"id" }); dbError("calendar_courses", error); }
+  const settings = await saveTimetableSettings(settingsInput);
+  return { ok:true, importedCount:rows.length, skippedCount, failedCourses:[], settings, courses:rows.map(courseFromDb) };
+}
+
+app.get("/api/timetable", apiAuth, async (req, res) => {
+  try { res.json(await readTimetableState(req.query.term)); }
+  catch (e) { res.status(503).json({ error:e.message }); }
+});
+app.put("/api/timetable/settings", apiAuth, async (req, res) => {
+  try { res.json(await saveTimetableSettings(req.body || {})); }
+  catch (e) { res.status(400).json({ error:e.message }); }
+});
+app.post("/api/timetable/courses", apiAuth, async (req, res) => {
+  try {
+    const { settings } = await readTimetableState();
+    const item = normalizeTimetableCourse({ ...req.body, term:req.body?.term ?? settings.term });
+    const { data, error } = await supabase.from("calendar_courses").upsert(courseToDbRow(item), { onConflict:"id" }).select().single(); dbError("calendar_courses", error);
+    res.status(201).json(courseFromDb(data));
+  } catch (e) { res.status(400).json({ error:e.message }); }
+});
+app.put("/api/timetable/courses/:id", apiAuth, async (req, res) => {
+  try {
+    const oldRow = await dbOne("calendar_courses", req.params.id); if (!oldRow) return res.status(404).json({ error:"Course not found" });
+    const old = courseFromDb(oldRow); const item = normalizeTimetableCourse({ ...old, ...(req.body || {}), id:req.params.id });
+    const { data, error } = await supabase.from("calendar_courses").upsert(courseToDbRow(item, old), { onConflict:"id" }).select().single(); dbError("calendar_courses", error);
+    res.json(courseFromDb(data));
+  } catch (e) { res.status(400).json({ error:e.message }); }
+});
+app.delete("/api/timetable/courses/:id", apiAuth, async (req, res) => {
+  try { await dbDelete("calendar_courses", req.params.id); res.json({ ok:true, id:req.params.id }); }
+  catch (e) { res.status(503).json({ error:e.message }); }
+});
+app.post("/api/timetable/import", apiAuth, async (req, res) => {
+  try {
+    res.json(await importTimetableCourses(req.body || {}));
+  } catch (e) { res.status(e.status || 503).json({ error:e.message, importedCount:0, failedCourses:e.failedCourses || [] }); }
 });
 app.delete("/api/calendar/period-details/:date", apiAuth, async (req, res) => {
   try {
@@ -2539,10 +2811,10 @@ async function buildTodayCalendarContext() {
   const semester = semesterResult.data || null;
   const phase = cyclePhaseForDay(moods, settings, day);
   const date = new Date(`${day}T00:00:00`); const weekday = date.getUTCDay() || 7;
-  const semesterStart = semester?.value?.semester_start || "";
-  const week = semesterStart ? Math.floor(daysBetweenCalendar(semesterStart, day) / 7) + 1 : -1;
+  const timetableSettings = timetableSettingsFromMeta(semester?.value || {});
+  const week = timetableSettings.semesterStart ? Math.floor(daysBetweenCalendar(timetableSettings.semesterStart, day) / 7) + 1 : -1;
   const scheduled = events.filter(item => item.date === day).map(item => `${item.timeStart || "全天"} ${item.name || item.title}${item.location ? `（${item.location}）` : ""}`);
-  const classes = courses.filter(course => course.day === weekday && week >= course.weekStart && week <= course.weekEnd).map(course => `第${course.startP}-${course.endP}节 ${course.name}${course.location ? `（${course.location}）` : ""}`);
+  const classes = courses.filter(course => (!timetableSettings.term || !course.term || course.term === timetableSettings.term) && course.weekday === weekday && courseOccursInTeachingWeek(course, week)).map(course => `第${course.periodStart}-${course.periodEnd}节 ${course.courseName}${course.location ? `（${course.location}）` : ""}`);
   const mood = moods.find(item => item.type === "mood" && item.who === "iris" && item.date === day);
   const lines = [`日期：${day}`, phase ? `周期：${phase.phase}（周期第 ${phase.dayInCycle} 天，按${settings ? "已设置" : "默认"}周期估算）` : "周期：尚无经期开始记录", `今日安排：${[...classes, ...scheduled].length ? [...classes, ...scheduled].map(item => `- ${item}`).join("\n") : "无"}`];
   if (mood?.mood) lines.push(`今日心情：${mood.mood}${mood.note ? `（${mood.note.slice(0,120)}）` : ""}`);
@@ -2864,7 +3136,11 @@ const CHAT_MEMORY_TOOLS = [
   { name: "read_calendar", description: "读取日历事项。安排计划或核对日期前使用。", parameters: { type: "object", properties: { fromDate: { type: "string" }, toDate: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false } },
   { name: "add_calendar_event", description: "新增明确的日历事项。日期必须确定；信息不完整时先问 Iris。", parameters: { type: "object", properties: { title: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string" }, note: { type: "string" }, eventType: { type: "string", enum: ["study", "date", "life", "anniversary", "other"] } }, required: ["title", "date"], additionalProperties: false } },
   { name: "update_calendar_event", description: "编辑已有日历事项。先读取日历获得准确 id。", parameters: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, date: { type: "string" }, time: { type: "string" }, note: { type: "string" }, eventType: { type: "string", enum: ["study", "date", "life", "anniversary", "other"] } }, required: ["id"], additionalProperties: false } },
-  { name: "delete_calendar_event", description: "删除日历事项。仅当 Iris 在当前消息中明确要求删除时使用。", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } }
+  { name: "delete_calendar_event", description: "删除日历事项。仅当 Iris 在当前消息中明确要求删除时使用。", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } },
+  { name: "read_timetable", description: "读取当前学期的结构化课表；课表与普通日程分开存储。", parameters: { type: "object", properties: { term: { type: "string" } }, additionalProperties: false } },
+  { name: "import_timetable", description: "一次导入多门结构化课程。收到课表截图或文本且 Iris 明确要求导入时使用；周数、单双周、地点或教师不确定时先询问，不能猜测。不要把课程拆成普通日程。", parameters: { type: "object", properties: { term: { type: "string" }, termStartDate: { type: "string", description: "YYYY-MM-DD" }, totalWeeks: { type: "integer", minimum: 1, maximum: 60 }, courses: { type: "array", minItems: 1, maxItems: 100, items: { type: "object", properties: { courseName:{type:"string"}, weekday:{type:"integer",minimum:1,maximum:7}, periodStart:{type:"integer",minimum:1}, periodEnd:{type:"integer",minimum:1}, weekStart:{type:"integer",minimum:1}, weekEnd:{type:"integer",minimum:1}, weekType:{type:"string",enum:["all","odd","even","list"]}, weeks:{type:"array",items:{type:"integer",minimum:1}}, location:{type:"string"}, teacher:{type:"string"}, note:{type:"string"} }, required:["courseName","weekday","periodStart","periodEnd"], additionalProperties:false } } }, required:["courses"], additionalProperties:false } },
+  { name: "update_timetable_course", description: "修改一门课程。必须先 read_timetable 获取准确 id。", parameters: { type: "object", properties: { id:{type:"string"}, courseName:{type:"string"}, weekday:{type:"integer",minimum:1,maximum:7}, periodStart:{type:"integer",minimum:1}, periodEnd:{type:"integer",minimum:1}, weekStart:{type:"integer",minimum:1}, weekEnd:{type:"integer",minimum:1}, weekType:{type:"string",enum:["all","odd","even","list"]}, weeks:{type:"array",items:{type:"integer",minimum:1}}, location:{type:"string"}, teacher:{type:"string"}, note:{type:"string"} }, required:["id"], additionalProperties:false } },
+  { name: "delete_timetable_course", description: "删除一门课程。仅当 Iris 在当前消息明确要求删除此课程时使用。", parameters: { type: "object", properties: { id:{type:"string"} }, required:["id"], additionalProperties:false } }
 ];
 const CHAT_COMPANION_TOOL = {
   name: "manage_companion_invitation",
@@ -3207,6 +3483,15 @@ async function executeChatTool(name, args = {}, toolState = {}) {
     case "add_calendar_event": { const now=new Date().toISOString();const item={id:generateId(),title:String(args.title||"").trim(),date:String(args.date||"").trim(),time:args.time||"",note:args.note||"",type:args.eventType||"other",createdAt:now,updatedAt:now};if(!item.title)throw new Error("Calendar event title is required");if(!/^\d{4}-\d{2}-\d{2}$/.test(item.date))throw new Error("Calendar event date must use YYYY-MM-DD");const saved=eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)));await refreshJsonBackup("calendar_events");return saved; }
     case "update_calendar_event": { const old=await dbOne("calendar_events",args.id);if(!old)throw new Error("Calendar event not found");const item={...eventFromDb(old),updatedAt:new Date().toISOString()};for(const [from,to] of [["title","title"],["date","date"],["time","time"],["note","note"],["eventType","type"]])if(args[from]!==undefined)item[to]=args[from];const saved=eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)));await refreshJsonBackup("calendar_events");return saved; }
     case "delete_calendar_event": requireExplicitDelete(toolState); await dbDelete("calendar_events",args.id);await refreshJsonBackup("calendar_events");return {ok:true,id:args.id};
+    case "read_timetable": return await readTimetableState(args.term);
+    case "import_timetable": return await importTimetableCourses(args);
+    case "update_timetable_course": {
+      const oldRow = await dbOne("calendar_courses", args.id); if (!oldRow) throw new Error("Course not found");
+      const old = courseFromDb(oldRow); const item = normalizeTimetableCourse({ ...old, ...args, id:args.id });
+      const { data, error } = await supabase.from("calendar_courses").upsert(courseToDbRow(item, old), { onConflict:"id" }).select().single(); dbError("calendar_courses", error);
+      return courseFromDb(data);
+    }
+    case "delete_timetable_course": requireExplicitDelete(toolState); await dbDelete("calendar_courses",args.id); return {ok:true,id:args.id};
     default: throw new Error(`Unknown tool: ${name}`);
   }
 }

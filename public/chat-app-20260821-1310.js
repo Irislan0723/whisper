@@ -133,6 +133,15 @@ function setupPhotoViewer(){if($('photoViewer'))return;document.body.insertAdjac
 function enhancePhotoChat(){injectPhotoStackStyles();setupPhotoViewer();const input=$('imageInput');if(input){input.multiple=true;input.onchange=async e=>{await acceptChatPhotos(e.target.files);e.target.value=''}}$('addImage').onclick=()=>input.click();$('removeImage').onclick=clearImage;$('imagePreview').onclick=e=>{const button=e.target.closest('[data-remove-photo]');if(!button)return;pendingImages.splice(Number(button.dataset.removePhoto),1);showPendingImages()};$('sendBtn').onclick=sendUserBubble;renderMessages()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhancePhotoChat);else enhancePhotoChat();
 
+/* Calendar only prepares this existing chat image flow. It never selects a
+   conversation, sends a message, or changes the image transport. */
+let timetableImportDraftTextV1='';
+function fillTimetableImportTextV1(){const input=$('chatInput');if(!input||!timetableImportDraftTextV1)return;input.value=timetableImportDraftTextV1;input.style.height='auto';input.style.height=Math.min(input.scrollHeight,96)+'px';timetableImportDraftTextV1=''}
+const openConversationBeforeTimetableImportV1=openConversation;
+openConversation=async function(id){const result=await openConversationBeforeTimetableImportV1(id);if(current)fillTimetableImportTextV1();return result}
+function restoreTimetableImportDraftV1(){let draft;try{draft=JSON.parse(localStorage.getItem('iris_timetable_import_draft_v1')||'null')}catch(_){draft=null}if(!draft?.image)return;localStorage.removeItem('iris_timetable_import_draft_v1');pendingImages=[draft.image];pendingImage=draft.image;timetableImportDraftTextV1=String(draft.text||'请识别这张课表截图，确认信息后一次导入整张课表。');showPendingImages();if(current)fillTimetableImportTextV1();toast(current?'课表图片已准备好，可发送给 Rei':'课表图片已准备好：请先选择或进入聊天会话，再发送给 Rei','success')}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',restoreTimetableImportDraftV1);else restoreTimetableImportDraftV1();
+
 // Multi-photo chat cards V2.  A photo group is deliberately rendered from the
 // saved images array every time a room is opened, so a re-entered conversation
 // uses the same grouped presentation as the just-sent optimistic message.
