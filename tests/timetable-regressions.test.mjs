@@ -69,6 +69,7 @@ test("16-19 AI has dedicated timetable tools", () => {
   for (const name of ["read_timetable", "import_timetable", "update_timetable_course", "delete_timetable_course"]) {
     assert.match(server, new RegExp(`name: "${name}"`));
     assert.match(server, new RegExp(`case "${name}"`));
+    assert.match(chat, new RegExp(`'${name}'`));
   }
 });
 
@@ -78,5 +79,5 @@ test("20 ordinary calendar routes and 21 original AI calendar tools remain", () 
   assert.match(server, /case "read_calendar"/);
   assert.match(server, /case "add_calendar_event"/);
   assert.match(calendar, /function getSemesterWeek/);
-  assert.match(chat, /restoreTimetableImportDraftV1/);
+  assert.doesNotMatch(calendar, /timetableImageInput|timetableImagePick|待导入课表图片|clearTimetableImage/);
 });
