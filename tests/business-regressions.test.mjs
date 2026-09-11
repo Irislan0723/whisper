@@ -19,6 +19,7 @@ function extractFunction(name) {
 const parseToolArguments = new Function(`${extractFunction("parseToolArguments")}; return parseToolArguments;`)();
 const parseCcToolCalls = new Function("parseToolArguments", `${extractFunction("parseCcToolCalls")}; return parseCcToolCalls;`)(parseToolArguments);
 const splitInlineThinking = new Function(`${extractFunction("splitInlineThinking")}; return splitInlineThinking;`)();
+const ccToolDescriptions = new Function("ensureArray", `${extractFunction("ccToolDescriptions")}; return ccToolDescriptions;`)(value => Array.isArray(value) ? value : []);
 const resolveDiaryTargetDay = new Function(`
   const CHAT_TIME_ZONE = "Asia/Shanghai";
   const CROSS_DAY_CONTEXT_CUTOFF_HOUR = 5;
@@ -148,6 +149,22 @@ test("Whisper thinking blocks use the parser-supported format and stay outside v
   assert.match(staticPrompt, /不能把 Thought 内容写进普通回复正文/);
   assert.match(staticPrompt, /不分析 Iris 的行为动机，不规划回复，不复盘，不写工具规划，也不写完整推理过程/);
   assert.equal(readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8").trim(), "正常聊天必须遵守 Whisper system prompt 规定的 thinking block 格式，不得省略，也不得把 Thought 写入普通正文。");
+});
+
+test("Claude Code receives complete nested recurrence parameters for calendar tools", () => {
+  const description = ccToolDescriptions([{
+    name:"add_calendar_event", description:"新增日程。recurrenceEndDate 为 YYYY-MM-DD 或 null（永不结束）。", parameters:{ type:"object", properties:{
+      recurrence:{ type:"object", properties:{ type:{ type:"string", enum:["none","daily","weekly","custom"] }, weekdays:{ type:"array" } }, required:["type"] },
+      recurrenceEndDate:{ type:["string","null"] }
+    } }
+  }]);
+  assert.match(description, /recurrence\{type\*\(none\|daily\|weekly\|custom\), weekdays\[\]\}/);
+  assert.match(description, /recurrenceEndDate/);
+  assert.match(description, /recurrenceEndDate 为 YYYY-MM-DD 或 null（永不结束）/);
+  assert.match(source, /name: "add_calendar_event"[\s\S]*recurrenceEndDate/);
+  assert.match(source, /name: "update_calendar_event"[\s\S]*recurrenceEndDate/);
+  assert.match(source, /recurrence:args\.recurrence,recurrenceEndDate:args\.recurrenceEndDate/);
+  assert.match(source, /\["recurrence","recurrence"\],\["recurrenceEndDate","recurrenceEndDate"\]/);
 });
 
 test("malformed tool JSON reports its parser error instead of becoming empty memory content", () => {
