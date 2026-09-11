@@ -361,8 +361,68 @@ function wishFromDb(r) { return { ...r, createdAt:r.created_at, updatedAt:r.upda
 function wishToDbRow(w) { return { id:w.id, text:w.text || "", category:w.category || "together", owner:w.owner || "both", done:!!w.done, created_at:w.createdAt, updated_at:w.updatedAt }; }
 function letterFromDb(r) { return { id:r.id, from:r.from_person, to:r.to_person, content:r.content, moodTag:r.mood_tag, unlockAt:r.unlock_at, password:r.password_hash, hideUntilUnlock:!!r.hide_until_unlock, allowReply:r.allow_reply !== false, isUnlocked:!!r.is_unlocked, reply:r.reply, createdAt:r.created_at, updatedAt:r.updated_at }; }
 function letterToDbRow(l) { return { id:l.id, from_person:l.from, to_person:l.to, content:l.content || "", mood_tag:l.moodTag || "happy", unlock_at:l.unlockAt || null, password_hash:l.password || null, hide_until_unlock:!!l.hideUntilUnlock, allow_reply:l.allowReply !== false, is_unlocked:!!l.isUnlocked, reply:l.reply || null, created_at:l.createdAt, updated_at:l.updatedAt }; }
-function eventFromDb(r) { return { ...r, name:r.title, timeStart:r.time || "", timeEnd:r.time_end || "", location:r.location || "", createdAt:r.created_at, updatedAt:r.updated_at }; }
-function eventToDbRow(e) { return { id:e.id, title:e.title || e.name || "", date:e.date, time:String(e.time ?? e.timeStart ?? "").trim() || null, time_end:String(e.time_end ?? e.timeEnd ?? "").trim() || null, location:e.location || "", note:e.note || "", type:e.type || "other", color:Number.isFinite(Number(e.color)) ? Number(e.color) : null, source:e.source || "calendar", created_at:e.createdAt || e.created_at || new Date().toISOString(), updated_at:e.updatedAt || e.updated_at || new Date().toISOString() }; }
+const CALENDAR_RECURRENCE_TYPES = new Set(["none", "daily", "weekly", "custom"]);
+const CALENDAR_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function normalizeCalendarRecurrence(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  const type = CALENDAR_RECURRENCE_TYPES.has(raw.type) ? raw.type : "none";
+  const weekdays = [...new Set(ensureArray(raw.weekdays).map(Number).filter(day => Number.isInteger(day) && day >= 1 && day <= 7))].sort((a, b) => a - b);
+  return type === "custom" ? { type, weekdays } : { type };
+}
+function normalizeRecurrenceEndDate(value) {
+  const date = String(value || "").trim();
+  return CALENDAR_DATE_RE.test(date) ? date : null;
+}
+function calendarWeekday(date) {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return weekday || 7;
+}
+function calendarEventOccursOnDate(event, date) {
+  const startDate = String(event?.date || "");
+  if (!CALENDAR_DATE_RE.test(startDate) || !CALENDAR_DATE_RE.test(date) || date < startDate) return false;
+  const recurrence = normalizeCalendarRecurrence(event?.recurrence);
+  const endDate = normalizeRecurrenceEndDate(event?.recurrenceEndDate ?? event?.recurrence_end_date);
+  if (endDate && date > endDate) return false;
+  if (recurrence.type === "none") return date === startDate;
+  if (recurrence.type === "daily") return true;
+  if (recurrence.type === "weekly") return calendarWeekday(date) === calendarWeekday(startDate);
+  return recurrence.weekdays.includes(calendarWeekday(date));
+}
+function calendarDateRange(fromDate, toDate) {
+  const start = CALENDAR_DATE_RE.test(fromDate || "") ? fromDate : null;
+  const end = CALENDAR_DATE_RE.test(toDate || "") ? toDate : start;
+  if (!start || !end || end < start) return null;
+  return { start, end };
+}
+function nextCalendarDate(date) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+}
+function calendarEventOccurrences(events, fromDate, toDate, limit = 50) {
+  const range = calendarDateRange(fromDate, toDate);
+  if (!range) return events;
+  const output = [];
+  for (let date = range.start; date <= range.end && output.length < limit; date = nextCalendarDate(date)) {
+    for (const event of events) {
+      if (!calendarEventOccursOnDate(event, date)) continue;
+      output.push({ ...event, occurrenceDate:date });
+      if (output.length >= limit) break;
+    }
+  }
+  return output;
+}
+function assertCalendarRecurrence(value, recurrenceEndDate, startDate) {
+  const recurrence = normalizeCalendarRecurrence(value);
+  const endDate = normalizeRecurrenceEndDate(recurrenceEndDate);
+  if (value && typeof value === "object" && value.type && recurrence.type === "none" && value.type !== "none") throw new Error("Calendar recurrence type is invalid");
+  if (recurrence.type === "custom" && !recurrence.weekdays.length) throw new Error("Custom calendar recurrence requires at least one weekday");
+  if (recurrenceEndDate !== undefined && recurrenceEndDate !== null && recurrenceEndDate !== "" && !endDate) throw new Error("Calendar recurrence end date must use YYYY-MM-DD");
+  if (endDate && startDate && endDate < startDate) throw new Error("Calendar recurrence end date cannot be before its start date");
+  return { recurrence, recurrenceEndDate:endDate };
+}
+function eventFromDb(r) { return { ...r, name:r.title, timeStart:r.time || "", timeEnd:r.time_end || "", location:r.location || "", recurrence:normalizeCalendarRecurrence(r.recurrence), recurrenceEndDate:normalizeRecurrenceEndDate(r.recurrence_end_date ?? r.recurrenceEndDate), createdAt:r.created_at, updatedAt:r.updated_at }; }
+function eventToDbRow(e) { const normalized = assertCalendarRecurrence(e.recurrence, e.recurrenceEndDate ?? e.recurrence_end_date, e.date); return { id:e.id, title:e.title || e.name || "", date:e.date, time:String(e.time ?? e.timeStart ?? "").trim() || null, time_end:String(e.time_end ?? e.timeEnd ?? "").trim() || null, location:e.location || "", note:e.note || "", type:e.type || "other", color:Number.isFinite(Number(e.color)) ? Number(e.color) : null, recurrence:normalized.recurrence, recurrence_end_date:normalized.recurrenceEndDate, source:e.source || "calendar", created_at:e.createdAt || e.created_at || new Date().toISOString(), updated_at:e.updatedAt || e.updated_at || new Date().toISOString() }; }
 const TIMETABLE_WEEK_TYPES = new Set(["all", "odd", "even", "list"]);
 const DEFAULT_PERIOD_TIMES = Object.freeze([
   { periodStart:1, periodEnd:2, startTime:"08:20", endTime:"09:50" },
@@ -1010,7 +1070,7 @@ function createMcpServer() {
 
   server.tool(
     "read_calendar",
-    "Read calendar events",
+    "Read calendar events that actually occur in the requested date window. Repeating events remain one stored record; results include occurrenceDate for each matching date.",
     {
       fromDate: z.string().optional(),
       toDate: z.string().optional(),
@@ -1030,17 +1090,19 @@ function createMcpServer() {
 
   server.tool(
     "write_calendar",
-    "Add a calendar event",
+    "Add one calendar event. A repeating event is always one record, never one record per occurrence.",
     {
       title: z.string(),
       date: z.string(),
       time: z.string().optional(),
       note: z.string().optional(),
-      type: z.enum(["study", "date", "life", "anniversary", "other"]).optional()
+      type: z.enum(["study", "date", "life", "anniversary", "other"]).optional(),
+      recurrence: z.object({ type:z.enum(["none", "daily", "weekly", "custom"]), weekdays:z.array(z.number().int().min(1).max(7)).optional() }).optional(),
+      recurrenceEndDate: z.string().nullable().optional()
     },
-    async ({ title, date, time = "", note = "", type = "other" }) => {
+    async ({ title, date, time = "", note = "", type = "other", recurrence, recurrenceEndDate }) => {
       try {
-        const item = await executeChatTool("add_calendar_event", { title, date, time, note, eventType:type });
+        const item = await executeChatTool("add_calendar_event", { title, date, time, note, eventType:type, recurrence, recurrenceEndDate });
         return {
           content: [
             {
@@ -1059,18 +1121,20 @@ function createMcpServer() {
 
   server.tool(
     "update_calendar",
-    "Update a calendar event by ID",
+    "Update one calendar event by ID, including its optional repeating rule. A repeating event remains one record.",
     {
       id: z.string(),
       title: z.string().optional(),
       date: z.string().optional(),
       time: z.string().optional(),
       note: z.string().optional(),
-      type: z.enum(["study", "date", "life", "anniversary", "other"]).optional()
+      type: z.enum(["study", "date", "life", "anniversary", "other"]).optional(),
+      recurrence: z.object({ type:z.enum(["none", "daily", "weekly", "custom"]), weekdays:z.array(z.number().int().min(1).max(7)).optional() }).optional(),
+      recurrenceEndDate: z.string().nullable().optional()
     },
-    async ({ id, title, date, time, note, type }) => {
+    async ({ id, title, date, time, note, type, recurrence, recurrenceEndDate }) => {
       try {
-        const item = await executeChatTool("update_calendar_event", { id, title, date, time, note, eventType:type });
+        const item = await executeChatTool("update_calendar_event", { id, title, date, time, note, eventType:type, recurrence, recurrenceEndDate });
         return {
           content: [
             {
@@ -1383,8 +1447,8 @@ app.delete("/api/letters/:id", apiAuth, async (req,res) => { try { await dbDelet
 app.post("/api/letters/:id/unlock", apiAuth, async (req,res) => { try { const old=await dbOne("letters",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item=letterFromDb(old); const timeOk=!item.unlockAt||new Date(item.unlockAt)<=new Date(); const passwordOk=item.password&&req.body.password===item.password; if(!timeOk&&!passwordOk)return res.status(403).json({error:"时间未到密码不对"}); item.isUnlocked=true; item.updatedAt=new Date().toISOString(); res.json(letterFromDb(await dbUpsert("letters",letterToDbRow(item)))); } catch(e){res.status(503).json({error:e.message});} });
 app.post("/api/letters/:id/reply", apiAuth, async (req,res) => { try { const old=await dbOne("letters",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item=letterFromDb(old); if(!item.isUnlocked&&item.unlockAt&&new Date(item.unlockAt)>new Date())return res.status(403).json({error:"未解封"}); if(item.reply)return res.status(409).json({error:"已有回信"}); item.reply={content:req.body.content||"",createdAt:new Date().toISOString()};item.updatedAt=new Date().toISOString();res.json(letterFromDb(await dbUpsert("letters",letterToDbRow(item)))); } catch(e){res.status(503).json({error:e.message});} });
 
-app.get("/api/calendar", apiAuth, async (req,res) => { try { let list=(await dbAll("calendar_events","date")).map(eventFromDb); if(req.query.fromDate)list=list.filter(e=>String(e.date)>=req.query.fromDate); if(req.query.toDate)list=list.filter(e=>String(e.date)<=req.query.toDate); list.sort((a,b)=>`${a.date} ${a.time||""}`.localeCompare(`${b.date} ${b.time||""}`)); res.json(list); } catch(e) { res.status(503).json({error:e.message}); } });
-app.post("/api/calendar", apiAuth, async (req,res) => { try { const now=new Date().toISOString(); const item={id:req.body.id||generateId(),title:req.body.title||"",date:req.body.date||"",time:req.body.time||"",time_end:req.body.time_end||"",location:req.body.location||"",note:req.body.note||"",type:req.body.type||"other",color:req.body.color,createdAt:now,updatedAt:now}; if(!item.title)return res.status(400).json({error:"title required"}); if(!item.date)return res.status(400).json({error:"date required"}); res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
+app.get("/api/calendar", apiAuth, async (req,res) => { try { const events=(await dbAll("calendar_events","date")).map(eventFromDb); const list=calendarEventOccurrences(events,req.query.fromDate,req.query.toDate,Number(req.query.limit)||50); list.sort((a,b)=>`${a.occurrenceDate||a.date} ${a.time||""}`.localeCompare(`${b.occurrenceDate||b.date} ${b.time||""}`)); res.json(list); } catch(e) { res.status(503).json({error:e.message}); } });
+app.post("/api/calendar", apiAuth, async (req,res) => { try { const now=new Date().toISOString(); const item={id:req.body.id||generateId(),title:req.body.title||"",date:req.body.date||"",time:req.body.time||"",time_end:req.body.time_end||"",location:req.body.location||"",note:req.body.note||"",type:req.body.type||"other",color:req.body.color,recurrence:req.body.recurrence,recurrenceEndDate:req.body.recurrenceEndDate,createdAt:now,updatedAt:now}; if(!item.title)return res.status(400).json({error:"title required"}); if(!CALENDAR_DATE_RE.test(item.date))return res.status(400).json({error:"date must use YYYY-MM-DD"}); res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(400).json({error:e.message}); } });
 app.delete("/api/calendar/:id", apiAuth, async (req,res) => { try { await dbDelete("calendar_events",req.params.id); res.json({ok:true}); } catch(e) { res.status(503).json({error:e.message}); } });
 
 // Calendar pages used to keep settings, courses, events and period details in
@@ -1576,7 +1640,7 @@ app.put("/api/calendar/period-details/:date", apiAuth, async (req, res) => {
     res.json(periodDetailFromDb(data));
   } catch (e) { res.status(503).json({ error:e.message }); }
 });
-app.put("/api/calendar/:id", apiAuth, async (req,res) => { try { const old=await dbOne("calendar_events",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item={...eventFromDb(old),...req.body,id:req.params.id,updatedAt:new Date().toISOString()}; res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(503).json({error:e.message}); } });
+app.put("/api/calendar/:id", apiAuth, async (req,res) => { try { const old=await dbOne("calendar_events",req.params.id); if(!old)return res.status(404).json({error:"Not found"}); const item={...eventFromDb(old),...req.body,id:req.params.id,updatedAt:new Date().toISOString()}; if(!CALENDAR_DATE_RE.test(item.date))return res.status(400).json({error:"date must use YYYY-MM-DD"}); res.json(eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)))); } catch(e) { res.status(400).json({error:e.message}); } });
 
 function normalizeHomeWeatherLocation(value = {}) {
   const lat = Number(value.lat);
@@ -2853,7 +2917,7 @@ async function buildTodayCalendarContext() {
   const date = new Date(`${day}T00:00:00Z`); const weekday = date.getUTCDay() || 7;
   const timetableSettings = timetableSettingsFromMeta(semester?.value || {});
   const week = timetableSettings.semesterStart ? Math.floor(daysBetweenCalendar(timetableSettings.semesterStart, day) / 7) + 1 : -1;
-  const scheduled = events.filter(item => item.date === day).map(item => {
+  const scheduled = events.filter(item => calendarEventOccursOnDate(item, day)).map(item => {
     const time = item.timeStart ? `${item.timeStart}${item.timeEnd ? `–${item.timeEnd}` : ""}` : "全天";
     return `${time} ${item.name || item.title}${item.location ? ` · ${item.location}` : ""}`;
   });
@@ -3185,9 +3249,9 @@ const CHAT_MEMORY_TOOLS = [
   { name: "save_mood", description: "记录或更新某天的心情。只在对话明确表达了当天心情，或 Iris 要求记录时使用。", parameters: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" }, who: { type: "string", enum: ["iris", "claude"] }, mood: { type: "string", enum: ["happy", "loved", "calm", "sad", "tired", "anxious"] }, note: { type: "string" } }, required: ["date", "who", "mood"], additionalProperties: false } },
   { name: "read_letters", description: "读取与你或 Iris 有关且当前允许查看的信件；未解锁的隐藏正文不会返回。", parameters: { type: "object", properties: { who: { type: "string", enum: ["iris", "claude"] } }, additionalProperties: false } },
   { name: "write_letter", description: "以你的身份给 Iris 写信，可设置若干天后解锁。只有确实想写信或 Iris 要求时使用。", parameters: { type: "object", properties: { content: { type: "string" }, moodTag: { type: "string", enum: ["happy", "loved", "calm", "sad", "miss", "secret"] }, unlockAfterDays: { type: "number", minimum: 0, maximum: 3650 }, hideUntilUnlock: { type: "boolean" } }, required: ["content"], additionalProperties: false } },
-  { name: "read_calendar", description: "读取日历事项。安排计划或核对日期前使用。", parameters: { type: "object", properties: { fromDate: { type: "string" }, toDate: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false } },
-  { name: "add_calendar_event", description: "新增明确的日历事项。日期必须确定；信息不完整时先问 Iris。", parameters: { type: "object", properties: { title: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string" }, note: { type: "string" }, eventType: { type: "string", enum: ["study", "date", "life", "anniversary", "other"] } }, required: ["title", "date"], additionalProperties: false } },
-  { name: "update_calendar_event", description: "编辑已有日历事项。先读取日历获得准确 id。", parameters: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, date: { type: "string" }, time: { type: "string" }, note: { type: "string" }, eventType: { type: "string", enum: ["study", "date", "life", "anniversary", "other"] } }, required: ["id"], additionalProperties: false } },
+  { name: "read_calendar", description: "读取查询日期窗口内实际命中的日历事项；重复事项会按 occurrenceDate 标明命中的当天，但仍只对应一条可编辑记录。安排计划或核对日期前使用。", parameters: { type: "object", properties: { fromDate: { type: "string", description:"YYYY-MM-DD" }, toDate: { type: "string", description:"YYYY-MM-DD" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false } },
+  { name: "add_calendar_event", description: "新增明确的日历事项。日期必须确定；信息不完整时先问 Iris。重复事项只创建一条记录，绝不能按日期拆成多条；recurrence 可为 none、daily、weekly 或 custom（weekdays 为周一=1 至周日=7），recurrenceEndDate 为空表示永不结束。", parameters: { type: "object", properties: { title: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD（重复日程的开始日期）" }, time: { type: "string" }, note: { type: "string" }, eventType: { type: "string", enum: ["study", "date", "life", "anniversary", "other"] }, recurrence:{ type:"object", properties:{ type:{type:"string",enum:["none","daily","weekly","custom"]}, weekdays:{type:"array",items:{type:"integer",minimum:1,maximum:7}} }, required:["type"], additionalProperties:false }, recurrenceEndDate:{ type:["string","null"], description:"YYYY-MM-DD 或 null（永不结束）" } }, required: ["title", "date"], additionalProperties: false } },
+  { name: "update_calendar_event", description: "编辑已有日历事项。先读取日历获得准确 id。修改重复规则仍只更新原来的一条记录。", parameters: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, date: { type: "string" }, time: { type: "string" }, note: { type: "string" }, eventType: { type: "string", enum: ["study", "date", "life", "anniversary", "other"] }, recurrence:{ type:"object", properties:{ type:{type:"string",enum:["none","daily","weekly","custom"]}, weekdays:{type:"array",items:{type:"integer",minimum:1,maximum:7}} }, required:["type"], additionalProperties:false }, recurrenceEndDate:{ type:["string","null"], description:"YYYY-MM-DD 或 null（永不结束）" } }, required: ["id"], additionalProperties: false } },
   { name: "delete_calendar_event", description: "删除日历事项。仅当 Iris 在当前消息中明确要求删除时使用。", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } },
   { name: "read_timetable", description: "读取当前学期的结构化课表；课表与普通日程分开存储。", parameters: { type: "object", properties: { term: { type: "string" } }, additionalProperties: false } },
   { name: "import_timetable", description: "一次导入多门结构化课程。收到课表截图或文本且 Iris 明确要求导入时使用；周数、单双周、地点或教师不确定时先询问，不能猜测。不要把课程拆成普通日程。", parameters: { type: "object", properties: { term: { type: "string" }, termStartDate: { type: "string", description: "YYYY-MM-DD" }, totalWeeks: { type: "integer", minimum: 1, maximum: 60 }, courses: { type: "array", minItems: 1, maxItems: 100, items: { type: "object", properties: { courseName:{type:"string"}, weekday:{type:"integer",minimum:1,maximum:7}, periodStart:{type:"integer",minimum:1}, periodEnd:{type:"integer",minimum:1}, weekStart:{type:"integer",minimum:1}, weekEnd:{type:"integer",minimum:1}, weekType:{type:"string",enum:["all","odd","even","list"]}, weeks:{type:"array",items:{type:"integer",minimum:1}}, location:{type:"string"}, teacher:{type:"string"}, note:{type:"string"} }, required:["courseName","weekday","periodStart","periodEnd"], additionalProperties:false } } }, required:["courses"], additionalProperties:false } },
@@ -3561,9 +3625,9 @@ async function executeChatTool(name, args = {}, toolState = {}) {
     case "update_wish": { const old=await dbOne("wishlist",args.id);if(!old)throw new Error("Wish not found");const item={...wishFromDb(old),updatedAt:new Date().toISOString()};for(const k of ["text","category","owner","done"])if(args[k]!==undefined)item[k]=args[k];const saved=wishFromDb(await dbUpsert("wishlist",wishToDbRow(item)));await refreshJsonBackup("wishlist");return saved; }
     case "read_letters": { const who=args.who||"claude";return (await dbAll("letters")).map(letterFromDb).filter(l=>l.from===who||l.to===who).map(l=>publicLetter(l,who)); }
     case "write_letter": { const now=new Date().toISOString();const days=Math.max(0,Number(args.unlockAfterDays||0));const item={id:generateId(),from:"claude",to:"iris",content:String(args.content||"").trim(),moodTag:args.moodTag||"loved",unlockAt:days?new Date(Date.now()+days*86400000).toISOString():null,password:null,hideUntilUnlock:!!args.hideUntilUnlock||days>0,allowReply:true,isUnlocked:days===0,reply:null,createdAt:now,updatedAt:now};const saved=letterFromDb(await dbUpsert("letters",letterToDbRow(item)));await refreshJsonBackup("letters");return saved; }
-    case "read_calendar": { let list=(await dbAll("calendar_events","date")).map(eventFromDb);if(args.fromDate)list=list.filter(e=>String(e.date)>=args.fromDate);if(args.toDate)list=list.filter(e=>String(e.date)<=args.toDate);return list.slice(0,clampToolLimit(args.limit,50,100)); }
-    case "add_calendar_event": { const now=new Date().toISOString();const item={id:generateId(),title:String(args.title||"").trim(),date:String(args.date||"").trim(),time:args.time||"",note:args.note||"",type:args.eventType||"other",createdAt:now,updatedAt:now};if(!item.title)throw new Error("Calendar event title is required");if(!/^\d{4}-\d{2}-\d{2}$/.test(item.date))throw new Error("Calendar event date must use YYYY-MM-DD");const saved=eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)));await refreshJsonBackup("calendar_events");return saved; }
-    case "update_calendar_event": { const old=await dbOne("calendar_events",args.id);if(!old)throw new Error("Calendar event not found");const item={...eventFromDb(old),updatedAt:new Date().toISOString()};for(const [from,to] of [["title","title"],["date","date"],["time","time"],["note","note"],["eventType","type"]])if(args[from]!==undefined)item[to]=args[from];const saved=eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)));await refreshJsonBackup("calendar_events");return saved; }
+    case "read_calendar": { const events=(await dbAll("calendar_events","date")).map(eventFromDb);return calendarEventOccurrences(events,args.fromDate,args.toDate,clampToolLimit(args.limit,50,100)); }
+    case "add_calendar_event": { const now=new Date().toISOString();const item={id:generateId(),title:String(args.title||"").trim(),date:String(args.date||"").trim(),time:args.time||"",note:args.note||"",type:args.eventType||"other",recurrence:args.recurrence,recurrenceEndDate:args.recurrenceEndDate,createdAt:now,updatedAt:now};if(!item.title)throw new Error("Calendar event title is required");if(!CALENDAR_DATE_RE.test(item.date))throw new Error("Calendar event date must use YYYY-MM-DD");const saved=eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)));await refreshJsonBackup("calendar_events");return saved; }
+    case "update_calendar_event": { const old=await dbOne("calendar_events",args.id);if(!old)throw new Error("Calendar event not found");const item={...eventFromDb(old),updatedAt:new Date().toISOString()};for(const [from,to] of [["title","title"],["date","date"],["time","time"],["note","note"],["eventType","type"],["recurrence","recurrence"],["recurrenceEndDate","recurrenceEndDate"]])if(args[from]!==undefined)item[to]=args[from];if(!CALENDAR_DATE_RE.test(item.date))throw new Error("Calendar event date must use YYYY-MM-DD");const saved=eventFromDb(await dbUpsert("calendar_events",eventToDbRow(item)));await refreshJsonBackup("calendar_events");return saved; }
     case "delete_calendar_event": requireExplicitDelete(toolState); await dbDelete("calendar_events",args.id);await refreshJsonBackup("calendar_events");return {ok:true,id:args.id};
     case "read_timetable": return await readTimetableState(args.term);
     case "import_timetable": return await importTimetableCourses(args);

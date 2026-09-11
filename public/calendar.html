@@ -99,10 +99,11 @@
 .cal-cta{display:block;width:100%;padding:13px 0;border:none;border-radius:999px;background:var(--accent);color:#fff;font-family:var(--font-cn);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.06em;transition:all .18s;box-shadow:0 2px 10px rgba(var(--shadow-color),.16);margin-bottom:14px}
 @media(hover:hover)and(pointer:fine){.cal-cta:hover{box-shadow:0 4px 16px rgba(var(--shadow-color),.24);transform:translateY(-1px)}}
 
-/* ---- My timetable button ---- */
-.schedule-btns{display:flex;gap:8px;margin-bottom:14px}
-.timetable-btn{display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:10px 0;border:1.5px solid var(--accent);border-radius:999px;background:transparent;color:var(--accent);font-family:var(--font-cn);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s}
-@media(hover:hover)and(pointer:fine){.timetable-btn:hover{background:var(--accent-pale)}}
+/* ---- Schedule actions ---- */
+.schedule-actions{display:flex;padding:3px;background:var(--bg-card);border-radius:999px;margin-bottom:14px;box-shadow:var(--shadow-sm);border:1px solid var(--border)}
+.schedule-action{flex:1;border:none;background:transparent;padding:9px 0;font-family:var(--font-cn);font-size:13px;color:var(--text-mid);border-radius:999px;cursor:pointer;transition:all .22s;letter-spacing:.04em;font-weight:400}
+.schedule-action.active{background:var(--accent);color:var(--accent-contrast);font-weight:600;box-shadow:0 2px 8px rgba(var(--shadow-color),.18)}
+@media(hover:hover)and(pointer:fine){.schedule-action:hover:not(.active){background:var(--accent-pale);color:var(--accent)}}
 
 /* ---- Stats card ---- */
 .stats-card{background:var(--bg-card);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-xs);margin-bottom:14px}
@@ -208,6 +209,9 @@
 .form-row-inline{display:flex;gap:8px}
 .form-row-inline .form-row{flex:1;margin-bottom:0}
 .form-select{width:100%;border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 11px;font-family:var(--font-cn);font-size:13px;color:var(--text);background:var(--bg);outline:none;appearance:none;box-sizing:border-box}
+.event-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.event-weekday{border:1px solid var(--border);background:var(--bg);color:var(--text-mid);border-radius:999px;padding:7px 0;font:12px var(--font-cn);cursor:pointer;transition:all .18s}
+.event-weekday.selected{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);font-weight:600}
 .course-list-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .course-list-item:last-child{border-bottom:none}
 .course-list-color{width:8px;height:36px;border-radius:4px;flex-shrink:0}
@@ -395,6 +399,10 @@
     <div class="form-row"><label class="form-label">开始时间</label><input class="form-input" id="eTimeStart" type="time"></div>
     <div class="form-row"><label class="form-label">结束时间</label><input class="form-input" id="eTimeEnd" type="time"></div>
   </div>
+  <div class="form-row"><label class="form-label">重复</label><select class="form-select" id="eRecurrence"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="custom">自定义</option></select></div>
+  <div class="form-row" id="eWeekdaysRow" hidden><label class="form-label">重复星期</label><div class="event-weekdays" id="eWeekdays"><button class="event-weekday" type="button" data-day="1">一</button><button class="event-weekday" type="button" data-day="2">二</button><button class="event-weekday" type="button" data-day="3">三</button><button class="event-weekday" type="button" data-day="4">四</button><button class="event-weekday" type="button" data-day="5">五</button><button class="event-weekday" type="button" data-day="6">六</button><button class="event-weekday" type="button" data-day="7">日</button></div></div>
+  <div class="form-row" id="eRecurrenceEndRow" hidden><label class="form-label">结束</label><select class="form-select" id="eRecurrenceEnd"><option value="never">永不</option><option value="date">指定日期</option></select></div>
+  <div class="form-row" id="eRecurrenceEndDateRow" hidden><label class="form-label">结束日期</label><input class="form-input" id="eRecurrenceEndDate" type="date"></div>
   <div class="form-row"><label class="form-label">地点</label><input class="form-input" id="eLocation" placeholder="选填"></div>
   <div class="form-row"><label class="form-label">备注</label><input class="form-input" id="eNote" placeholder="选填"></div>
   <input type="hidden" id="eEditId">
@@ -509,7 +517,7 @@ var toastTimer;
 function showToast(msg,type){var el=$('toast');el.textContent=msg;el.className='toast '+(type||'')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.className='toast'},2400)}
 function $(id){return document.getElementById(id)}
 function openSheet(id){$(id).classList.add('open');document.body.style.overflow='hidden'}
-function closeSheet(id){$(id).classList.remove('open');if(!document.querySelector('.sheet-overlay.open'))document.body.style.overflow=''}
+function closeSheet(id){$(id).classList.remove('open');if(id==='eventSheet'||id==='courseListSheet')document.querySelectorAll('.schedule-action.active').forEach(function(button){button.classList.remove('active')});if(!document.querySelector('.sheet-overlay.open'))document.body.style.overflow=''}
 window.closeSheet=closeSheet;
 window.openCourseEditor=function(id){openCourseForm(id)};
 document.querySelectorAll('.sheet-overlay').forEach(function(el){el.addEventListener('click',function(e){if(e.target===el)closeSheet(el.id)})});
@@ -720,7 +728,29 @@ function openTimetableImport(){$('timetableImportText').value='';openSheet('time
 async function importTimetableText(){var text=$('timetableImportText').value.trim();if(!text){showToast('请粘贴课表文本');return}try{var r=await fetch(BASE+'/api/timetable/import',{method:'POST',headers:H,body:JSON.stringify({term:courseData.term,termStartDate:courseData.semester_start,totalWeeks:courseData.totalWeeks,text:text})});var d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error((d.failedCourses&&d.failedCourses[0]&&d.failedCourses[0].error)||d.error||'导入失败');await loadTimetable();closeSheet('timetableImportSheet');renderAll();showToast('已导入 '+d.importedCount+' 门课程'+(d.skippedCount?'，跳过 '+d.skippedCount+' 门重复课程':'') ,'success')}catch(e){showToast('课表导入失败：'+e.message,'error')}}
 /* ===== Custom Events ===== */
 function saveEvents(){saveJSON(EVENTS_KEY,eventsData);queueCalendarSync()}
-function getEventsForDate(dstr){return eventsData.filter(function(e){return e.date===dstr})}
+function normalizeEventRecurrence(value){
+  var raw=value&&typeof value==='object'?value:{};
+  var type=['none','daily','weekly','custom'].indexOf(raw.type)>=0?raw.type:'none';
+  var weekdays=Array.isArray(raw.weekdays)?raw.weekdays.map(Number).filter(function(day,index,all){return day>=1&&day<=7&&Math.floor(day)===day&&all.indexOf(day)===index}).sort(function(a,b){return a-b}):[];
+  return type==='custom'?{type:type,weekdays:weekdays}:{type:type};
+}
+function eventWeekday(dstr){var day=new Date(dstr+'T00:00:00Z').getUTCDay();return day||7}
+function eventOccursOnDate(event,dstr){
+  if(!event||!event.date||!dstr||dstr<event.date)return false;
+  var recurrence=normalizeEventRecurrence(event.recurrence),endDate=event.recurrenceEndDate||event.recurrence_end_date||null;
+  if(endDate&&dstr>endDate)return false;
+  if(recurrence.type==='none')return event.date===dstr;
+  if(recurrence.type==='daily')return true;
+  if(recurrence.type==='weekly')return eventWeekday(dstr)===eventWeekday(event.date);
+  return recurrence.weekdays.indexOf(eventWeekday(dstr))!==-1;
+}
+function getEventsForDate(dstr){return eventsData.filter(function(e){return eventOccursOnDate(e,dstr)})}
+function updateEventRecurrenceFields(){
+  var type=$('eRecurrence').value,isRepeating=type!=='none';
+  $('eWeekdaysRow').hidden=type!=='custom';$('eRecurrenceEndRow').hidden=!isRepeating;
+  $('eRecurrenceEndDateRow').hidden=!isRepeating||$('eRecurrenceEnd').value!=='date';
+}
+function selectedEventWeekdays(){return Array.prototype.map.call($('eWeekdays').querySelectorAll('.event-weekday.selected'),function(button){return Number(button.dataset.day)}).sort(function(a,b){return a-b})}
 function openEventForm(dateStr,editId){
   var ev=editId?eventsData.find(function(e){return e.id===editId}):null;
   $('eventSheetTitle').textContent=ev?'编辑日程':'添加日程';
@@ -730,6 +760,9 @@ function openEventForm(dateStr,editId){
   $('eTimeEnd').value=ev?ev.timeEnd||'':'';
   $('eLocation').value=ev?ev.location||'':'';
   $('eNote').value=ev?ev.note||'':'';
+  var recurrence=normalizeEventRecurrence(ev&&ev.recurrence);$('eRecurrence').value=recurrence.type;
+  $('eWeekdays').querySelectorAll('.event-weekday').forEach(function(button){button.classList.toggle('selected',recurrence.weekdays&&recurrence.weekdays.indexOf(Number(button.dataset.day))!==-1)});
+  var endDate=ev&&(ev.recurrenceEndDate||ev.recurrence_end_date);$('eRecurrenceEnd').value=endDate?'date':'never';$('eRecurrenceEndDate').value=endDate||'';updateEventRecurrenceFields();
   $('eEditId').value=editId||'';
   openSheet('eventSheet');
 }
@@ -738,18 +771,23 @@ async function saveEventForm(){
   var date=$('eDate').value;if(!date){showToast('请选择日期');return}
   var ts=$('eTimeStart').value,te=$('eTimeEnd').value;
   var loc=$('eLocation').value.trim(),note=$('eNote').value.trim();
+  var recurrence=normalizeEventRecurrence({type:$('eRecurrence').value,weekdays:selectedEventWeekdays()});
+  if(recurrence.type==='custom'&&!recurrence.weekdays.length){showToast('请至少选择一个重复星期');return}
+  var recurrenceEndDate=recurrence.type!=='none'&&$('eRecurrenceEnd').value==='date'?$('eRecurrenceEndDate').value:'';
+  if(recurrence.type!=='none'&&$('eRecurrenceEnd').value==='date'&&!recurrenceEndDate){showToast('请选择结束日期');return}
+  if(recurrenceEndDate&&recurrenceEndDate<date){showToast('结束日期不能早于开始日期');return}
   var editId=$('eEditId').value;
   var before=eventsData.map(function(event){return Object.assign({},event)});
   var existingEvent=editId?eventsData.find(function(event){return event.id===editId}):null;
   var eventColor=existingEvent&&existingEvent.color!==undefined?existingEvent.color:eventsData.length%COURSE_COLORS.length;
   if(editId){
     var ev=eventsData.find(function(e){return e.id===editId});
-    if(ev){ev.name=name;ev.date=date;ev.timeStart=ts;ev.timeEnd=te;ev.location=loc;ev.note=note}
+    if(ev){ev.name=name;ev.date=date;ev.timeStart=ts;ev.timeEnd=te;ev.location=loc;ev.note=note;ev.recurrence=recurrence;ev.recurrenceEndDate=recurrenceEndDate||null}
   }else{
-    eventsData.push({id:'ev'+Date.now(),name:name,date:date,timeStart:ts,timeEnd:te,location:loc,note:note,color:eventColor});
+    eventsData.push({id:'ev'+Date.now(),name:name,date:date,timeStart:ts,timeEnd:te,location:loc,note:note,color:eventColor,recurrence:recurrence,recurrenceEndDate:recurrenceEndDate||null});
   }
   try{
-    var response=await fetch(BASE+'/api/calendar'+(editId?'/'+encodeURIComponent(editId):''),{method:editId?'PUT':'POST',headers:H,body:JSON.stringify({id:editId||eventsData[eventsData.length-1].id,title:name,date:date,time:ts,time_end:te,location:loc,note:note,type:'other',color:eventColor})});
+    var response=await fetch(BASE+'/api/calendar'+(editId?'/'+encodeURIComponent(editId):''),{method:editId?'PUT':'POST',headers:H,body:JSON.stringify({id:editId||eventsData[eventsData.length-1].id,title:name,date:date,time:ts,time_end:te,location:loc,note:note,type:'other',color:eventColor,recurrence:recurrence,recurrenceEndDate:recurrenceEndDate||null})});
     if(!response.ok){var errorData=await response.json().catch(function(){return{}});throw new Error(errorData.error||'同步失败')}
     var saved=await response.json();
     if(editId){var savedIndex=eventsData.findIndex(function(event){return event.id===editId});if(savedIndex>=0)eventsData[savedIndex]=saved}
@@ -987,8 +1025,8 @@ function renderTabContent(){
     var dayCourses=getCoursesForDate(selDate);
     var dayEvents=getEventsForDate(selDate);
     var dayNames=['','周一','周二','周三','周四','周五','周六','周日'];
-    var scheduleHtml='<div class="schedule-btns"><button class="timetable-btn" id="openTimetable">课表管理</button>'+
-      '<button class="timetable-btn" id="addEventBtn">添加日程</button></div>';
+    var scheduleHtml='<div class="schedule-actions"><button class="schedule-action" id="openTimetable">课表管理</button>'+
+      '<button class="schedule-action" id="addEventBtn">添加日程</button></div>';
     scheduleHtml+='<div class="day-schedule"><div class="day-schedule-header"><span class="day-schedule-title">'+(selDay?(curMonth+1)+'月'+selDay+'日':'今日')+'日程</span>'+
       '<span class="day-schedule-date">'+(getSemesterWeek(selDate)>0?'第'+getSemesterWeek(selDate)+'周':'')+'</span></div>';
     if(dayCourses.length>0){
@@ -1014,8 +1052,8 @@ function renderTabContent(){
     }
     scheduleHtml+='</div>';
     sec.innerHTML=scheduleHtml;
-    $('openTimetable').addEventListener('click',function(){renderCourseList();openSheet('courseListSheet')});
-    $('addEventBtn').addEventListener('click',function(){openEventForm(selDate)});
+    $('openTimetable').addEventListener('click',function(){this.classList.add('active');renderCourseList();openSheet('courseListSheet')});
+    $('addEventBtn').addEventListener('click',function(){this.classList.add('active');openEventForm(selDate)});
   }
 }
 
@@ -1286,6 +1324,9 @@ $('settingsSave').addEventListener('click',saveSettingsAction);
 $('settingsSave').addEventListener('click',function(){queueCalendarSync()});
 $('courseSave').addEventListener('click',saveCourseForm);
 $('eventSave').addEventListener('click',saveEventForm);
+$('eRecurrence').addEventListener('change',updateEventRecurrenceFields);
+$('eRecurrenceEnd').addEventListener('change',updateEventRecurrenceFields);
+$('eWeekdays').addEventListener('click',function(event){var button=event.target.closest('.event-weekday');if(button)button.classList.toggle('selected')});
 $('cWeekType').addEventListener('change',function(){$('cWeeksRow').hidden=this.value!=='list'});
 ['semesterTerm','semesterStart','semesterWeeks'].forEach(function(id){$(id).addEventListener('change',saveSemesterSettings)});
 $('periodTimesOpen').addEventListener('click',openPeriodTimes);

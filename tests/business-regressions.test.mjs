@@ -39,8 +39,17 @@ const periodStatusForDay = new Function(
   value => Array.isArray(value) ? value : [],
   (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000)
 );
+const calendarEventOccursOnDate = new Function("ensureArray", `
+  const CALENDAR_RECURRENCE_TYPES = new Set(["none", "daily", "weekly", "custom"]);
+  const CALENDAR_DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;
+  ${extractFunction("normalizeCalendarRecurrence")}
+  ${extractFunction("normalizeRecurrenceEndDate")}
+  ${extractFunction("calendarWeekday")}
+  ${extractFunction("calendarEventOccursOnDate")}
+  return calendarEventOccursOnDate;
+`)(value => Array.isArray(value) ? value : []);
 const makeTodayCalendarContext = new Function(
-  "calendarDateKey", "dbAll", "moodFromDb", "eventFromDb", "supabase", "courseFromDb", "periodStatusForDay", "timetableSettingsFromMeta", "daysBetweenCalendar", "courseOccursInTeachingWeek", "timetableCourseTimeRange",
+  "calendarDateKey", "dbAll", "moodFromDb", "eventFromDb", "supabase", "courseFromDb", "periodStatusForDay", "timetableSettingsFromMeta", "daysBetweenCalendar", "courseOccursInTeachingWeek", "timetableCourseTimeRange", "calendarEventOccursOnDate",
   `return (async () => { async ${extractFunction("buildTodayCalendarContext")}; return buildTodayCalendarContext; })();`
 );
 
@@ -74,7 +83,8 @@ async function buildTodayCalendarFixture({ day = "2026-09-07", moods = [], event
       const first = periodTimes.find(item => course.periodStart >= item.periodStart && course.periodStart <= item.periodEnd);
       const last = periodTimes.find(item => course.periodEnd >= item.periodStart && course.periodEnd <= item.periodEnd);
       return first && last ? `${first.startTime}–${last.endTime}` : "";
-    }
+    },
+    calendarEventOccursOnDate
   );
   return build();
 }
@@ -165,7 +175,7 @@ test("daily context labels a recorded period differently from a forecast", () =>
 
 test("daily context combines only today's active courses and ordinary events", async () => {
   const course = { term:"2026-2027-1", courseName:"数据新闻", weekday:1, periodStart:5, periodEnd:6, weekStart:1, weekEnd:16, weekType:"all", weeks:[], location:"文浚楼326" };
-  const event = { date:"2026-09-07", name:"取快递", timeStart:"18:30", timeEnd:"", location:"" };
+  const event = { date:"2026-09-05", name:"取快递", timeStart:"18:30", timeEnd:"", location:"", recurrence:{ type:"daily" } };
 
   const eventOnly = await buildTodayCalendarFixture({ events:[event] });
   assert.match(eventOnly.text, /日程：\n- 18:30 取快递/);
