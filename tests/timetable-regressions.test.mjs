@@ -26,7 +26,8 @@ const timetableHelpers = new Function(`
   ${extract("importWeekRule")}
   ${extract("parseTimetableImportText")}
   ${extract("courseOccursInTeachingWeek")}
-  return { parseWeekExpression, importWeekRule, parseTimetableImportText, courseOccursInTeachingWeek };
+  ${extract("timetableCourseTimeRange")}
+  return { parseWeekExpression, importWeekRule, parseTimetableImportText, courseOccursInTeachingWeek, timetableCourseTimeRange };
 `)();
 
 test("1-4 course recurrence supports weekly, odd, even, and explicit weeks", () => {
@@ -42,6 +43,18 @@ test("1-4 course recurrence supports weekly, odd, even, and explicit weeks", () 
 test("5-6 explicit-week input expands ranges and keeps only valid weeks", () => {
   assert.deepEqual(timetableHelpers.parseWeekExpression("1,2,4,7,9-12"), [1, 2, 4, 7, 9, 10, 11, 12]);
   assert.deepEqual(timetableHelpers.importWeekRule("1-16周 单周"), { weekStart: 1, weekEnd: 16, weekType: "odd", weeks: [] });
+});
+
+test("course context uses the saved period-time ranges instead of hardcoded times", () => {
+  const range = timetableHelpers.timetableCourseTimeRange(
+    { periodStart: 5, periodEnd: 6 },
+    [
+      { periodStart: 1, periodEnd: 2, startTime: "08:20", endTime: "09:50" },
+      { periodStart: 5, periodEnd: 6, startTime: "14:00", endTime: "15:30" }
+    ]
+  );
+  assert.equal(range, "14:00–15:30");
+  assert.equal(timetableHelpers.timetableCourseTimeRange({ periodStart: 7, periodEnd: 8 }, []), "");
 });
 
 test("7 text imports parse a whole timetable without ordinary events", () => {
@@ -80,4 +93,11 @@ test("20 ordinary calendar routes and 21 original AI calendar tools remain", () 
   assert.match(server, /case "add_calendar_event"/);
   assert.match(calendar, /function getSemesterWeek/);
   assert.doesNotMatch(calendar, /timetableImageInput|timetableImagePick|待导入课表图片|clearTimetableImage/);
+});
+
+test("today's course cards read the same saved period-time settings", () => {
+  assert.match(calendar, /function getCourseTimeRange\(c\)/);
+  assert.match(calendar, /courseData\.periodTimes/);
+  assert.match(calendar, /courseTime\?courseTime\+' · '/);
+  assert.match(calendar, /week>Number\(courseData\.totalWeeks\|\|16\)/);
 });

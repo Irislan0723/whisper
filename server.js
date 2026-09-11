@@ -2792,6 +2792,46 @@ function cyclePhaseForDay(periodRecords, settings, day = calendarDateKey()) {
   const phase = dayInCycle < periodLength ? "经期" : dayInCycle >= ovulationDay - 2 && dayInCycle <= ovulationDay + 2 ? "排卵期" : dayInCycle < ovulationDay - 2 ? "卵泡期" : "黄体期";
   return { phase, dayInCycle:dayInCycle + 1, estimated:true };
 }
+function periodStatusForDay(periodRecords, settings, day = calendarDateKey()) {
+  const records = ensureArray(periodRecords);
+  const periodLength = Math.max(1, Math.min(20, Number(settings?.period_length || 5)));
+  const cycleLength = Math.max(15, Math.min(60, Number(settings?.cycle_length || 28)));
+  const starts = records
+    .filter(item => item.type === "period" && item.phase === "start" && !item.predicted && String(item.date) <= day)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const ends = records
+    .filter(item => item.type === "period" && item.phase === "end")
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  if (!starts.length) return { kind:"unknown" };
+
+  // A manually recorded start is the source of truth. An unfinished range
+  // uses the configured duration only to keep the existing calendar behavior.
+  for (const start of [...starts].reverse()) {
+    const markedEnd = ends.find(end => String(end.date) >= String(start.date));
+    const endDay = markedEnd?.date || (() => {
+      const value = new Date(`${start.date}T00:00:00Z`);
+      value.setUTCDate(value.getUTCDate() + periodLength - 1);
+      return value.toISOString().slice(0, 10);
+    })();
+    if (day >= start.date && day <= endDay) return { kind:"actual", day:daysBetweenCalendar(start.date, day) + 1, startDate:start.date, endDate:endDay };
+  }
+
+  // Future cycles are only a forecast after the latest recorded period has
+  // been explicitly ended. Forecasts never create or alter period records.
+  const latestStart = starts.at(-1);
+  const latestEnd = ends.find(end => String(end.date) >= String(latestStart.date));
+  if (!latestEnd) return { kind:"none" };
+  const elapsed = daysBetweenCalendar(latestStart.date, day);
+  const cycleDay = ((elapsed % cycleLength) + cycleLength) % cycleLength;
+  if (elapsed >= cycleLength && cycleDay < periodLength) return { kind:"predicted", day:cycleDay + 1, referenceDate:latestStart.date };
+  return { kind:"none" };
+}
+function timetableCourseTimeRange(course, periodTimes) {
+  const rows = ensureArray(periodTimes);
+  const first = rows.find(item => course.periodStart >= Number(item.periodStart) && course.periodStart <= Number(item.periodEnd));
+  const last = rows.find(item => course.periodEnd >= Number(item.periodStart) && course.periodEnd <= Number(item.periodEnd));
+  return first?.startTime && last?.endTime ? `${first.startTime}–${last.endTime}` : "";
+}
 async function buildTodayCalendarContext() {
   const day = calendarDateKey();
   // A missing optional calendar extension must never suppress the whole daily
@@ -2809,16 +2849,26 @@ async function buildTodayCalendarContext() {
   const settings = settingsResult.data || null;
   const courses = (coursesResult.data || []).map(courseFromDb);
   const semester = semesterResult.data || null;
-  const phase = cyclePhaseForDay(moods, settings, day);
-  const date = new Date(`${day}T00:00:00`); const weekday = date.getUTCDay() || 7;
+  const period = periodStatusForDay(moods, settings, day);
+  const date = new Date(`${day}T00:00:00Z`); const weekday = date.getUTCDay() || 7;
   const timetableSettings = timetableSettingsFromMeta(semester?.value || {});
   const week = timetableSettings.semesterStart ? Math.floor(daysBetweenCalendar(timetableSettings.semesterStart, day) / 7) + 1 : -1;
-  const scheduled = events.filter(item => item.date === day).map(item => `${item.timeStart || "全天"} ${item.name || item.title}${item.location ? `（${item.location}）` : ""}`);
-  const classes = courses.filter(course => (!timetableSettings.term || !course.term || course.term === timetableSettings.term) && course.weekday === weekday && courseOccursInTeachingWeek(course, week)).map(course => `第${course.periodStart}-${course.periodEnd}节 ${course.courseName}${course.location ? `（${course.location}）` : ""}`);
+  const scheduled = events.filter(item => item.date === day).map(item => {
+    const time = item.timeStart ? `${item.timeStart}${item.timeEnd ? `–${item.timeEnd}` : ""}` : "全天";
+    return `${time} ${item.name || item.title}${item.location ? ` · ${item.location}` : ""}`;
+  });
+  const classes = courses
+    .filter(course => week >= 1 && week <= timetableSettings.totalWeeks && (!timetableSettings.term || !course.term || course.term === timetableSettings.term) && course.weekday === weekday && courseOccursInTeachingWeek(course, week))
+    .sort((a, b) => a.periodStart - b.periodStart || a.periodEnd - b.periodEnd)
+    .map(course => `${timetableCourseTimeRange(course, timetableSettings.periodTimes) || `第${course.periodStart}-${course.periodEnd}节`} ${course.courseName}${course.location ? ` · ${course.location}` : ""}`);
   const mood = moods.find(item => item.type === "mood" && item.who === "iris" && item.date === day);
-  const lines = [`日期：${day}`, phase ? `周期：${phase.phase}（周期第 ${phase.dayInCycle} 天，按${settings ? "已设置" : "默认"}周期估算）` : "周期：尚无经期开始记录", `今日安排：${[...classes, ...scheduled].length ? [...classes, ...scheduled].map(item => `- ${item}`).join("\n") : "无"}`];
+  const lines = [
+    `日期：${day}`,
+    period.kind === "actual" ? `周期：经期第${period.day}天` : period.kind === "predicted" ? `周期：预测经期第${period.day}天（未记录实际开始）` : period.kind === "unknown" ? "周期：尚无经期开始记录" : "",
+    classes.length || scheduled.length ? `【今日安排】\n${classes.length ? `课程：\n${classes.map(item => `- ${item}`).join("\n")}` : ""}${classes.length && scheduled.length ? "\n" : ""}${scheduled.length ? `日程：\n${scheduled.map(item => `- ${item}`).join("\n")}` : ""}` : ""
+  ].filter(Boolean);
   if (mood?.mood) lines.push(`今日心情：${mood.mood}${mood.note ? `（${mood.note.slice(0,120)}）` : ""}`);
-  return { day, phase, schedule:[...classes, ...scheduled], text:lines.join("\n") };
+  return { day, period, schedule:[...classes, ...scheduled], text:lines.join("\n") };
 }
 const WEATHER_CONTEXT_CACHE_MS = 10 * 60 * 1000;
 let weatherContextCache = { key:"", at:0, text:"" };
@@ -3835,8 +3885,8 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     .filter(Boolean)
     .join("\n");
   // ── CC（Agent 模式）专用静态 system prompt ──
-  // 只包含：人设 + 默认工具规则（记忆/档案）+ 日期 + 日程 + 自我档案
-  // 动态内容（时间/天气/动态工具/表情包等）在 ccDynamic 里每轮注入
+  // 只包含：人设 + 默认工具规则（记忆/档案）+ 自我档案
+  // 动态内容（时间/天气/日程/课表/动态工具/表情包等）在 ccDynamic 里每轮注入
   const isAgentMode = preset?.provider === "cc";
   const ccStaticSystemPrompt = isAgentMode ? [
     `当前日期：${new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
@@ -3848,7 +3898,6 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     toolsEnabled ? `【日记】write_diary 可以主动使用。Iris 明确要求写日记时，任何时间都可以写；当 Iris 明确结束当天聊天、准备睡觉或说晚安时，若当天尚未写日记，可以主动写。白天普通聊天不要随便写日记；已有同日记时 write_diary 会更新原日记，不会新建第二篇。` : "",
     `【所有工具｜失败处理】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。如果一次回复调用了多个工具，必须逐一报告每个工具的执行结果，不能因为某个工具成功就忽略其他工具的失败。不要在工具调用之前或同时声称已完成，只有在工具返回成功结果之后才能说已完成。`,
     `没有在当前消息的【当前已开启的额外工具】中列出的工具，你都不能使用。如需使用某个工具但当前未开启，请告诉 Iris 在右侧工具列表中开启对应功能。`,
-    dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期或日程”；若显示“尚无经期开始记录”，应如实说明缺少开始标记。` : "",
     selfProfileText ? `你当前的自我档案如下。它是连续成长中的自我认识，不是不可改变的硬提示词：\n${selfProfileText}` : "",
     toolsEnabled ? `遇到同一事件先更新旧记忆，不要新增重复项。相同事项已确认时不要重复查询。` : ""
   ].filter(Boolean).join("\n\n") : null;
@@ -4011,6 +4060,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     // ── 动态上下文（Agent 模式压缩版） ──
     const ccDynamic = [
       `时间：${ccTimeCompact}`,
+      dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期、日程或课程”；若显示“预测经期”，不得把它说成已经实际开始。` : "",
       dailyNoteContext ? `【未读Moment】\n${dailyNoteContext}` : "",
       companionStatusText || "",
       pendingCompanionText || "",

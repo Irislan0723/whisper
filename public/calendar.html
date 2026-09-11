@@ -647,8 +647,14 @@ function getCoursesForDate(dateStr){
   var d=new Date(dateStr+'T00:00:00');
   var dow=d.getDay();dow=dow===0?7:dow;
   var week=getSemesterWeek(dateStr);
-  if(week<1)return[];
+  if(week<1||week>Number(courseData.totalWeeks||16))return[];
   return courseData.courses.filter(function(c){return (!courseData.term||!c.term||c.term===courseData.term)&&c.day===dow&&courseOccursInWeek(c,week)});
+}
+function getCourseTimeRange(c){
+  var times=Array.isArray(courseData.periodTimes)?courseData.periodTimes:[];
+  var first=times.find(function(item){return c.startP>=Number(item.periodStart)&&c.startP<=Number(item.periodEnd)});
+  var last=times.find(function(item){return c.endP>=Number(item.periodStart)&&c.endP<=Number(item.periodEnd)});
+  return first&&first.startTime&&last&&last.endTime?first.startTime+'–'+last.endTime:'';
 }
 function saveCourses(){saveJSON(COURSE_KEY,courseData);queueCalendarSync()}
 function parseWeeksInput(value){
@@ -988,9 +994,10 @@ function renderTabContent(){
     if(dayCourses.length>0){
       dayCourses.sort(function(a,b){return a.startP-b.startP});
       dayCourses.forEach(function(c){
+        var courseTime=getCourseTimeRange(c);
         scheduleHtml+='<div class="schedule-item"><div class="schedule-color-bar" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'+
           '<div class="schedule-info"><div class="schedule-name">'+escHtml(c.name)+'</div>'+
-          '<div class="schedule-detail">第'+c.startP+'-'+c.endP+'节'+(c.location?' · '+escHtml(c.location):'')+(c.teacher?' · '+escHtml(c.teacher):'')+'</div></div></div>';
+          '<div class="schedule-detail">'+(courseTime?courseTime+' · ':'')+'第'+c.startP+'-'+c.endP+'节'+(c.location?' · '+escHtml(c.location):'')+(c.teacher?' · '+escHtml(c.teacher):'')+'</div></div></div>';
       });
     }
     if(dayEvents.length>0){
@@ -1093,9 +1100,10 @@ function showDayDetail(day){
       body+='<div class="detail-sub" style="margin-top:10px">课程安排</div>';
       courses.sort(function(a,b){return a.startP-b.startP});
       courses.forEach(function(c){
+        var courseTime=getCourseTimeRange(c);
         body+='<div class="schedule-item"><div class="schedule-color-bar" style="background:'+COURSE_COLORS[c.color||0]+'"></div>'+
           '<div class="schedule-info"><div class="schedule-name">'+escHtml(c.name)+'</div>'+
-          '<div class="schedule-detail">第'+c.startP+'-'+c.endP+'节'+(c.location?' · '+escHtml(c.location):'')+(c.teacher?' · '+escHtml(c.teacher):'')+'</div></div></div>';
+          '<div class="schedule-detail">'+(courseTime?courseTime+' · ':'')+'第'+c.startP+'-'+c.endP+'节'+(c.location?' · '+escHtml(c.location):'')+(c.teacher?' · '+escHtml(c.teacher):'')+'</div></div></div>';
       });
     }
     if(dayEvts.length>0){

@@ -32,6 +32,52 @@ const resolveDiaryTargetDay = new Function(`
 `)();
 const diaryTags = new Function("ensureArray", `${extractFunction("diaryTags")}; return diaryTags;`)(value => Array.isArray(value) ? value : []);
 const diaryDayKey = memory => (memory.tags || []).find(tag => String(tag).startsWith("__diary_date:"))?.slice("__diary_date:".length) || "";
+const periodStatusForDay = new Function(
+  "ensureArray", "daysBetweenCalendar",
+  `${extractFunction("periodStatusForDay")}; return periodStatusForDay;`
+)(
+  value => Array.isArray(value) ? value : [],
+  (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000)
+);
+const makeTodayCalendarContext = new Function(
+  "calendarDateKey", "dbAll", "moodFromDb", "eventFromDb", "supabase", "courseFromDb", "periodStatusForDay", "timetableSettingsFromMeta", "daysBetweenCalendar", "courseOccursInTeachingWeek", "timetableCourseTimeRange",
+  `return (async () => { async ${extractFunction("buildTodayCalendarContext")}; return buildTodayCalendarContext; })();`
+);
+
+async function buildTodayCalendarFixture({ day = "2026-09-07", moods = [], events = [], courses = [], timetable = {} } = {}) {
+  const settings = {
+    term:"2026-2027-1", semesterStart:"2026-09-07", totalWeeks:16,
+    periodTimes:[
+      { periodStart:1, periodEnd:2, startTime:"08:20", endTime:"09:50" },
+      { periodStart:5, periodEnd:6, startTime:"14:00", endTime:"15:30" }
+    ],
+    ...timetable
+  };
+  const dbAll = async table => table === "moods" ? moods : table === "calendar_events" ? events : [];
+  const supabase = {
+    from(table) {
+      return {
+        select() {
+          if (table === "calendar_settings") return { eq: () => ({ maybeSingle: async () => ({ data:{ cycle_length:28, period_length:5 }, error:null }) }) };
+          if (table === "calendar_meta") return { eq: () => ({ maybeSingle: async () => ({ data:{ value:settings }, error:null }) }) };
+          if (table === "calendar_courses") return Promise.resolve({ data:courses, error:null });
+          return Promise.resolve({ data:[], error:null });
+        }
+      };
+    }
+  };
+  const build = await makeTodayCalendarContext(
+    () => day, dbAll, value => value, value => value, supabase, value => value,
+    periodStatusForDay, value => value, (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000),
+    (course, week) => week >= course.weekStart && week <= course.weekEnd && (course.weekType !== "odd" || week % 2 === 1) && (course.weekType !== "even" || week % 2 === 0) && (course.weekType !== "list" || course.weeks.includes(week)),
+    (course, periodTimes) => {
+      const first = periodTimes.find(item => course.periodStart >= item.periodStart && course.periodStart <= item.periodEnd);
+      const last = periodTimes.find(item => course.periodEnd >= item.periodStart && course.periodEnd <= item.periodEnd);
+      return first && last ? `${first.startTime}–${last.endTime}` : "";
+    }
+  );
+  return build();
+}
 
 function memoryWriterAt(iso, rows = []) {
   class FixedDate extends Date {
@@ -95,6 +141,50 @@ test("diary target date supports evening today and early-morning yesterday", () 
   assert.deepEqual(resolveDiaryTargetDay("", new Date("2026-09-06T17:00:00Z")), { today: "2026-09-07", targetDiaryDay: "2026-09-06" });
   assert.deepEqual(resolveDiaryTargetDay("2026-09-07", new Date("2026-09-07T14:00:00Z")), { today: "2026-09-07", targetDiaryDay: "2026-09-07" });
   assert.throws(() => resolveDiaryTargetDay("2026-09-08", new Date("2026-09-07T14:00:00Z")), /未来日期/);
+});
+
+test("daily context labels a recorded period differently from a forecast", () => {
+  const settings = { cycle_length: 28, period_length: 5 };
+  const actual = periodStatusForDay([{ type:"period", phase:"start", date:"2026-09-10" }], settings, "2026-09-11");
+  assert.deepEqual(actual, { kind:"actual", day:2, startDate:"2026-09-10", endDate:"2026-09-14" });
+
+  const history = [
+    { type:"period", phase:"start", date:"2026-08-01" },
+    { type:"period", phase:"end", date:"2026-08-05" }
+  ];
+  assert.deepEqual(periodStatusForDay(history, settings, "2026-08-29"), { kind:"predicted", day:1, referenceDate:"2026-08-01" });
+
+  const override = periodStatusForDay([...history, { type:"period", phase:"start", date:"2026-08-29" }], settings, "2026-08-29");
+  assert.equal(override.kind, "actual");
+  assert.equal(override.day, 1);
+  assert.deepEqual(history, [
+    { type:"period", phase:"start", date:"2026-08-01" },
+    { type:"period", phase:"end", date:"2026-08-05" }
+  ]);
+});
+
+test("daily context combines only today's active courses and ordinary events", async () => {
+  const course = { term:"2026-2027-1", courseName:"数据新闻", weekday:1, periodStart:5, periodEnd:6, weekStart:1, weekEnd:16, weekType:"all", weeks:[], location:"文浚楼326" };
+  const event = { date:"2026-09-07", name:"取快递", timeStart:"18:30", timeEnd:"", location:"" };
+
+  const eventOnly = await buildTodayCalendarFixture({ events:[event] });
+  assert.match(eventOnly.text, /日程：\n- 18:30 取快递/);
+  assert.doesNotMatch(eventOnly.text, /课程：/);
+
+  const courseOnly = await buildTodayCalendarFixture({ courses:[course] });
+  assert.match(courseOnly.text, /课程：\n- 14:00–15:30 数据新闻 · 文浚楼326/);
+  assert.doesNotMatch(courseOnly.text, /日程：/);
+
+  const both = await buildTodayCalendarFixture({ courses:[course], events:[event] });
+  assert.match(both.text, /课程：/);
+  assert.match(both.text, /日程：/);
+
+  const odd = await buildTodayCalendarFixture({ courses:[{ ...course, weekType:"odd" }, { ...course, courseName:"双周课", weekType:"even" }] });
+  assert.match(odd.text, /数据新闻/);
+  assert.doesNotMatch(odd.text, /双周课/);
+
+  const changedTime = await buildTodayCalendarFixture({ courses:[course], timetable:{ periodTimes:[{ periodStart:5, periodEnd:6, startTime:"14:10", endTime:"15:40" }] } });
+  assert.match(changedTime.text, /14:10–15:40 数据新闻/);
 });
 
 test("diaries are unique by diary target date without a late-night execution window", () => {
@@ -173,6 +263,16 @@ test("calendar writes wait for their persistent APIs and surface failures", () =
   assert.ok(source.indexOf('app.put("/api/calendar/state"') < source.indexOf('app.put("/api/calendar/:id"'), "calendar state route must precede the generic :id route");
   assert.match(source, /time:String\(e\.time \?\? e\.timeStart \?\? ""\)\.trim\(\) \|\| null/);
   assert.match(source, /time_end:String\(e\.time_end \?\? e\.timeEnd \?\? ""\)\.trim\(\) \|\| null/);
+});
+
+test("Agent receives the daily calendar state in dynamic context, not its static prompt", () => {
+  const agentStatic = source.slice(source.indexOf("const ccStaticSystemPrompt"), source.indexOf("// ── API 模式完整 system prompt"));
+  const agentDynamic = source.slice(source.indexOf("const ccDynamic = ["), source.indexOf("// ── 首次调用"));
+  assert.doesNotMatch(agentStatic, /dailyCalendarText \?/);
+  assert.match(agentDynamic, /dailyCalendarText \?/);
+  assert.match(agentDynamic, /预测经期.*不得把它说成已经实际开始/);
+  assert.match(source, /课程：\\n/);
+  assert.match(source, /日程：\\n/);
 });
 
 test("appearance controls do not inherit dark variables from their own data attribute", () => {
