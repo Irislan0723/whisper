@@ -1313,7 +1313,7 @@ function enhanceRoomAppearanceV16(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',enhanceRoomAppearanceV16);else enhanceRoomAppearanceV16();
 
 // Role-level tool allowlist in the right drawer.
-const TOOL_GROUPS_V17=[['记忆',['read_memories','search_memories','add_memory','update_memory','delete_memory'],['读取长期记忆','搜索长期记忆','写入记忆（长期 / 日常 / 日记）','编辑已有记忆','删除长期记忆']],['自我档案',['read_self_profile','update_self_profile'],['读取自我档案','更新自我档案']],['心情与经期',['read_moods','save_mood'],['读取心情/经期记录','记录当天心情']],['日程',['read_calendar','add_calendar_event','update_calendar_event','delete_calendar_event'],['读取日程','新增日程','编辑日程','删除日程']],['课表',['read_timetable','import_timetable','update_timetable_course','delete_timetable_course'],['读取课表','导入整张课表','编辑课程','删除课程']],['信箱',['read_letters','write_letter'],['读取信箱','写信']],['聊天动作',['quote_user_message','recall_own_message'],['引用我的消息','撤回 TA 的旧消息']],['生图',['generate_image'],['生成图片']]];
+const TOOL_GROUPS_V17=[['记忆',['read_memories','search_memories','add_deep_memory','add_daily_memory','write_diary','update_memory','delete_memory'],['读取长期记忆','搜索长期记忆','写入长期记忆','写入日常记忆','写每日完整日记','编辑已有记忆','删除长期记忆']],['自我档案',['read_self_profile','update_self_profile'],['读取自我档案','更新自我档案']],['心情与经期',['read_moods','save_mood'],['读取心情/经期记录','记录当天心情']],['日程',['read_calendar','add_calendar_event','update_calendar_event','delete_calendar_event'],['读取日程','新增日程','编辑日程','删除日程']],['课表',['read_timetable','import_timetable','update_timetable_course','delete_timetable_course'],['读取课表','导入整张课表','编辑课程','删除课程']],['信箱',['read_letters','write_letter'],['读取信箱','写信']],['聊天动作',['quote_user_message','recall_own_message'],['引用我的消息','撤回 TA 的旧消息']],['生图',['generate_image'],['生成图片']]];
 function toolRoleV17(){return roles.find(role=>role.id===current?.roleId)||null}function toolConfigV17(value){const raw=value&&typeof value==='object'?value:{};return{enabled:raw.enabled!==false,mode:raw.mode==='all'?'all':'custom',allowed:Array.isArray(raw.allowed)?raw.allowed:[]}}
 async function persistToolConfigV17(config){const role=toolRoleV17();if(!role)return;const saved=await api('/api/chat/roles/'+encodeURIComponent(role.id),{method:'PUT',body:JSON.stringify({toolConfig:config})});const i=roles.findIndex(item=>item.id===role.id);if(i>=0)roles[i]=saved;renderToolManagerV17();toast('工具设置已保存','success')}
 function renderToolManagerV17(){const panel=$('rightMenuPanel-toolsV17');if(!panel)return;const role=toolRoleV17();if(!role){panel.innerHTML='<p class="tool-note-v17">当前对话还没有绑定角色。</p>';return}const config=toolConfigV17(role.toolConfig);const rows=(names,labels)=>names.map((name,i)=>'<label class="tool-choice-v17"><span>'+labels[i]+'<small>'+name+'</small></span><input type="checkbox" data-tool="'+name+'" '+(config.mode==='all'||config.allowed.includes(name)?'checked':'')+' '+(!config.enabled||config.mode==='all'?'disabled':'')+'></label>').join('');panel.innerHTML='<div class="tool-head-v17"><strong>'+esc(role.name||'当前 TA')+'</strong><small>角色级设置，所有房间生效</small></div><label class="setting-row tool-switch-v17"><span>允许 TA 调用工具<small>关闭后不注入任何工具</small></span><input class="switch" id="toolMasterV17" type="checkbox" '+(config.enabled?'checked':'')+'></label><label class="setting-row tool-switch-v17"><span>全部工具<small>关闭后可按分类选择</small></span><input class="switch" id="toolAllV17" type="checkbox" '+(config.mode==='all'?'checked':'')+' '+(!config.enabled?'disabled':'')+'></label><div class="tool-groups-v17">'+TOOL_GROUPS_V17.map(g=>'<details><summary>'+g[0]+'</summary>'+rows(g[1],g[2])+'</details>').join('')+'</div>';const save=()=>persistToolConfigV17({enabled:$('toolMasterV17').checked,mode:$('toolAllV17').checked?'all':'custom',allowed:[...panel.querySelectorAll('[data-tool]:checked')].map(input=>input.dataset.tool)}).catch(e=>toast('保存失败：'+e.message,'error'));$('toolMasterV17').onchange=save;$('toolAllV17').onchange=save;panel.querySelectorAll('[data-tool]').forEach(input=>input.onchange=save)}
@@ -1660,7 +1660,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 /* V23: per-turn native thinking and tool-call sheets. */
 const TURN_TOOL_NAMES_V23={
   read_self_profile:'读取自我档案',update_self_profile:'更新自我档案',
-  read_memories:'读取长期记忆',search_memories:'搜索长期记忆',add_memory:'写入记忆',update_memory:'编辑记忆',delete_memory:'删除记忆',
+  read_memories:'读取长期记忆',search_memories:'搜索长期记忆',add_memory:'写入记忆（旧版）',add_deep_memory:'写入长期记忆',add_daily_memory:'写入日常记忆',write_diary:'写每日完整日记',update_memory:'编辑记忆',delete_memory:'删除记忆',
   read_moods:'读取心情 / 经期记录',save_mood:'记录当天心情',
   read_letters:'读取信箱',write_letter:'写信',
   read_calendar:'读取日程',add_calendar_event:'新增日程',update_calendar_event:'编辑日程',delete_calendar_event:'删除日程',
@@ -2625,17 +2625,19 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    so the tool manager shows agent defaults (memory + self-profile) when in agent
    mode, and saves agent-mode tool changes to the conversation object instead of
    the role. */
-const CC_AGENT_DEFAULT_TOOLS_V88=new Set(['read_self_profile','update_self_profile','read_memories','search_memories','add_memory','update_memory','delete_memory']);
+const MEMORY_WRITE_TOOL_NAMES_V91=['add_deep_memory','add_daily_memory','write_diary'];
+const CC_AGENT_DEFAULT_TOOLS_V88=new Set(['read_self_profile','update_self_profile','read_memories','search_memories',...MEMORY_WRITE_TOOL_NAMES_V91,'update_memory','delete_memory']);
+function migrateLegacyMemoryToolConfigV91(allowed){const names=Array.isArray(allowed)?allowed.map(String):[];return names.includes('add_memory')?[...new Set([...names.filter(name=>name!=='add_memory'),...MEMORY_WRITE_TOOL_NAMES_V91])]:names}
 const toolConfigV88bBase=toolConfigV17;
 toolConfigV17=function(value){
   if((current?.mode||'api')==='agent'){
     const agentCfg=current.agentToolConfig;
     if(agentCfg&&typeof agentCfg==='object'){
-      return{enabled:agentCfg.enabled!==false,mode:'custom',allowed:Array.isArray(agentCfg.allowed)?agentCfg.allowed:[]}
+      return{enabled:agentCfg.enabled!==false,mode:'custom',allowed:migrateLegacyMemoryToolConfigV91(agentCfg.allowed)}
     }
     /* 无保存过的 agentToolConfig → 默认只开启 agent 默认工具 */
     const base=toolConfigV88bBase(value);
-    const agentAllowed=base.mode==='all'?[...CC_AGENT_DEFAULT_TOOLS_V88]:base.allowed.filter(name=>CC_AGENT_DEFAULT_TOOLS_V88.has(name));
+    const agentAllowed=base.mode==='all'?[...CC_AGENT_DEFAULT_TOOLS_V88]:migrateLegacyMemoryToolConfigV91(base.allowed).filter(name=>CC_AGENT_DEFAULT_TOOLS_V88.has(name));
     return{enabled:true,mode:'custom',allowed:agentAllowed}
   }
   return toolConfigV88bBase(value)

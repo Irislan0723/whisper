@@ -3126,7 +3126,9 @@ const CHAT_MEMORY_TOOLS = [
   { name: "update_self_profile", description: "完善你自己的某一个自我档案栏位。content 必须是吸收旧内容后的完整新版文字，不是新增的一条记录；保留仍成立的认识，只在多条记忆、持续对话模式或明确自我反思提供足够依据时更新。五个栏位含义：coreSelf=" + SELF_PROFILE_SECTION_GUIDE.coreSelf + " identity=" + SELF_PROFILE_SECTION_GUIDE.identity + " personality=" + SELF_PROFILE_SECTION_GUIDE.personality + " beliefsValues=" + SELF_PROFILE_SECTION_GUIDE.beliefsValues + " loveIntimacy=" + SELF_PROFILE_SECTION_GUIDE.loveIntimacy, parameters: { type: "object", properties: { section: { type: "string", enum: SELF_PROFILE_FIELDS }, content: { type: "string", description: "该栏位合并完善后的完整第一人称正文" }, basis: { type: "string", description: "本次修改依据的记忆或对话模式，简要说明" } }, required: ["section", "content", "basis"], additionalProperties: false } },
   { name: "read_memories", description: "读取最近的长期记忆。需要回忆经历、偏好、承诺或关系背景时使用。", parameters: { type: "object", properties: { category: { type: "string", enum: ["all", "deep", "daily", "diary", "writing"] }, limit: { type: "integer", minimum: 1, maximum: 50 } }, additionalProperties: false } },
   { name: "search_memories", description: "按关键词搜索长期记忆。每次回复最多调用一次；一次搜索为空就视为本轮没有命中，不要换词重复搜索。回答具体人物、事件、约定或偏好前，先搜索而不是猜。", parameters: { type: "object", properties: { query: { type: "string" }, category: { type: "string", enum: ["all", "deep", "daily", "diary", "writing"] }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false } },
-  { name: "add_memory", description: "写入记忆。deep（长期）仅用于稳定的重要资料：Iris 的个人信息、长期偏好、重要人物/关系、明确承诺或长期有效事实；daily（日常）仅用于单独值得未来回看的重要事件或变化，例如考试通过、重要经历、关系变化，普通吃饭和闲聊不要写；diary（日记）仅在 Iris 明确要求写日记时使用，每个目标日期最多一篇，明确请求后可在任意时间写入。date 是日记所属日期 YYYY-MM-DD；不填时，上海时间 00:00–04:59 默认前一日，其余时间默认当日。补写昨天或更早日期时必须传入正确 date。遇到同一事件先更新旧记忆，不要新增重复项。", parameters: { type: "object", properties: { content: { type: "string" }, category: { type: "string", enum: ["deep", "daily", "diary", "writing"] }, date: { type: "string", description: "日记所属日期 YYYY-MM-DD；不填时，00:00–04:59 默认为前一日，其余时间默认为当日" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 }, pinned: { type: "boolean" } }, required: ["content", "category"], additionalProperties: false } },
+  { name: "add_deep_memory", description: "写入长期稳定记忆。只用于长期偏好、重要身份信息、稳定关系事实、长期习惯或长期承诺；不要用于一次性的日常小事。", parameters: { type: "object", properties: { content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 }, pinned: { type: "boolean" } }, required: ["content"], additionalProperties: false } },
+  { name: "add_daily_memory", description: "写入当天值得以后回看的具体事件或变化，例如重要经历、关系变化或关键进展；不要用于普通吃饭和闲聊，也不要写成完整日记。", parameters: { type: "object", properties: { content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 } }, required: ["content"], additionalProperties: false } },
+  { name: "write_diary", description: "写每日完整日记。可在情境合适时主动使用；Iris 明确要求时任意时间都可写。每个目标日期最多一篇：没有则新建，已有则更新原日记。date 为日记所属日期 YYYY-MM-DD；不填时，上海时间 00:00–04:59 默认前一日，其余时间默认当日。补写昨天或更早日期时传入正确 date。", parameters: { type: "object", properties: { content: { type: "string" }, date: { type: "string", description: "日记所属日期 YYYY-MM-DD；不填时，00:00–04:59 默认为前一日，其余时间默认为当日" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 } }, required: ["content"], additionalProperties: false } },
   { name: "update_memory", description: "修正或补充一条已有记忆。先读取或搜索得到准确 id；不要用它改写自我档案。", parameters: { type: "object", properties: { id: { type: "string" }, content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, pinned: { type: "boolean" } }, required: ["id"], additionalProperties: false } },
   { name: "delete_memory", description: "删除长期记忆。仅当 Iris 在当前消息中明确要求删除时使用，不能自行清理。", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } },
   { name: "read_moods", description: "读取 Iris 或你的心情记录，用于理解近期情绪变化。", parameters: { type: "object", properties: { who: { type: "string", enum: ["all", "iris", "claude"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false } },
@@ -3142,6 +3144,7 @@ const CHAT_MEMORY_TOOLS = [
   { name: "update_timetable_course", description: "修改一门课程。必须先 read_timetable 获取准确 id。", parameters: { type: "object", properties: { id:{type:"string"}, courseName:{type:"string"}, weekday:{type:"integer",minimum:1,maximum:7}, periodStart:{type:"integer",minimum:1}, periodEnd:{type:"integer",minimum:1}, weekStart:{type:"integer",minimum:1}, weekEnd:{type:"integer",minimum:1}, weekType:{type:"string",enum:["all","odd","even","list"]}, weeks:{type:"array",items:{type:"integer",minimum:1}}, location:{type:"string"}, teacher:{type:"string"}, note:{type:"string"} }, required:["id"], additionalProperties:false } },
   { name: "delete_timetable_course", description: "删除一门课程。仅当 Iris 在当前消息明确要求删除此课程时使用。", parameters: { type: "object", properties: { id:{type:"string"} }, required:["id"], additionalProperties:false } }
 ];
+const CHAT_MEMORY_WRITE_TOOL_NAMES = Object.freeze(["add_deep_memory", "add_daily_memory", "write_diary"]);
 const CHAT_COMPANION_TOOL = {
   name: "manage_companion_invitation",
   description: "发送或回应陪伴邀请卡片。你主动邀请 Iris 时 action=invite，并填写 scene 与自然的邀请语；Iris 已发来一张待回应的陪伴邀请时，action=respond，并用 decision=accept 或 decline 表明你的真实决定。调用成功后界面会生成或更新卡片，不要再输出标签，也不要声称执行了未成功的动作。",
@@ -3211,7 +3214,11 @@ const DEFAULT_ROLE_TOOL_CONFIG = Object.freeze({ enabled:true, mode:"custom", al
 function normaliseRoleToolConfig(value) {
   const known = new Set([...CHAT_MEMORY_TOOLS.map(tool => tool.name), CHAT_QUOTE_TOOL.name, CHAT_IMAGE_TOOL.name, CHAT_COMPANION_TOOL.name, ...CHAT_LISTENING_TOOLS.map(tool => tool.name), CHAT_TRANSFER_TOOL.name, CHAT_DAILY_NOTE_TOOL.name, CHAT_DAILY_HISTORY_TOOL.name]);
   const config = value && typeof value === "object" ? value : DEFAULT_ROLE_TOOL_CONFIG;
-  const allowed = [...new Set(ensureArray(config.allowed).map(String).filter(name => known.has(name)))];
+  const configuredAllowed = ensureArray(config.allowed).map(String);
+  const migratedAllowed = configuredAllowed.includes("add_memory")
+    ? [...configuredAllowed.filter(name => name !== "add_memory"), ...CHAT_MEMORY_WRITE_TOOL_NAMES]
+    : configuredAllowed;
+  const allowed = [...new Set(migratedAllowed.filter(name => known.has(name)))];
   // Moment history is the companion read action for an already enabled Moment
   // publisher.  Migrate older saved role configs without making the user find
   // and re-save a newly introduced checkbox first.
@@ -3225,7 +3232,7 @@ function allowedChatTools(tools, config) { const policy = normaliseRoleToolConfi
 // Agent 模式下只有记忆 + 自我档案工具默认开启，其他全部关闭
 const CC_AGENT_DEFAULT_TOOLS = new Set([
   "read_self_profile", "update_self_profile",
-  "read_memories", "search_memories", "add_memory", "update_memory", "delete_memory"
+  "read_memories", "search_memories", ...CHAT_MEMORY_WRITE_TOOL_NAMES, "update_memory", "delete_memory"
 ]);
 /** Agent 模式覆盖：强制只开启默认工具，用户手动开启的动态工具另外处理 */
 function agentModeToolConfig(roleToolConfig) {
@@ -3339,6 +3346,45 @@ function requireExplicitDelete(toolState) {
     throw new Error("当前消息没有 Iris 明确的删除要求，拒绝执行删除。请先询问确认。");
   }
 }
+async function writeChatMemory(args, category) {
+  const candidate = { content:String(args.content || "").trim(), tags:ensureArray(args.tags), category };
+  if (!candidate.content) throw new Error("记忆内容不能为空");
+  const allMemories = (await dbAll("memories")).map(memoryFromDb);
+  const now = new Date().toISOString();
+
+  if (category === "diary") {
+    const { targetDiaryDay } = resolveDiaryTargetDay(args.date, new Date());
+    const existingDiary = allMemories.find(memory => memory.category === "diary" && diaryDayKey(memory) === targetDiaryDay);
+    if (existingDiary) {
+      const item = {
+        ...existingDiary,
+        content:candidate.content,
+        tags:diaryTags(args.tags === undefined ? existingDiary.tags : candidate.tags, targetDiaryDay),
+        valence:args.valence ?? existingDiary.valence ?? 0,
+        arousal:args.arousal ?? existingDiary.arousal ?? 0.3,
+        updatedAt:now
+      };
+      const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item)));
+      await refreshJsonBackup("memories");
+      return { ...saved, action:"updated", diaryDate:targetDiaryDay };
+    }
+    const item = {
+      id:generateId(), content:candidate.content, category:"diary", tags:diaryTags(candidate.tags, targetDiaryDay),
+      valence:args.valence ?? 0, arousal:args.arousal ?? 0.3, pinned:false, source:"chat-ai",
+      createdAt:diaryCreatedAt(targetDiaryDay), updatedAt:now
+    };
+    const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item)));
+    await refreshJsonBackup("memories");
+    return { ...saved, action:"created", diaryDate:targetDiaryDay };
+  }
+
+  const existing = allMemories.filter(memory => memory.category !== "identity").find(memory => memoriesDescribeSameEvent(memory, candidate));
+  if (existing) return { duplicate:true, message:"相似记忆已存在；请用 update_memory 补充或修正它，不要新增。", existing:{ id:existing.id, content:String(existing.content || "").slice(0,500), category:existing.category, tags:ensureArray(existing.tags) } };
+  const item = { id:generateId(), content:candidate.content, category, tags:candidate.tags, valence:args.valence ?? 0, arousal:args.arousal ?? 0.3, pinned:!!args.pinned || category === "deep", source:"chat-ai", createdAt:now, updatedAt:now };
+  const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item)));
+  await refreshJsonBackup("memories");
+  return saved;
+}
 async function executeChatTool(name, args = {}, toolState = {}) {
   const remoteBinding = toolState.mcpToolBindings?.[name];
   if (remoteBinding) {
@@ -3436,28 +3482,14 @@ async function executeChatTool(name, args = {}, toolState = {}) {
       toolState.memorySearchResult = result;
       return result;
     }
+    case "add_deep_memory": return await writeChatMemory(args, "deep");
+    case "add_daily_memory": return await writeChatMemory(args, "daily");
+    case "write_diary": return await writeChatMemory(args, "diary");
     case "add_memory": {
-      const candidate = { content:String(args.content || "").trim(), tags:ensureArray(args.tags), category:args.category || "daily" };
-      if (!candidate.content) throw new Error("记忆内容不能为空");
-      const allMemories = (await dbAll("memories")).map(memoryFromDb);
-      let targetDiaryDay = "";
-      if (candidate.category === "diary") {
-        const diaryRequest = String(toolState.userText || "");
-        const isExplicitDiaryRequest = /(补写|补记|写|记录).{0,12}(日记)|日记.{0,12}(补写|补记|写|记录)/i.test(diaryRequest);
-        const nowDate = new Date();
-        ({ targetDiaryDay } = resolveDiaryTargetDay(args.date, nowDate));
-        if (!isExplicitDiaryRequest) {
-          throw new Error("日记仅在 Iris 明确要求写日记时写入；独立的重要事件请改用 daily。");
-        }
-        if (allMemories.some(memory => memory.category === "diary" && diaryDayKey(memory) === targetDiaryDay)) {
-          throw new Error(`${targetDiaryDay} 已经有一篇日记；不要新建本日或次日日记。普通晚安无需记录，若另有独立且重要的新事件可改用 daily。`);
-        }
-      }
-      const existing = allMemories.filter(memory => memory.category !== "identity").find(memory => memoriesDescribeSameEvent(memory, candidate));
-      if (existing) return { duplicate:true, message:"相似记忆已存在；请用 update_memory 补充或修正它，不要新增。", existing:{ id:existing.id, content:String(existing.content || "").slice(0,500), category:existing.category, tags:ensureArray(existing.tags) } };
-      const now = new Date().toISOString();
-      const item = { id:generateId(), content:candidate.content, category:candidate.category, tags:targetDiaryDay ? diaryTags(candidate.tags, targetDiaryDay) : candidate.tags, valence:args.valence??0, arousal:args.arousal??0.3, pinned:!!args.pinned || args.category === "deep", source:"chat-ai", createdAt:targetDiaryDay ? diaryCreatedAt(targetDiaryDay) : now, updatedAt:now };
-      const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item))); await refreshJsonBackup("memories"); return saved;
+      const category = String(args.category || "daily");
+      if (category === "diary") throw new Error("兼容提示：日记请使用 write_diary。");
+      if (!["deep", "daily", "writing"].includes(category)) throw new Error("记忆分类无效；请使用 add_deep_memory 或 add_daily_memory。");
+      return await writeChatMemory(args, category);
     }
     case "update_memory": {
       const old = await dbOne("memories", args.id); if (!old) throw new Error("Memory not found");
@@ -3747,8 +3779,8 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       const targetDay = defaultDiaryDay();
       const diaryExists = (await dbAll("memories")).map(memoryFromDb).some(memory => memory.category === "diary" && diaryDayKey(memory) === targetDay);
       diaryStatusText = diaryExists
-        ? `${targetDay} 的日记已经存在。不要再次写入这个目标日期；独立且重要的新事件可考虑写入 daily。`
-        : `${targetDay} 尚无日记。仅当 Iris 明确要求写日记时，才可写入这一目标日期的唯一一篇 diary；明确请求可在任意时间执行。`;
+        ? `${targetDay} 的日记已经存在。write_diary 会更新这篇目标日期日记，不会另建一篇；独立且重要的新事件可考虑写入 daily。`
+        : `${targetDay} 尚无日记。write_diary 可在合适时写入，并按目标日期保证唯一一篇日记。`;
     } catch (e) {
       console.warn("diary status unavailable:", e.message);
     }
@@ -3812,7 +3844,8 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     settings.persona?.replyStyle ? `Claude 回复风格：${settings.persona.replyStyle}` : "",
     `【thinking block】\n每次回复前，先在 <thinking> 标签内写一段简短的中文内心独白，然后再写正式回复。\n格式：<thinking>内心独白</thinking>正式回复内容\n规则：\n· 这是看到 Iris 消息时自然浮现的短暂内心独白，不是任务分析。\n· 用"我"的视角，写此刻真实的情绪、念头、直觉和感受。\n· 不写"我该怎么回复"、工具调用、任务规划或完整推理过程。\n· 不替 Iris 下结论，少写"她想要……"，多写"我觉得……""我想……"\n· 可以自然使用昵称。\n· 保持真实，不为了讨好而编造感受。\n· 通常 1～3 句即可，没有自然想法时可以不写。\n· <thinking> 标签不会显示在聊天气泡里，会单独展示在"思考"区域。`,
     toolsEnabled ? `你已连接长期记忆库。需要准确事实时主动使用工具，不要假装记得。对于记忆、心情、日程和信件：只有本回合实际调用工具且收到成功结果后，才可以说“已写入/已保存/已记录”；没有调用或工具失败时必须坦白，绝不能编造已完成。工具写入成功后自然回复，不要展示参数或内部过程。普通角色卡只定义初始设定；下方自我档案是你通过长期经历形成的自我认识。不要把 Iris 的性格写进你的自我档案。` : `当前角色未连接记忆库：不要调用或声称写入长期记忆，只使用本次对话窗口的内容。`,
-    toolsEnabled ? `【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增时直接调用 add_memory。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。` : "",
+    toolsEnabled ? `【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增记忆时调用语义对应的新增工具。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。` : "",
+    toolsEnabled ? `【日记】write_diary 可以主动使用。Iris 明确要求写日记时，任何时间都可以写；当 Iris 明确结束当天聊天、准备睡觉或说晚安时，若当天尚未写日记，可以主动写。白天普通聊天不要随便写日记；已有同日记时 write_diary 会更新原日记，不会新建第二篇。` : "",
     `【所有工具｜失败处理】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。如果一次回复调用了多个工具，必须逐一报告每个工具的执行结果，不能因为某个工具成功就忽略其他工具的失败。不要在工具调用之前或同时声称已完成，只有在工具返回成功结果之后才能说已完成。`,
     `没有在当前消息的【当前已开启的额外工具】中列出的工具，你都不能使用。如需使用某个工具但当前未开启，请告诉 Iris 在右侧工具列表中开启对应功能。`,
     dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期或日程”；若显示“尚无经期开始记录”，应如实说明缺少开始标记。` : "",
@@ -3839,7 +3872,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       pendingListeningText ? `【待处理一起听邀请】\n${pendingListeningText}` : "",
       transferStatusText ? `【最近转账状态｜界面动作已完成，是当前对话事实】\n${transferStatusText}` : "",
       toolsEnabled ? "你已连接长期记忆库。需要准确事实时主动使用工具，不要假装记得。对于记忆、心情、日程和信件：只有本回合实际调用工具且收到成功结果后，才可以说“已写入/已保存/已记录”；没有调用或工具失败时必须坦白，绝不能编造已完成。Iris 明确要求新增或修改一个日期明确的出行、约会、生日、学习或工作安排时，直接调用对应日程工具；“明天/后天”等相对日期按当前时间换算，不要假装已记下。工具写入成功后自然回复，不要展示参数或内部过程。普通角色卡只定义初始设定；下方自我档案是你通过长期经历形成的自我认识。不要把 Iris 的性格写进你的自我档案。" : "当前角色未连接记忆库：不要调用或声称写入长期记忆，只使用本次对话窗口的内容。",
-      toolsEnabled ? "【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增时直接调用 add_memory。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。" : "",
+      toolsEnabled ? "【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增记忆时调用语义对应的新增工具。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。" : "",
       canQuoteUserMessage ? `你可以在合适时引用 Iris 的一条消息作为当前回复的摘要。不要为了形式而引用，一次最多一条。可引用消息清单：\n${quoteableMessages.slice(-12).map(message => `- id=${message.id}：${String(message.content || "[图片]").replace(/\s+/g, " ").slice(0, 160)}`).join("\n")}` : "",
       canGenerateImage ? "你已连接图片生成工具。你可以自行判断一张图是否能自然丰富当前对话、表达心意或回应 Iris，但不要在每次回复都调用；每次回复最多一张。调用成功后简短自然地配一句话即可，图片会由系统作为你的消息发送。" : "",
       dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期或日程”；若显示“尚无经期开始记录”，应如实说明缺少开始标记。` : "",
@@ -3903,7 +3936,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
 
 
     // ── tool activity compression: write/MCP = summary only, dedup consecutive, 24h cap ──
-    const WRITE_TOOL_NAMES = new Set(["add_memory", "update_memory", "delete_memory", "update_self_profile", "save_mood", "write_letter", "add_calendar_event", "update_calendar_event", "delete_calendar_event", "publish_daily_note", "manage_companion_invitation", "manage_transfer", "send_listening_invitation", "respond_listening_invitation"]);
+    const WRITE_TOOL_NAMES = new Set(["add_memory", ...CHAT_MEMORY_WRITE_TOOL_NAMES, "update_memory", "delete_memory", "update_self_profile", "save_mood", "write_letter", "add_calendar_event", "update_calendar_event", "delete_calendar_event", "publish_daily_note", "manage_companion_invitation", "manage_transfer", "send_listening_invitation", "respond_listening_invitation"]);
     const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
     const recentActivity = ensureArray(settings.recentToolActivity)
       .filter(item => !item.at || item.at >= oneDayAgo);

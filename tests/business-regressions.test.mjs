@@ -30,8 +30,41 @@ const resolveDiaryTargetDay = new Function(`
   ${extractFunction("resolveDiaryTargetDay")}
   return resolveDiaryTargetDay;
 `)();
+const diaryTags = new Function("ensureArray", `${extractFunction("diaryTags")}; return diaryTags;`)(value => Array.isArray(value) ? value : []);
+const diaryDayKey = memory => (memory.tags || []).find(tag => String(tag).startsWith("__diary_date:"))?.slice("__diary_date:".length) || "";
 
-test("add_memory CC payloads preserve Chinese punctuation, quotes, newlines, and emoji", () => {
+function memoryWriterAt(iso, rows = []) {
+  class FixedDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [iso])); }
+  }
+  const writeChatMemorySource = source.slice(source.indexOf("async function writeChatMemory"), source.indexOf("async function executeChatTool"));
+  const writeChatMemory = new Function(
+    "ensureArray", "dbAll", "memoryFromDb", "resolveDiaryTargetDay", "diaryDayKey", "diaryTags", "generateId", "diaryCreatedAt", "dbUpsert", "memoryToDbRow", "refreshJsonBackup", "memoriesDescribeSameEvent", "Date",
+    `${writeChatMemorySource}; return writeChatMemory;`
+  )(
+    value => Array.isArray(value) ? value : [],
+    async () => rows.map(item => ({ ...item })),
+    item => ({ ...item }),
+    resolveDiaryTargetDay,
+    diaryDayKey,
+    diaryTags,
+    () => `memory-${rows.length + 1}`,
+    day => new Date(`${day}T12:00:00+08:00`).toISOString(),
+    async (_table, item) => {
+      const index = rows.findIndex(row => row.id === item.id);
+      if (index >= 0) rows[index] = { ...item };
+      else rows.push({ ...item });
+      return { ...item };
+    },
+    item => item,
+    async () => {},
+    () => false,
+    FixedDate
+  );
+  return { rows, writeChatMemory };
+}
+
+test("memory tool CC payloads preserve Chinese punctuation, quotes, newlines, and emoji", () => {
   const contents = [
     "普通中文内容",
     "她说“今天好困”",
@@ -43,7 +76,7 @@ test("add_memory CC payloads preserve Chinese punctuation, quotes, newlines, and
     "她说“好困”，但还是陪我聊了一会儿；「Whisper」很好。"
   ];
   for (const content of contents) {
-    const xml = `<tool_call name="add_memory">${JSON.stringify({ content, category: "daily" })}</tool_call>`;
+    const xml = `<tool_call name="add_daily_memory">${JSON.stringify({ content })}</tool_call>`;
     const [call] = parseCcToolCalls(xml);
     assert.equal(call.parseError, "");
     assert.equal(call.args.content, content);
@@ -51,7 +84,7 @@ test("add_memory CC payloads preserve Chinese punctuation, quotes, newlines, and
 });
 
 test("malformed tool JSON reports its parser error instead of becoming empty memory content", () => {
-  const [call] = parseCcToolCalls('<tool_call name="add_memory">{"content":"lost}</tool_call>');
+  const [call] = parseCcToolCalls('<tool_call name="add_daily_memory">{"content":"lost}</tool_call>');
   assert.match(call.parseError, /JSON 解析失败/);
   assert.deepEqual(call.args, {});
   assert.match(source, /if \(!candidate\.content\) throw new Error\("记忆内容不能为空"\)/);
@@ -65,11 +98,60 @@ test("diary target date supports evening today and early-morning yesterday", () 
 });
 
 test("diaries are unique by diary target date without a late-night execution window", () => {
-  const addMemoryCase = source.slice(source.indexOf('case "add_memory":'), source.indexOf('case "update_memory":'));
-  assert.doesNotMatch(addMemoryCase, /isDiaryClosingWindow|isCrossDayGracePeriod/);
-  assert.match(addMemoryCase, /resolveDiaryTargetDay\(args\.date, nowDate\)/);
-  assert.match(addMemoryCase, /diaryDayKey\(memory\) === targetDiaryDay/);
+  const writeMemoryFunction = extractFunction("writeChatMemory");
+  assert.doesNotMatch(writeMemoryFunction, /isDiaryClosingWindow|isCrossDayGracePeriod|isExplicitDiaryRequest|日记仅在 Iris 明确要求写日记时写入/);
+  assert.match(writeMemoryFunction, /resolveDiaryTargetDay\(args\.date, new Date\(\)\)/);
+  assert.match(writeMemoryFunction, /diaryDayKey\(memory\) === targetDiaryDay/);
+  assert.match(writeMemoryFunction, /action:"updated"/);
+  assert.match(writeMemoryFunction, /action:"created"/);
+  assert.match(writeMemoryFunction, /diaryTags\(/);
   assert.match(source, /if \(targetDiaryDay > today\) throw new Error\("不能提前写未来日期的日记。"\)/);
+});
+
+test("memory writers are split by purpose and retain a safe legacy add_memory bridge", () => {
+  for (const toolName of ["add_deep_memory", "add_daily_memory", "write_diary"]) assert.match(source, new RegExp(`name: "${toolName}"`));
+  assert.match(source, /case "add_deep_memory": return await writeChatMemory\(args, "deep"\)/);
+  assert.match(source, /case "add_daily_memory": return await writeChatMemory\(args, "daily"\)/);
+  assert.match(source, /case "write_diary": return await writeChatMemory\(args, "diary"\)/);
+  const legacyCase = source.slice(source.indexOf('case "add_memory":'), source.indexOf('case "update_memory":'));
+  assert.match(legacyCase, /日记请使用 write_diary/);
+  assert.doesNotMatch(legacyCase, /isExplicitDiaryRequest|日记仅在 Iris 明确要求写日记时写入/);
+  assert.match(source, /CHAT_MEMORY_WRITE_TOOL_NAMES/);
+  assert.match(source, /migratedAllowed/);
+});
+
+test("split writers preserve deep/daily behavior and diary upserts by target date", async () => {
+  const evening = memoryWriterAt("2026-09-07T14:00:00.000Z"); // Shanghai 22:00
+  const deep = await evening.writeChatMemory({ content:"长期偏好" }, "deep");
+  const daily = await evening.writeChatMemory({ content:"今天的重要变化" }, "daily");
+  assert.equal(deep.category, "deep");
+  assert.equal(deep.pinned, true);
+  assert.equal(daily.category, "daily");
+
+  const firstToday = await evening.writeChatMemory({ content:"22 点写今天日记" }, "diary");
+  assert.equal(firstToday.action, "created");
+  assert.equal(firstToday.diaryDate, "2026-09-07");
+  const updatedToday = await evening.writeChatMemory({ content:"同日更新原日记", tags:["important"] }, "diary");
+  assert.equal(updatedToday.action, "updated");
+  assert.equal(evening.rows.filter(row => row.category === "diary" && diaryDayKey(row) === "2026-09-07").length, 1);
+  assert.equal(updatedToday.content, "同日更新原日记");
+  assert.ok(updatedToday.tags.includes("__diary_date:2026-09-07"));
+
+  const afternoon = memoryWriterAt("2026-09-07T09:00:00.000Z"); // Shanghai 17:00
+  const explicitAt17 = await afternoon.writeChatMemory({ content:"17 点明确要求写今天日记" }, "diary");
+  assert.equal(explicitAt17.action, "created");
+  assert.equal(explicitAt17.diaryDate, "2026-09-07");
+
+  const crossDayRows = [];
+  const earlyMorning = memoryWriterAt("2026-09-06T17:00:00.000Z", crossDayRows); // Shanghai 01:00 on Sep 7
+  const defaultYesterday = await earlyMorning.writeChatMemory({ content:"凌晨默认归昨天" }, "diary");
+  assert.equal(defaultYesterday.diaryDate, "2026-09-06");
+  const explicitYesterday = await earlyMorning.writeChatMemory({ content:"凌晨明确补昨天" , date:"2026-09-06" }, "diary");
+  assert.equal(explicitYesterday.action, "updated");
+  const laterThatDay = memoryWriterAt("2026-09-07T14:00:00.000Z", crossDayRows); // Shanghai 22:00
+  const todayAfterYesterday = await laterThatDay.writeChatMemory({ content:"当天另一份日记" }, "diary");
+  assert.equal(todayAfterYesterday.diaryDate, "2026-09-07");
+  assert.deepEqual(crossDayRows.filter(row => row.category === "diary").map(diaryDayKey).sort(), ["2026-09-06", "2026-09-07"]);
 });
 
 test("calendar writes wait for their persistent APIs and surface failures", () => {
