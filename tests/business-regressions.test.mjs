@@ -18,6 +18,7 @@ function extractFunction(name) {
 
 const parseToolArguments = new Function(`${extractFunction("parseToolArguments")}; return parseToolArguments;`)();
 const parseCcToolCalls = new Function("parseToolArguments", `${extractFunction("parseCcToolCalls")}; return parseCcToolCalls;`)(parseToolArguments);
+const splitInlineThinking = new Function(`${extractFunction("splitInlineThinking")}; return splitInlineThinking;`)();
 const resolveDiaryTargetDay = new Function(`
   const CHAT_TIME_ZONE = "Asia/Shanghai";
   const CROSS_DAY_CONTEXT_CUTOFF_HOUR = 5;
@@ -137,6 +138,16 @@ test("memory tool CC payloads preserve Chinese punctuation, quotes, newlines, an
     assert.equal(call.parseError, "");
     assert.equal(call.args.content, content);
   }
+});
+
+test("Whisper thinking blocks use the parser-supported format and stay outside visible text", () => {
+  assert.deepEqual(splitInlineThinking("<thinking>第一句\n第二句</thinking>正式回复"), { text:"正式回复", reasoning:"第一句\n第二句" });
+  const staticPrompt = source.slice(source.indexOf("const ccStaticSystemPrompt"), source.indexOf("// ── API 模式完整 system prompt"));
+  assert.match(staticPrompt, /每次正常聊天回复都必须先输出一个独立的 <thinking>\.\.\.<\/thinking> block/);
+  assert.match(staticPrompt, /正常聊天一律不得省略/);
+  assert.match(staticPrompt, /不能把 Thought 内容写进普通回复正文/);
+  assert.match(staticPrompt, /不分析 Iris 的行为动机，不规划回复，不复盘，不写工具规划，也不写完整推理过程/);
+  assert.equal(readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8").trim(), "正常聊天必须遵守 Whisper system prompt 规定的 thinking block 格式，不得省略，也不得把 Thought 写入普通正文。");
 });
 
 test("malformed tool JSON reports its parser error instead of becoming empty memory content", () => {
