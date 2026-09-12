@@ -2852,3 +2852,7 @@ openMcpFormV60=openMcpFormV98;
 openMcpFormV62=openMcpFormV98;
 function initMcpManagementV98(){injectMcpManagementV98Styles();ensureMcpPanelV98();const entry=$('leftMcpConnectorEntryV60');if(entry)entry.onclick=activateMcpPanelV60}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initMcpManagementV98);else initMcpManagementV98();
+
+// V99: keep saved MCP cards theme-correct and touch actions evenly distributed.
+function injectMcpSavedListPolishV99(){if($('mcpSavedListPolishV99'))return;document.head.insertAdjacentHTML('beforeend','<style id="mcpSavedListPolishV99">.mcp-card-v98{background:var(--chat-surface);border-color:var(--chat-border);color:var(--chat-text)}.mcp-saved-list-v98{max-height:568px}.mcp-card-bottom-v98{display:block;width:100%;margin-top:8px}.mcp-card-actions-v98{display:grid;grid-template-columns:repeat(4,minmax(40px,1fr));gap:8px;width:100%}.mcp-icon-button-v98{width:100%;min-width:0;height:40px;min-height:40px}html[data-appearance="dark"] .mcp-tabs-v98,html[data-appearance="dark"] .mcp-card-v98{background:#262626;border-color:#3A3A3A;color:var(--chat-text)}@media(max-width:400px){.mcp-card-actions-v98{gap:6px}}</style>')}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectMcpSavedListPolishV99);else injectMcpSavedListPolishV99();
