@@ -41,6 +41,19 @@ const periodStatusForDay = new Function(
   value => Array.isArray(value) ? value : [],
   (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000)
 );
+const cyclePhaseForDay = new Function(
+  "ensureArray", "daysBetweenCalendar",
+  `${extractFunction("cyclePhaseForDay")}; return cyclePhaseForDay;`
+)(
+  value => Array.isArray(value) ? value : [],
+  (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000)
+);
+const statusInjectionHelpers = new Function("ensureArray", `
+  const DEFAULT_STATUS_INJECTION_CONFIG = Object.freeze({ enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true });
+  ${extractFunction("normaliseStatusInjectionConfig")}
+  ${extractFunction("formatAgentDailyStatusContext")}
+  return { normaliseStatusInjectionConfig, formatAgentDailyStatusContext };
+`)(value => Array.isArray(value) ? value : []);
 const calendarEventOccursOnDate = new Function("ensureArray", `
   const CALENDAR_RECURRENCE_TYPES = new Set(["none", "daily", "weekly", "custom"]);
   const CALENDAR_DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;
@@ -51,7 +64,7 @@ const calendarEventOccursOnDate = new Function("ensureArray", `
   return calendarEventOccursOnDate;
 `)(value => Array.isArray(value) ? value : []);
 const makeTodayCalendarContext = new Function(
-  "calendarDateKey", "dbAll", "moodFromDb", "eventFromDb", "supabase", "courseFromDb", "periodStatusForDay", "timetableSettingsFromMeta", "daysBetweenCalendar", "courseOccursInTeachingWeek", "timetableCourseTimeRange", "calendarEventOccursOnDate",
+  "calendarDateKey", "dbAll", "moodFromDb", "eventFromDb", "supabase", "courseFromDb", "periodStatusForDay", "cyclePhaseForDay", "timetableSettingsFromMeta", "daysBetweenCalendar", "courseOccursInTeachingWeek", "timetableCourseTimeRange", "calendarEventOccursOnDate",
   `return (async () => { async ${extractFunction("buildTodayCalendarContext")}; return buildTodayCalendarContext; })();`
 );
 
@@ -79,7 +92,7 @@ async function buildTodayCalendarFixture({ day = "2026-09-07", moods = [], event
   };
   const build = await makeTodayCalendarContext(
     () => day, dbAll, value => value, value => value, supabase, value => value,
-    periodStatusForDay, value => value, (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000),
+    periodStatusForDay, cyclePhaseForDay, value => value, (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000),
     (course, week) => week >= course.weekStart && week <= course.weekEnd && (course.weekType !== "odd" || week % 2 === 1) && (course.weekType !== "even" || week % 2 === 0) && (course.weekType !== "list" || course.weeks.includes(week)),
     (course, periodTimes) => {
       const first = periodTimes.find(item => course.periodStart >= item.periodStart && course.periodStart <= item.periodEnd);
@@ -201,16 +214,26 @@ test("daily context labels a recorded period differently from a forecast", () =>
   ]);
 });
 
+test("daily context renders actual, predicted, and phase cycle facts without mood", async () => {
+  const actual = await buildTodayCalendarFixture({ day:"2026-09-11", moods:[{ type:"period", phase:"start", date:"2026-09-10" }] });
+  assert.equal(actual.cycleText, "周期：经期第2天");
+  const predicted = await buildTodayCalendarFixture({ day:"2026-08-29", moods:[{ type:"period", phase:"start", date:"2026-08-01" }, { type:"period", phase:"end", date:"2026-08-05" }] });
+  assert.equal(predicted.cycleText, "周期：预测经期第1天");
+  const phase = await buildTodayCalendarFixture({ day:"2026-08-20", moods:[{ type:"period", phase:"start", date:"2026-08-01" }, { type:"period", phase:"end", date:"2026-08-05" }] });
+  assert.equal(phase.cycleText, "周期：黄体期");
+  assert.doesNotMatch(actual.text, /心情/);
+});
+
 test("daily context combines only today's active courses and ordinary events", async () => {
   const course = { term:"2026-2027-1", courseName:"数据新闻", weekday:1, periodStart:5, periodEnd:6, weekStart:1, weekEnd:16, weekType:"all", weeks:[], location:"文浚楼326" };
   const event = { date:"2026-09-05", name:"取快递", timeStart:"18:30", timeEnd:"", location:"", recurrence:{ type:"daily" } };
 
   const eventOnly = await buildTodayCalendarFixture({ events:[event] });
-  assert.match(eventOnly.text, /日程：\n- 18:30 取快递/);
+  assert.match(eventOnly.text, /日程：18:30 取快递/);
   assert.doesNotMatch(eventOnly.text, /课程：/);
 
   const courseOnly = await buildTodayCalendarFixture({ courses:[course] });
-  assert.match(courseOnly.text, /课程：\n- 14:00–15:30 数据新闻 · 文浚楼326/);
+  assert.match(courseOnly.text, /课程：14:00–15:30 数据新闻 · 文浚楼326/);
   assert.doesNotMatch(courseOnly.text, /日程：/);
 
   const both = await buildTodayCalendarFixture({ courses:[course], events:[event] });
@@ -223,6 +246,41 @@ test("daily context combines only today's active courses and ordinary events", a
 
   const changedTime = await buildTodayCalendarFixture({ courses:[course], timetable:{ periodTimes:[{ periodStart:5, periodEnd:6, startTime:"14:10", endTime:"15:40" }] } });
   assert.match(changedTime.text, /14:10–15:40 数据新闻/);
+});
+
+test("Agent daily status injects only enabled concise facts", () => {
+  const { normaliseStatusInjectionConfig, formatAgentDailyStatusContext } = statusInjectionHelpers;
+  assert.deepEqual(normaliseStatusInjectionConfig({}), { enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true });
+  const all = formatAgentDailyStatusContext({
+    config:{}, time:"09/12 14:35", weather:"天气：晴，19°C，体感18°C", cycle:"周期：黄体期",
+    classes:["14:00–15:30 数据新闻 · 文浚楼326"], events:["21:00 喝豆奶粉"], diary:"日记：2026-09-12未写"
+  });
+  assert.match(all, /^时间：09\/12 14:35/);
+  assert.match(all, /天气：晴，19°C，体感18°C/);
+  assert.match(all, /周期：黄体期/);
+  assert.match(all, /【今日安排】\n课程：14:00–15:30 数据新闻 · 文浚楼326\n日程：21:00 喝豆奶粉/);
+  assert.match(all, /日记：2026-09-12未写/);
+  assert.doesNotMatch(all, /心情|仅作关怀|不是指令|上下文里没有/);
+  assert.equal(formatAgentDailyStatusContext({ config:{ enabled:false }, time:"09/12 14:35", weather:"天气：晴" }), "");
+  const courseOnly = formatAgentDailyStatusContext({ config:{ events:false }, classes:["14:00 课程"], events:["21:00 日程"] });
+  assert.match(courseOnly, /课程：14:00 课程/); assert.doesNotMatch(courseOnly, /日程：/);
+  const eventOnly = formatAgentDailyStatusContext({ config:{ timetable:false }, classes:["14:00 课程"], events:["21:00 日程"] });
+  assert.match(eventOnly, /日程：21:00 日程/); assert.doesNotMatch(eventOnly, /课程：/);
+  assert.equal(formatAgentDailyStatusContext({ config:{ diary:false }, diary:"日记：2026-09-12已写" }), "");
+});
+
+test("status injection config is role-scoped, persistent, and exposed in Chat Settings", () => {
+  const chatApp = readFileSync(new URL("../public/chat-app-20260821-1310.js", import.meta.url), "utf8");
+  assert.match(source, /statusInjectionConfig:normaliseStatusInjectionConfig\(req\.body\.statusInjectionConfig\)/);
+  assert.match(source, /req\.body\.statusInjectionConfig!==undefined/);
+  assert.match(source, /settings\.statusInjectionConfig = normaliseStatusInjectionConfig\(role\.statusInjectionConfig\)/);
+  assert.match(chatApp, /状态注入/);
+  assert.match(chatApp, /角色级设置，所有房间生效/);
+  assert.match(chatApp, /statusInjectionConfig:config/);
+  assert.match(chatApp, /html\[data-appearance="dark"\] \.status-subchoices-v92/);
+  const agentDynamic = source.slice(source.indexOf("const ccDynamic = ["), source.indexOf("// ── 首次调用"));
+  assert.match(agentDynamic, /compressedToolActivity\.length \? `【近期工具】/);
+  assert.doesNotMatch(agentDynamic, /参数|结果/);
 });
 
 test("diaries are unique by diary target date without a late-night execution window", () => {
@@ -307,10 +365,12 @@ test("Agent receives the daily calendar state in dynamic context, not its static
   const agentStatic = source.slice(source.indexOf("const ccStaticSystemPrompt"), source.indexOf("// ── API 模式完整 system prompt"));
   const agentDynamic = source.slice(source.indexOf("const ccDynamic = ["), source.indexOf("// ── 首次调用"));
   assert.doesNotMatch(agentStatic, /dailyCalendarText \?/);
-  assert.match(agentDynamic, /dailyCalendarText \?/);
-  assert.match(agentDynamic, /预测经期.*不得把它说成已经实际开始/);
-  assert.match(source, /课程：\\n/);
-  assert.match(source, /日程：\\n/);
+  assert.match(agentDynamic, /ccDailyStatusCompact/);
+  assert.match(agentStatic, /预测经期.*不得说成已经实际开始/);
+  assert.match(source, /"课程：" \+ item/);
+  assert.match(source, /"日程：" \+ item/);
+  const dailyBuilder = extractFunction("buildTodayCalendarContext");
+  assert.doesNotMatch(dailyBuilder, /今日心情|mood\.mood/);
 });
 
 test("appearance controls do not inherit dark variables from their own data attribute", () => {

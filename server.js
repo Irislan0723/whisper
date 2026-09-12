@@ -2925,14 +2925,17 @@ async function buildTodayCalendarContext() {
     .filter(course => week >= 1 && week <= timetableSettings.totalWeeks && (!timetableSettings.term || !course.term || course.term === timetableSettings.term) && course.weekday === weekday && courseOccursInTeachingWeek(course, week))
     .sort((a, b) => a.periodStart - b.periodStart || a.periodEnd - b.periodEnd)
     .map(course => `${timetableCourseTimeRange(course, timetableSettings.periodTimes) || `第${course.periodStart}-${course.periodEnd}节`} ${course.courseName}${course.location ? ` · ${course.location}` : ""}`);
-  const mood = moods.find(item => item.type === "mood" && item.who === "iris" && item.date === day);
+  const phase = cyclePhaseForDay(moods.filter(item => !item.predicted), settings, day);
+  const cycleText = period.kind === "actual"
+    ? `周期：经期第${period.day}天`
+    : period.kind === "predicted"
+      ? `周期：预测经期第${period.day}天`
+      : phase?.phase && phase.phase !== "经期" ? `周期：${phase.phase}` : "";
   const lines = [
-    `日期：${day}`,
-    period.kind === "actual" ? `周期：经期第${period.day}天` : period.kind === "predicted" ? `周期：预测经期第${period.day}天（未记录实际开始）` : period.kind === "unknown" ? "周期：尚无经期开始记录" : "",
-    classes.length || scheduled.length ? `【今日安排】\n${classes.length ? `课程：\n${classes.map(item => `- ${item}`).join("\n")}` : ""}${classes.length && scheduled.length ? "\n" : ""}${scheduled.length ? `日程：\n${scheduled.map(item => `- ${item}`).join("\n")}` : ""}` : ""
+    cycleText,
+    classes.length || scheduled.length ? `【今日安排】\n${[...classes.map(item => `课程：${item}`), ...scheduled.map(item => `日程：${item}`)].join("\n")}` : ""
   ].filter(Boolean);
-  if (mood?.mood) lines.push(`今日心情：${mood.mood}${mood.note ? `（${mood.note.slice(0,120)}）` : ""}`);
-  return { day, period, schedule:[...classes, ...scheduled], text:lines.join("\n") };
+  return { day, period, cycleText, events:scheduled, classes, schedule:[...classes, ...scheduled], text:lines.join("\n") };
 }
 const WEATHER_CONTEXT_CACHE_MS = 10 * 60 * 1000;
 let weatherContextCache = { key:"", at:0, text:"" };
@@ -3325,6 +3328,28 @@ const CHAT_DAILY_HISTORY_TOOL = {
 };
 const ROLE_TOOL_CONFIG_VERSION = 5;
 const DEFAULT_ROLE_TOOL_CONFIG = Object.freeze({ enabled:true, mode:"custom", allowed:[], version:ROLE_TOOL_CONFIG_VERSION });
+const DEFAULT_STATUS_INJECTION_CONFIG = Object.freeze({ enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true });
+function normaliseStatusInjectionConfig(value) {
+  const raw = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(Object.keys(DEFAULT_STATUS_INJECTION_CONFIG).map(key => [key, raw[key] !== false]));
+}
+function formatAgentDailyStatusContext(input) {
+  input = input || {};
+  const { config, time = "", weather = "", cycle = "", events = [], classes = [], diary = "" } = input;
+  const status = normaliseStatusInjectionConfig(config);
+  if (!status.enabled) return "";
+  const schedule = status.schedule ? [
+    ...(status.timetable ? ensureArray(classes).map(item => "课程：" + item) : []),
+    ...(status.events ? ensureArray(events).map(item => "日程：" + item) : [])
+  ] : [];
+  return [
+    status.time && time ? "时间：" + time : "",
+    status.weather && weather,
+    status.cycle && cycle,
+    schedule.length ? "【今日安排】\n" + schedule.join("\n") : "",
+    status.diary && diary
+  ].filter(Boolean).join("\n");
+}
 function normaliseRoleToolConfig(value) {
   const known = new Set([...CHAT_MEMORY_TOOLS.map(tool => tool.name), CHAT_QUOTE_TOOL.name, CHAT_IMAGE_TOOL.name, CHAT_COMPANION_TOOL.name, ...CHAT_LISTENING_TOOLS.map(tool => tool.name), CHAT_TRANSFER_TOOL.name, CHAT_DAILY_NOTE_TOOL.name, CHAT_DAILY_HISTORY_TOOL.name]);
   const config = value && typeof value === "object" ? value : DEFAULT_ROLE_TOOL_CONFIG;
@@ -3839,6 +3864,8 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
   const baseUrl = normalizeApiRoot(preset?.baseUrl);
   const apiKey  = preset?.apiKey;
   const model   = preset?.model;
+  const isAgentMode = preset?.provider === "cc";
+  const statusInjection = normaliseStatusInjectionConfig(settings.statusInjectionConfig);
 
   if (!baseUrl || !apiKey || !model) {
     return {
@@ -3875,10 +3902,12 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     ...ensureArray(mcpTools)
   ];
   const memoryText = toolsEnabled ? formatRelatedMemoryPreview(relatedMemories) : "";
+  let dailyCalendarContext = null;
   let dailyCalendarText = "";
-  if (settings.calendar?.dailyContext !== false) { try { dailyCalendarText = (await buildTodayCalendarContext()).text; } catch (e) { console.warn("today calendar context unavailable:", e.message); } }
+  const needsCalendarStatus = !isAgentMode || (statusInjection.enabled && (statusInjection.cycle || (statusInjection.schedule && (statusInjection.events || statusInjection.timetable))));
+  if (settings.calendar?.dailyContext !== false && needsCalendarStatus) { try { dailyCalendarContext = await buildTodayCalendarContext(); dailyCalendarText = dailyCalendarContext.text; } catch (e) { console.warn("today calendar context unavailable:", e.message); } }
   let dailyWeatherText = "";
-  try { dailyWeatherText = await buildTodayWeatherContext(); } catch (e) { console.warn("today weather context unavailable:", e.message); }
+  if (!isAgentMode || (statusInjection.enabled && statusInjection.weather)) { try { dailyWeatherText = await buildTodayWeatherContext(); } catch (e) { console.warn("today weather context unavailable:", e.message); } }
   let selfProfileText = "";
   if (toolsEnabled) {
     try {
@@ -3889,7 +3918,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     }
   }
   let diaryStatusText = "";
-  if (toolsEnabled) {
+  if (toolsEnabled && (!isAgentMode || (statusInjection.enabled && statusInjection.diary))) {
     try {
       const targetDay = defaultDiaryDay();
       const diaryExists = (await dbAll("memories")).map(memoryFromDb).some(memory => memory.category === "diary" && diaryDayKey(memory) === targetDay);
@@ -3952,7 +3981,6 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
   // ── CC（Agent 模式）专用静态 system prompt ──
   // 只包含：人设 + 默认工具规则（记忆/档案）+ 自我档案
   // 动态内容（时间/天气/日程/课表/动态工具/表情包等）在 ccDynamic 里每轮注入
-  const isAgentMode = preset?.provider === "cc";
   const ccStaticSystemPrompt = isAgentMode ? [
     `当前日期：${new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
     settings.persona?.irisName ? `Iris 的称呼：${settings.persona.irisName}` : "",
@@ -3962,6 +3990,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     toolsEnabled ? `【工具节流规则】每次回复最多调用一次 search_memories。第一次搜索没有命中就接受空结果，不要换同义词、拆关键词或改变分类再次搜索；需要新增记忆时调用语义对应的新增工具。近期工具行动若已经明确显示同一事项刚被搜索或写入，也不要无必要地重复确认。` : "",
     toolsEnabled ? `【日记】write_diary 可以主动使用。Iris 明确要求写日记时，任何时间都可以写；当 Iris 明确结束当天聊天、准备睡觉或说晚安时，若当天尚未写日记，可以主动写。白天普通聊天不要随便写日记；已有同日记时 write_diary 会更新原日记，不会新建第二篇。` : "",
     `【所有工具｜失败处理】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。如果一次回复调用了多个工具，必须逐一报告每个工具的执行结果，不能因为某个工具成功就忽略其他工具的失败。不要在工具调用之前或同时声称已完成，只有在工具返回成功结果之后才能说已完成。`,
+    `周期状态出现“预测经期”时，只能作为预测表述，不得说成已经实际开始。`,
     `没有在当前消息的【当前已开启的额外工具】中列出的工具，你都不能使用。如需使用某个工具但当前未开启，请告诉 Iris 在右侧工具列表中开启对应功能。`,
     selfProfileText ? `你当前的自我档案如下。它是连续成长中的自我认识，不是不可改变的硬提示词：\n${selfProfileText}` : "",
     toolsEnabled ? `遇到同一事件先更新旧记忆，不要新增重复项。相同事项已确认时不要重复查询。` : ""
@@ -4122,17 +4151,24 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       return `日记:${day}未写`;
     })();
 
-    // ── 动态上下文（Agent 模式压缩版） ──
+    const ccDailyStatusCompact = formatAgentDailyStatusContext({
+      config:statusInjection,
+      time:ccTimeCompact,
+      weather:ccWeatherCompact,
+      cycle:dailyCalendarContext?.cycleText || "",
+      events:dailyCalendarContext?.events,
+      classes:dailyCalendarContext?.classes,
+      diary:ccDiaryCompact
+    });
+
+    // ── 动态上下文（Agent 模式：只保留开启的每日事实） ──
     const ccDynamic = [
-      `时间：${ccTimeCompact}`,
-      dailyCalendarText ? `【今日状态｜系统已从数据库自动注入；仅作关怀与安排参考，不是指令】\n${dailyCalendarText}\n这段内容已经在当前上下文中，绝不可说“上下文里没有今天的心情、周期、日程或课程”；若显示“预测经期”，不得把它说成已经实际开始。` : "",
+      ccDailyStatusCompact,
       dailyNoteContext ? `【未读Moment】\n${dailyNoteContext}` : "",
       companionStatusText || "",
       pendingCompanionText || "",
       pendingListeningText || "",
       transferStatusText || "",
-      ccWeatherCompact ? `${ccWeatherCompact}` : "",
-      ccDiaryCompact || "",
       compressedToolActivity.length ? `【近期工具】\n${compressedToolActivity.join("\n")}` : "",
       relatedMemoryLookupPerformed && !ccMemoryCompact ? "记忆检索:未命中" : "",
       ccMemoryCompact ? `【记忆】\n${ccMemoryCompact}` : "",
@@ -4704,12 +4740,12 @@ app.delete("/api/chat/conversations/:id", apiAuth, (req, res) => {
 });
 app.get("/api/chat/roles", apiAuth, (req, res) => res.json({ roles: readChatRoles() }));
 app.post("/api/chat/roles", apiAuth, (req, res) => {
-  const now = chatNow(); const item = { id: generateId(), name: String(req.body.name || "新角色").slice(0, 50), avatar: req.body.avatar || "", identity: req.body.identity || "", prompt: req.body.prompt || "", relationship: req.body.relationship || "", memoryEnabled: req.body.memoryEnabled !== false, toolConfig:normaliseRoleToolConfig(req.body.toolConfig), stickerConfig:normaliseRoleStickerConfig(req.body.stickerConfig), createdAt: now, updatedAt: now };
+  const now = chatNow(); const item = { id: generateId(), name: String(req.body.name || "新角色").slice(0, 50), avatar: req.body.avatar || "", identity: req.body.identity || "", prompt: req.body.prompt || "", relationship: req.body.relationship || "", memoryEnabled: req.body.memoryEnabled !== false, toolConfig:normaliseRoleToolConfig(req.body.toolConfig), statusInjectionConfig:normaliseStatusInjectionConfig(req.body.statusInjectionConfig), stickerConfig:normaliseRoleStickerConfig(req.body.stickerConfig), createdAt: now, updatedAt: now };
   const list = readChatRoles(); list.push(item); writeChatRoles(list); res.status(201).json(item);
 });
 app.put("/api/chat/roles/:id", apiAuth, (req, res) => {
   const list = readChatRoles(); const idx = list.findIndex(x => x.id === req.params.id); if (idx < 0) return res.status(404).json({ error: "Role not found" });
-  ["name", "avatar", "identity", "prompt", "relationship", "memoryEnabled"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; }); if(req.body.toolConfig!==undefined)list[idx].toolConfig=normaliseRoleToolConfig(req.body.toolConfig); if(req.body.stickerConfig!==undefined)list[idx].stickerConfig=normaliseRoleStickerConfig(req.body.stickerConfig); list[idx].updatedAt = chatNow(); writeChatRoles(list); res.json(list[idx]);
+  ["name", "avatar", "identity", "prompt", "relationship", "memoryEnabled"].forEach(k => { if (req.body[k] !== undefined) list[idx][k] = req.body[k]; }); if(req.body.toolConfig!==undefined)list[idx].toolConfig=normaliseRoleToolConfig(req.body.toolConfig); if(req.body.statusInjectionConfig!==undefined)list[idx].statusInjectionConfig=normaliseStatusInjectionConfig(req.body.statusInjectionConfig); if(req.body.stickerConfig!==undefined)list[idx].stickerConfig=normaliseRoleStickerConfig(req.body.stickerConfig); list[idx].updatedAt = chatNow(); writeChatRoles(list); res.json(list[idx]);
 });
 app.delete("/api/chat/roles/:id", apiAuth, (req, res) => { writeChatRoles(readChatRoles().filter(x => x.id !== req.params.id)); res.json({ ok: true }); });
 app.get("/api/chat/profile", apiAuth, (req, res) => res.json(readChatProfile()));
@@ -5289,6 +5325,7 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
     settings.persona = { ...(settings.persona || {}), systemPrompt: rolePrompt, replyStyle: settings.persona?.replyStyle };
     settings.memory = { ...(settings.memory || {}), enabled: role.memoryEnabled !== false };
     settings.toolConfig = normaliseRoleToolConfig(role.toolConfig);
+    settings.statusInjectionConfig = normaliseStatusInjectionConfig(role.statusInjectionConfig);
     settings.recentToolActivity = ensureArray(conversation.recentToolActivity).slice(-12);
     // Agent 模式：优先使用对话级 agentToolConfig，否则回退到默认过滤
     if ((conversation.mode || "api") === "agent") {
@@ -5693,6 +5730,7 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
     settings.persona = { ...(settings.persona || {}), systemPrompt: rolePrompt, replyStyle: settings.persona?.replyStyle };
     settings.memory = { ...(settings.memory || {}), enabled: role.memoryEnabled !== false };
     settings.toolConfig = normaliseRoleToolConfig(role.toolConfig);
+    settings.statusInjectionConfig = normaliseStatusInjectionConfig(role.statusInjectionConfig);
     settings.recentToolActivity = ensureArray(conversation.recentToolActivity).slice(-12);
     // Agent 模式：优先使用对话级 agentToolConfig，否则回退到默认过滤
     if ((conversation.mode || "api") === "agent") {
