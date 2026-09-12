@@ -26,8 +26,8 @@ test("8. deleting a preset retains its original handler", () => assert.match(cha
 test("9. saving functional models retains its original handler", () => assert.match(chat, /\$\('saveFunctions'\)\.onclick=saveFunctions/));
 test("10. immediate summary retains the shared handler", () => assert.match(chat, /button\.onclick=runSummaryNowV94/));
 test("11. status card keeps its existing status renderer", () => assert.match(chat, /function renderFunctionModelStatusV94\(\)/));
-test("12. status dot and label use a compact ten-pixel gap", () => assert.match(chat, /\.status-title-row-v95\{display:flex;align-items:flex-start;gap:10px\}/));
-test("13. every model name shares the same title-row structure", () => assert.match(chat, /<div class="status-title-row-v95"><i class="status-dot-v95"[\s\S]*?<strong>'\+esc\(FUNCTION_MODEL_LABELS_V94\[role\]\)/));
+test("12. status dot and label use a compact ten-pixel gap", () => assert.match(chat, /\.model-status-row-v96\{display:flex!important;align-items:flex-start!important;gap:10px!important\}/));
+test("13. every model name shares the same fixed status-row structure", () => assert.match(chat, /model-status-row-v96 model-status--'\+state\+'-v96"[\s\S]*?model-status-content-v96"><strong>'\+esc\(FUNCTION_MODEL_LABELS_V94\[role\]\)/));
 test("14. light theme uses existing Whisper variables", () => assert.match(chat, /\.model-settings-tabs-v95\{[^}]*background:var\(--chat-surface\)[^}]*border:1px solid var\(--chat-border\)/));
 test("15. dark theme uses the project html appearance selector", () => assert.match(chat, /html\[data-appearance="dark"\] \.model-settings-tabs-v95/));
 test("16. four tabs are equal-width and compact at phone width", () => {
