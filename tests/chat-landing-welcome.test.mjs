@@ -16,12 +16,26 @@ function localTime(hour, minute = 0, weekday = 1) {
 }
 
 test("New chat landing uses the local Claude logo instead of the star or subtitle", () => {
-  assert.match(html, /<img src="\/icons\/claude-logo\.png" alt="Claude">/);
+  assert.match(html, /class="landing-mark logo-wrap" id="landingMark"><img src="\/icons\/claude-logo\.png" alt="Claude">/);
+  assert.match(html, /\.logo-wrap\{width:48px;height:48px;flex:0 0 48px;overflow:hidden\}/);
+  assert.match(html, /\.logo-wrap img\{display:block;width:48px;height:48px;max-width:none;max-height:none;object-fit:contain\}/);
   assert.doesNotMatch(html.slice(html.indexOf('id="landing"'), html.indexOf('id="messages"')), /现在想和 TA 说点什么|landing-mark[^>]*>\s*<svg/);
   const initIcons = chat.slice(chat.indexOf("function initIcons"), chat.indexOf("function initTopBar"));
   assert.match(initIcons, /landingMark.*claude-logo\.png/);
   assert.doesNotMatch(initIcons, /landingMark.*ICON\.spark/);
   assert.doesNotMatch(chat.slice(welcomeStart, welcomeEnd), /supabase|https?:\/\//i);
+});
+
+test("Thought process control uses the lightweight dotted-clock SVG without changing its trigger", () => {
+  const thoughtIcon = chat.slice(chat.indexOf("function thoughtIconV23"), chat.indexOf("function staticInsightSheetV25"));
+  const trigger = chat.slice(chat.indexOf("function turnInsightButtonsV23"), chat.indexOf("const renderGroupV23Base"));
+  assert.match(thoughtIcon, /A8\.8 8\.8 0 1 1/);
+  assert.match(thoughtIcon, /<circle cx="5" cy="6\.8" r="\.9" fill="currentColor" stroke="none"\/>/);
+  assert.match(thoughtIcon, /M12 7\.8v4\.6l3 1\.8/);
+  assert.doesNotMatch(thoughtIcon, /<circle cx="12" cy="12" r="8\.2"\/>/);
+  assert.match(trigger, /data-turn-insight="thinking"[\s\S]*?\+thoughtIconV23\(\)/);
+  assert.match(chat, /data-turn-insight="thinking"\] svg\{width:18px;height:18px\}/);
+  assert.match(chat, /data-turn-insight="thinking"\]:active\{transform:none\}/);
 });
 
 test("welcome greetings select the correct local-time pool for every time period", () => {
@@ -42,7 +56,7 @@ test("welcome pool is broad, supports occasional weekdays, and avoids an immedia
 });
 
 test("landing styling is compact, responsive, dark-safe, and leaves start behavior intact", () => {
-  assert.match(chat, /#landing\.landing-v93 \.landing-mark img\{[^}]*object-fit:contain[^}]*box-shadow:none/);
+  assert.match(chat, /#landing\.landing-v93 \.logo-wrap img\{[^}]*width:48px;height:48px[^}]*object-fit:contain[^}]*box-shadow:none/);
   assert.match(chat, /#landing\.landing-v93 h1\{[^}]*max-width:min\(88vw,560px\)[^}]*clamp\(30px,8vw,38px\)/);
   assert.match(chat, /@media\(max-width:350px\)/);
   assert.match(chat, /html\[data-appearance="dark"\] #landing\.landing-v93 h1/);
