@@ -2170,6 +2170,7 @@ const CHAT_MCP_CONNECTORS_FILE = join(DATA_DIR, "chat-mcp-connectors.json");
 const DEFAULT_CHAT_SETTINGS = {
   presets: [],
   activePresetId: "",
+  functions: { main:"", summary:"", translation:"", image:"", summaryEnabled:false, summaryThreshold:48 },
   notifications: { enabled:false, mode:"combined", bubbleIntervalSeconds:2 },
   memory: { enabled: true, categories: ["deep", "daily", "diary"] },
   persona: {
@@ -2196,11 +2197,78 @@ function removeLegacyBubbleInstruction(text = "") {
 function readChatSettings() {
   const saved = readJSON(CHAT_SETTINGS_FILE, {});
   const persona = { ...DEFAULT_CHAT_SETTINGS.persona, ...(saved.persona || {}) };
+  const functions = { ...DEFAULT_CHAT_SETTINGS.functions, ...(saved.functions || {}) };
   persona.systemPrompt = removeLegacyBubbleInstruction(persona.systemPrompt);
-  return { ...DEFAULT_CHAT_SETTINGS, ...saved, persona };
+  return { ...DEFAULT_CHAT_SETTINGS, ...saved, persona, functions };
 }
 function writeChatSettings(data) {
-  writeJSON(CHAT_SETTINGS_FILE, { ...DEFAULT_CHAT_SETTINGS, ...data });
+  writeJSON(CHAT_SETTINGS_FILE, { ...DEFAULT_CHAT_SETTINGS, ...data, functions:{ ...DEFAULT_CHAT_SETTINGS.functions, ...(data?.functions || {}) } });
+}
+
+const FUNCTION_MODEL_ROLES = ["main", "summary", "translation", "image"];
+const FUNCTION_MODEL_ROLE_LABELS = { main:"主模型", summary:"总结模型", translation:"翻译模型", image:"图像模型" };
+function functionalModelSelection(settings = {}, role = "main") {
+  const functions = settings.functions || {};
+  return String(functions[role] || (role === "main" ? "" : functions.main) || "").trim();
+}
+function functionalModelError(error) {
+  const raw = String(error?.message || error || "");
+  const code = String(error?.status || raw.match(/\b([1-5]\d\d)\b/)?.[1] || "");
+  if (code === "401") return { code, message:"API key 无效" };
+  if (code === "402" || /余额|balance|insufficient.?credit/i.test(raw)) return { code:code || "402", message:"余额不足" };
+  if (code === "429") return { code, message:"quota exceeded" };
+  if (/timeout|timed out|超时/i.test(raw)) return { code:code || "timeout", message:"请求超时" };
+  if (/\b5\d\d\b/.test(code || raw) || /provider.*(?:unavailable|error)|服务.*不可用/i.test(raw)) return { code:code || "5xx", message:"Provider unavailable" };
+  return { code:code || "", message:"调用失败" };
+}
+function functionalModelStatus(settings = {}, role = "main") {
+  const entry = settings.functionModelStatus?.[role] || {};
+  const lastSuccessAt = String(entry.lastSuccessAt || "");
+  const lastErrorAt = String(entry.lastErrorAt || "");
+  return {
+    role,
+    label:FUNCTION_MODEL_ROLE_LABELS[role] || role,
+    status:lastErrorAt && lastErrorAt > lastSuccessAt ? "error" : (lastSuccessAt ? "normal" : "unused"),
+    lastSuccessAt:lastSuccessAt || null,
+    lastErrorAt:lastErrorAt || null,
+    lastError:lastErrorAt && lastErrorAt > lastSuccessAt ? String(entry.lastError || "调用失败").slice(0, 120) : null,
+    lastErrorCode:lastErrorAt && lastErrorAt > lastSuccessAt ? String(entry.lastErrorCode || "").slice(0, 24) || null : null,
+    modelName:String(entry.modelName || getFunctionalChatPreset(settings, functionalModelSelection(settings, role))?.model || "").slice(0, 160) || null,
+    providerName:String(entry.providerName || getFunctionalChatPreset(settings, functionalModelSelection(settings, role))?.provider || "").slice(0, 48) || null
+  };
+}
+function publicFunctionModelStatus(settings = readChatSettings()) {
+  return {
+    statuses:FUNCTION_MODEL_ROLES.map(role => functionalModelStatus(settings, role)),
+    lastModelStatusViewedAt:settings.lastModelStatusViewedAt || null,
+    hasUnread:FUNCTION_MODEL_ROLES.some(role => {
+      const lastErrorAt = String(settings.functionModelStatus?.[role]?.lastErrorAt || "");
+      return !!lastErrorAt && lastErrorAt > String(settings.lastModelStatusViewedAt || "");
+    })
+  };
+}
+function recordFunctionModelStatus(role, preset, error = null) {
+  if (!FUNCTION_MODEL_ROLES.includes(role)) return;
+  const settings = readChatSettings();
+  const statuses = settings.functionModelStatus && typeof settings.functionModelStatus === "object" ? settings.functionModelStatus : {};
+  const previous = statuses[role] && typeof statuses[role] === "object" ? statuses[role] : {};
+  const now = chatNow();
+  const identity = { modelName:String(preset?.model || "").slice(0, 160), providerName:String(preset?.provider || "").slice(0, 48) };
+  statuses[role] = error
+    ? { ...previous, ...identity, lastErrorAt:now, lastError:functionalModelError(error).message, lastErrorCode:functionalModelError(error).code }
+    : { ...previous, ...identity, lastSuccessAt:now };
+  settings.functionModelStatus = statuses;
+  writeChatSettings(settings);
+}
+async function callFunctionModel(role, preset, call) {
+  try {
+    const result = await call();
+    if (preset?.baseUrl && preset?.apiKey && preset?.model) recordFunctionModelStatus(role, preset);
+    return result;
+  } catch (error) {
+    recordFunctionModelStatus(role, preset, error);
+    throw error;
+  }
 }
 function readChatConversations() {
   let list = ensureArray(readJSON(CHAT_CONVERSATIONS_FILE, []));
@@ -3143,9 +3211,14 @@ function previousChatDay(day = chatDayKey()) {
   return chatDayKey(date);
 }
 
-async function updateRollingDaySummary({ conversation, history, settings, day = chatDayKey() }) {
+function configuredSummaryThreshold(value) {
+  const parsed = Math.floor(Number(value));
+  return Math.max(24, Math.min(120, Number.isFinite(parsed) ? parsed : 48));
+}
+
+async function updateRollingDaySummary({ conversation, history, settings, day = chatDayKey(), force = false }) {
   const config = settings.functions || {};
-  if (!config.summaryEnabled) return "";
+  if (!force && !config.summaryEnabled) return "";
   const summaries = conversation.dailySummaries && typeof conversation.dailySummaries === "object" ? conversation.dailySummaries : {};
   conversation.dailySummaries = summaries;
   const existing = summaries[day] || {};
@@ -3154,20 +3227,21 @@ async function updateRollingDaySummary({ conversation, history, settings, day = 
     ? allDayMessages.findIndex(message => String(message.id) === String(existing.summarizedUntilMessageId))
     : -1;
   const pending = allDayMessages.slice(cursorIndex + 1).filter(message => !message.recalled);
-  // The main chat caller sends at most 24 raw messages.  Never wait beyond that
-  // window, even if an old UI setting still says a larger trigger count.
-  const configuredThreshold = Math.max(10, Number(config.summaryThreshold || 30));
-  const effectiveThreshold = Math.min(24, configuredThreshold);
-  if (pending.length < effectiveThreshold) return String(existing.summary || "");
+  const threshold = configuredSummaryThreshold(config.summaryThreshold);
+  if (!force && pending.length < threshold) return String(existing.summary || "");
+  if (!pending.length) return String(existing.summary || "");
 
   const preset = getFunctionalChatPreset(settings, config.summary || config.main);
-  const summary = await callRollingDaySummary({
-    preset,
-    previousSummary: existing.summary || "",
-    messages: pending,
-    maxChars: config.summaryMaxChars || ROLLING_SUMMARY_MAX_CHARS
+  const summary = await callFunctionModel("summary", preset, async () => {
+    const value = await callRollingDaySummary({
+      preset,
+      previousSummary: existing.summary || "",
+      messages: pending,
+      maxChars: config.summaryMaxChars || ROLLING_SUMMARY_MAX_CHARS
+    });
+    if (!value) throw new Error("摘要模型没有返回可保存的内容");
+    return value;
   });
-  if (!summary) throw new Error("摘要模型没有返回可保存的内容");
   summaries[day] = {
     summary,
     summarizedUntilMessageId: pending[pending.length - 1].id,
@@ -3857,7 +3931,7 @@ function createAiImageHandler(settings, imageGenerationEnabled) {
   if (!selected) return null;
   const preset = getFunctionalChatPreset(settings, selected);
   if (!preset?.baseUrl || !preset.apiKey || !preset.model || preset.provider === "anthropic") return null;
-  return async prompt => await generateChatImage(preset, prompt);
+  return async prompt => await callFunctionModel("image", preset, () => generateChatImage(preset, prompt));
 }
 
 async function callOpenAICompatible({ preset, settings, content, image, images, quote, history, recallableMessages = [], recallOwnMessage = null, quoteableMessages = [], selectQuoteMessage = null, generateImage = null, manageCompanion = null, manageListening = null, manageTransfer = null, publishDailyNote = null, readDailyMoments = null, dailyNoteContext = "", mcpTools = [], mcpToolBindings = {}, relatedMemories = [], relatedMemoryLookupPerformed = false, onToolTrace = null, ccSessionState = null, stickerPromptForDynamic = "" }) {
@@ -4385,7 +4459,7 @@ async function translateChatMessage(message, settings = readChatSettings()) {
       systemPrompt: "你是翻译助手。将用户提供的内容准确翻译成简体中文，保留原有语气、段落、专有名词和 emoji。只输出译文，不要解释、不要加前缀。"
     }
   };
-  const result = await callOpenAICompatible({
+  const result = await callFunctionModel("translation", preset, () => callOpenAICompatible({
     preset,
     settings: translationSettings,
     content: String(message.content),
@@ -4393,7 +4467,7 @@ async function translateChatMessage(message, settings = readChatSettings()) {
     images: [],
     quote: null,
     history: []
-  });
+  }));
   message.translation = {
     text: String(result.text || "").trim(),
     model: result.model || preset?.model || "",
@@ -4815,6 +4889,15 @@ app.get("/api/chat/settings", apiAuth, (req, res) => {
 app.put("/api/chat/settings", apiAuth, (req, res) => {
   writeChatSettings(req.body || {});
   res.json(readChatSettings());
+});
+app.get("/api/chat/function-model-status", apiAuth, (req, res) => {
+  res.json(publicFunctionModelStatus());
+});
+app.post("/api/chat/function-model-status/viewed", apiAuth, (req, res) => {
+  const settings = readChatSettings();
+  settings.lastModelStatusViewedAt = chatNow();
+  writeChatSettings(settings);
+  res.json(publicFunctionModelStatus(readChatSettings()));
 });
 
 // ---- Claude Code usage / quota ----
@@ -5277,6 +5360,25 @@ app.post("/api/chat/conversations/:id/clear-messages", apiAuth, (req, res) => {
   res.json({ ok: true, deleted: list.length - next.length });
 });
 
+// ---- Run the existing rolling-summary path on demand; raw chat messages stay intact. ----
+app.post("/api/chat/conversations/:id/summary", apiAuth, async (req, res) => {
+  const conversations = readChatConversations();
+  const conversation = conversations.find(item => item.id === req.params.id);
+  if (!conversation) return res.status(404).json({ error: "Conversation not found" });
+  const settings = readChatSettings();
+  const history = readChatMessages().filter(message => (message.conversationId || "legacy-chat") === conversation.id && message.role !== "system");
+  const day = chatDayKey();
+  const previousUpdatedAt = String(conversation.dailySummaries?.[day]?.updatedAt || "");
+  try {
+    const summary = await updateRollingDaySummary({ conversation, history, settings, day, force:true });
+    conversation.updatedAt = chatNow();
+    writeChatConversations(conversations);
+    res.json({ ok:true, updated:String(conversation.dailySummaries?.[day]?.updatedAt || "") !== previousUpdatedAt, hasSummary:!!summary });
+  } catch (error) {
+    res.status(502).json({ error:error.message || "总结失败" });
+  }
+});
+
 // ---- 清空聊天 ----
 app.post("/api/chat/clear", apiAuth, (req, res) => {
   discardChatMessages(readChatMessages());
@@ -5455,7 +5557,7 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
       get: () => conversation.ccSession || null,
       set: (state) => { conversation.ccSession = state; writeChatConversations(conversations); }
     } : null;
-    const ai = await callOpenAICompatible({
+    const ai = await callFunctionModel("main", preset, () => callOpenAICompatible({
       preset,
       settings,
       content: userTurnContent,
@@ -5481,7 +5583,7 @@ app.post("/api/chat/send", apiAuth, async (req, res) => {
       onToolTrace: createToolActivityRecorder(conversation, conversations),
       ccSessionState,
       stickerPromptForDynamic
-    });
+    }));
     if (unreadUserDailyNotes.length) {
       const consumedIds = new Set(unreadUserDailyNotes.map(note => note.id));
       const notes = readChatDailyNotes(); let changed = false; const now = chatNow();
@@ -5788,7 +5890,7 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
     }
     recordMemoryInjection(conversation, relatedMemories);
     const mcpToolset = buildConversationMcpTools(conversation);
-    const result = await callOpenAICompatible({
+    const result = await callFunctionModel("main", preset, () => callOpenAICompatible({
       preset,
       settings,
       content: userTurnContent,
@@ -5807,7 +5909,7 @@ app.post("/api/chat/messages/:id/regenerate", apiAuth, async (req, res) => {
       relatedMemoryLookupPerformed: automaticMemoryRecall && !!userTurnContent.trim(),
       onToolTrace: createToolActivityRecorder(conversation, conversations),
       stickerPromptForDynamic
-    });
+    }));
     const stickerDirective = await extractAiStickerDirective(result.text, role, canAiSendSticker(history));
     const resultText = String(stickerDirective.text || "").trim();
     const generatedImages = normalizeChatMessageImages(result.generatedImages);
