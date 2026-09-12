@@ -104,14 +104,30 @@ function loadMemories() {
   }
 }
 
+const MEMORY_AFFECT_LIMITS = Object.freeze({
+  valence: Object.freeze({ min:-1, max:1, fallback:0 }),
+  arousal: Object.freeze({ min:0, max:1, fallback:0.3 })
+});
+function normaliseMemoryAffect(value, limits) {
+  const numeric = Number(value);
+  const safe = Number.isFinite(numeric) ? numeric : limits.fallback;
+  return Math.max(limits.min, Math.min(limits.max, safe));
+}
+function normaliseMemoryAffects(input = {}, fallback = {}) {
+  return {
+    valence: normaliseMemoryAffect(input.valence === undefined ? fallback.valence : input.valence, MEMORY_AFFECT_LIMITS.valence),
+    arousal: normaliseMemoryAffect(input.arousal === undefined ? fallback.arousal : input.arousal, MEMORY_AFFECT_LIMITS.arousal)
+  };
+}
 function memoryToDb(memory) {
+  const affect = normaliseMemoryAffects(memory);
   return {
     id: memory.id,
     content: memory.content || "",
     category: memory.category || "daily",
     tags: memory.tags || [],
-    valence: memory.valence ?? 0,
-    arousal: memory.arousal ?? 0.3,
+    valence: affect.valence,
+    arousal: affect.arousal,
     pinned: !!memory.pinned,
     source: memory.source || "server",
     created_at: memory.createdAt || memory.created_at || new Date().toISOString(),
@@ -3319,7 +3335,7 @@ const CHAT_MEMORY_TOOLS = [
   { name: "search_memories", description: "按关键词搜索长期记忆。每次回复最多调用一次；一次搜索为空就视为本轮没有命中，不要换词重复搜索。回答具体人物、事件、约定或偏好前，先搜索而不是猜。", parameters: { type: "object", properties: { query: { type: "string" }, category: { type: "string", enum: ["all", "deep", "daily", "diary", "writing"] }, limit: { type: "integer", minimum: 1, maximum: 50 } }, required: ["query"], additionalProperties: false } },
   { name: "add_deep_memory", description: "写入长期稳定记忆。只用于长期偏好、重要身份信息、稳定关系事实、长期习惯或长期承诺；不要用于一次性的日常小事。", parameters: { type: "object", properties: { content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 }, pinned: { type: "boolean" } }, required: ["content"], additionalProperties: false } },
   { name: "add_daily_memory", description: "写入当天值得以后回看的具体事件或变化，例如重要经历、关系变化或关键进展；不要用于普通吃饭和闲聊，也不要写成完整日记。", parameters: { type: "object", properties: { content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 } }, required: ["content"], additionalProperties: false } },
-  { name: "write_diary", description: "写每日完整日记。可在情境合适时主动使用；Iris 明确要求时任意时间都可写。每个目标日期最多一篇：没有则新建，已有则更新原日记。date 为日记所属日期 YYYY-MM-DD；不填时，上海时间 00:00–04:59 默认前一日，其余时间默认当日。补写昨天或更早日期时传入正确 date。", parameters: { type: "object", properties: { content: { type: "string" }, date: { type: "string", description: "日记所属日期 YYYY-MM-DD；不填时，00:00–04:59 默认为前一日，其余时间默认为当日" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1 }, arousal: { type: "number", minimum: 0, maximum: 1 } }, required: ["content"], additionalProperties: false } },
+  { name: "write_diary", description: "写每日完整日记。可在情境合适时主动使用；Iris 明确要求时任意时间都可写。每个目标日期最多一篇：没有则新建，已有则更新原日记。date 为日记所属日期 YYYY-MM-DD；不填时，上海时间 00:00–04:59 默认前一日，其余时间默认当日。补写昨天或更早日期时传入正确 date。valence 可选，情绪正负程度为 -1～1；arousal 可选，情绪唤醒/强度为 0～1。", parameters: { type: "object", properties: { content: { type: "string" }, date: { type: "string", description: "日记所属日期 YYYY-MM-DD；不填时，00:00–04:59 默认为前一日，其余时间默认为当日" }, tags: { type: "array", items: { type: "string" } }, valence: { type: "number", minimum: -1, maximum: 1, description: "情绪正负程度，-1～1" }, arousal: { type: "number", minimum: 0, maximum: 1, description: "情绪唤醒/强度，0～1" } }, required: ["content"], additionalProperties: false } },
   { name: "update_memory", description: "修正或补充一条已有记忆。先读取或搜索得到准确 id；不要用它改写自我档案。", parameters: { type: "object", properties: { id: { type: "string" }, content: { type: "string" }, tags: { type: "array", items: { type: "string" } }, pinned: { type: "boolean" } }, required: ["id"], additionalProperties: false } },
   { name: "delete_memory", description: "删除长期记忆。仅当 Iris 在当前消息中明确要求删除时使用，不能自行清理。", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false } },
   { name: "read_moods", description: "读取 Iris 或你的心情记录，用于理解近期情绪变化。", parameters: { type: "object", properties: { who: { type: "string", enum: ["all", "iris", "claude"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false } },
@@ -3402,14 +3418,14 @@ const CHAT_DAILY_HISTORY_TOOL = {
 };
 const ROLE_TOOL_CONFIG_VERSION = 5;
 const DEFAULT_ROLE_TOOL_CONFIG = Object.freeze({ enabled:true, mode:"custom", allowed:[], version:ROLE_TOOL_CONFIG_VERSION });
-const DEFAULT_STATUS_INJECTION_CONFIG = Object.freeze({ enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true });
+const DEFAULT_STATUS_INJECTION_CONFIG = Object.freeze({ enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true, mood:true });
 function normaliseStatusInjectionConfig(value) {
   const raw = value && typeof value === "object" ? value : {};
   return Object.fromEntries(Object.keys(DEFAULT_STATUS_INJECTION_CONFIG).map(key => [key, raw[key] !== false]));
 }
 function formatAgentDailyStatusContext(input) {
   input = input || {};
-  const { config, time = "", weather = "", cycle = "", events = [], classes = [], diary = "" } = input;
+  const { config, time = "", weather = "", cycle = "", events = [], classes = [], diary = "", mood = "" } = input;
   const status = normaliseStatusInjectionConfig(config);
   if (!status.enabled) return "";
   const schedule = status.schedule ? [
@@ -3421,7 +3437,8 @@ function formatAgentDailyStatusContext(input) {
     status.weather && weather,
     status.cycle && cycle,
     schedule.length ? "【今日安排】\n" + schedule.join("\n") : "",
-    status.diary && diary
+    status.diary && diary,
+    status.mood && mood
   ].filter(Boolean).join("\n");
 }
 function normaliseRoleToolConfig(value) {
@@ -3570,21 +3587,22 @@ async function writeChatMemory(args, category) {
     const { targetDiaryDay } = resolveDiaryTargetDay(args.date, new Date());
     const existingDiary = allMemories.find(memory => memory.category === "diary" && diaryDayKey(memory) === targetDiaryDay);
     if (existingDiary) {
+      const affect = normaliseMemoryAffects(args, existingDiary);
       const item = {
         ...existingDiary,
         content:candidate.content,
         tags:diaryTags(args.tags === undefined ? existingDiary.tags : candidate.tags, targetDiaryDay),
-        valence:args.valence ?? existingDiary.valence ?? 0,
-        arousal:args.arousal ?? existingDiary.arousal ?? 0.3,
+        ...affect,
         updatedAt:now
       };
       const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item)));
       await refreshJsonBackup("memories");
       return { ...saved, action:"updated", diaryDate:targetDiaryDay };
     }
+    const affect = normaliseMemoryAffects(args);
     const item = {
       id:generateId(), content:candidate.content, category:"diary", tags:diaryTags(candidate.tags, targetDiaryDay),
-      valence:args.valence ?? 0, arousal:args.arousal ?? 0.3, pinned:false, source:"chat-ai",
+      ...affect, pinned:false, source:"chat-ai",
       createdAt:diaryCreatedAt(targetDiaryDay), updatedAt:now
     };
     const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item)));
@@ -3594,7 +3612,8 @@ async function writeChatMemory(args, category) {
 
   const existing = allMemories.filter(memory => memory.category !== "identity").find(memory => memoriesDescribeSameEvent(memory, candidate));
   if (existing) return { duplicate:true, message:"相似记忆已存在；请用 update_memory 补充或修正它，不要新增。", existing:{ id:existing.id, content:String(existing.content || "").slice(0,500), category:existing.category, tags:ensureArray(existing.tags) } };
-  const item = { id:generateId(), content:candidate.content, category, tags:candidate.tags, valence:args.valence ?? 0, arousal:args.arousal ?? 0.3, pinned:!!args.pinned || category === "deep", source:"chat-ai", createdAt:now, updatedAt:now };
+  const affect = normaliseMemoryAffects(args);
+  const item = { id:generateId(), content:candidate.content, category, tags:candidate.tags, ...affect, pinned:!!args.pinned || category === "deep", source:"chat-ai", createdAt:now, updatedAt:now };
   const saved = memoryFromDb(await dbUpsert("memories", memoryToDbRow(item)));
   await refreshJsonBackup("memories");
   return saved;
@@ -3983,7 +4002,9 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
   let dailyWeatherText = "";
   if (!isAgentMode || (statusInjection.enabled && statusInjection.weather)) { try { dailyWeatherText = await buildTodayWeatherContext(); } catch (e) { console.warn("today weather context unavailable:", e.message); } }
   let selfProfileText = "";
-  if (toolsEnabled) {
+  // API mode retains its existing profile context. Claude Code reads it only
+  // when needed through read_self_profile, never as automatic static context.
+  if (toolsEnabled && !isAgentMode) {
     try {
       const p = await readSelfProfile();
       selfProfileText = SELF_PROFILE_FIELDS.filter(k => p[k]).map(k => `${SELF_PROFILE_SECTION_GUIDE[k]}\n${p[k]}`).join("\n\n");
@@ -4001,6 +4022,18 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
         : `${targetDay} 尚无日记。write_diary 可在合适时写入，并按目标日期保证唯一一篇日记。`;
     } catch (e) {
       console.warn("diary status unavailable:", e.message);
+    }
+  }
+  let reiMoodStatusText = "";
+  if (isAgentMode && statusInjection.enabled && statusInjection.mood) {
+    try {
+      const today = calendarDateKey();
+      const recorded = (await dbAll("moods", "date"))
+        .map(moodFromDb)
+        .some(item => item.type === "mood" && item.who === "claude" && item.date === today);
+      reiMoodStatusText = `心情：今日${recorded ? "已记录" : "未记录"}`;
+    } catch (e) {
+      console.warn("Rei mood status unavailable:", e.message);
     }
   }
   // UI-only invitation actions are stored as system messages, which the raw
@@ -4053,7 +4086,7 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     .filter(Boolean)
     .join("\n");
   // ── CC（Agent 模式）专用静态 system prompt ──
-  // 只包含：人设 + 默认工具规则（记忆/档案）+ 自我档案
+  // 只包含：人设 + 默认工具规则；自我档案仅在工具读取后提供。
   // 动态内容（时间/天气/日程/课表/动态工具/表情包等）在 ccDynamic 里每轮注入
   const ccStaticSystemPrompt = isAgentMode ? [
     `当前日期：${new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}\n\n` + (settings.persona?.systemPrompt || DEFAULT_CHAT_SETTINGS.persona.systemPrompt),
@@ -4066,7 +4099,6 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
     `【所有工具｜失败处理】任何工具一旦返回失败或明确错误，本轮都禁止再次调用同一个工具。直接根据工具返回的失败原因，用自然语言向 Iris 说明未能完成的原因；不得假装成功。如果一次回复调用了多个工具，必须逐一报告每个工具的执行结果，不能因为某个工具成功就忽略其他工具的失败。不要在工具调用之前或同时声称已完成，只有在工具返回成功结果之后才能说已完成。`,
     `周期状态出现“预测经期”时，只能作为预测表述，不得说成已经实际开始。`,
     `没有在当前消息的【当前已开启的额外工具】中列出的工具，你都不能使用。如需使用某个工具但当前未开启，请告诉 Iris 在右侧工具列表中开启对应功能。`,
-    selfProfileText ? `你当前的自我档案如下。它是连续成长中的自我认识，不是不可改变的硬提示词：\n${selfProfileText}` : "",
     toolsEnabled ? `遇到同一事件先更新旧记忆，不要新增重复项。相同事项已确认时不要重复查询。` : ""
   ].filter(Boolean).join("\n\n") : null;
 
@@ -4232,7 +4264,8 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
       cycle:dailyCalendarContext?.cycleText || "",
       events:dailyCalendarContext?.events,
       classes:dailyCalendarContext?.classes,
-      diary:ccDiaryCompact
+      diary:ccDiaryCompact,
+      mood:reiMoodStatusText
     });
 
     // ── 动态上下文（Agent 模式：只保留开启的每日事实） ──

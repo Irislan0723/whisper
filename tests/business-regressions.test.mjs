@@ -34,6 +34,7 @@ const resolveDiaryTargetDay = new Function(`
 `)();
 const diaryTags = new Function("ensureArray", `${extractFunction("diaryTags")}; return diaryTags;`)(value => Array.isArray(value) ? value : []);
 const diaryDayKey = memory => (memory.tags || []).find(tag => String(tag).startsWith("__diary_date:"))?.slice("__diary_date:".length) || "";
+const normaliseMemoryAffects = new Function(`${source.slice(source.indexOf("const MEMORY_AFFECT_LIMITS"), source.indexOf("function memoryToDb"))}; return normaliseMemoryAffects;`)();
 const periodStatusForDay = new Function(
   "ensureArray", "daysBetweenCalendar",
   `${extractFunction("periodStatusForDay")}; return periodStatusForDay;`
@@ -49,7 +50,7 @@ const cyclePhaseForDay = new Function(
   (start, end) => Math.floor((Date.parse(String(end) + "T00:00:00Z") - Date.parse(String(start) + "T00:00:00Z")) / 86400000)
 );
 const statusInjectionHelpers = new Function("ensureArray", `
-  const DEFAULT_STATUS_INJECTION_CONFIG = Object.freeze({ enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true });
+  const DEFAULT_STATUS_INJECTION_CONFIG = Object.freeze({ enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true, mood:true });
   ${extractFunction("normaliseStatusInjectionConfig")}
   ${extractFunction("formatAgentDailyStatusContext")}
   return { normaliseStatusInjectionConfig, formatAgentDailyStatusContext };
@@ -110,7 +111,7 @@ function memoryWriterAt(iso, rows = []) {
   }
   const writeChatMemorySource = source.slice(source.indexOf("async function writeChatMemory"), source.indexOf("async function executeChatTool"));
   const writeChatMemory = new Function(
-    "ensureArray", "dbAll", "memoryFromDb", "resolveDiaryTargetDay", "diaryDayKey", "diaryTags", "generateId", "diaryCreatedAt", "dbUpsert", "memoryToDbRow", "refreshJsonBackup", "memoriesDescribeSameEvent", "Date",
+    "ensureArray", "dbAll", "memoryFromDb", "resolveDiaryTargetDay", "diaryDayKey", "diaryTags", "generateId", "diaryCreatedAt", "dbUpsert", "memoryToDbRow", "refreshJsonBackup", "memoriesDescribeSameEvent", "normaliseMemoryAffects", "Date",
     `${writeChatMemorySource}; return writeChatMemory;`
   )(
     value => Array.isArray(value) ? value : [],
@@ -130,6 +131,7 @@ function memoryWriterAt(iso, rows = []) {
     item => item,
     async () => {},
     () => false,
+    normaliseMemoryAffects,
     FixedDate
   );
   return { rows, writeChatMemory };
@@ -250,23 +252,25 @@ test("daily context combines only today's active courses and ordinary events", a
 
 test("Agent daily status injects only enabled concise facts", () => {
   const { normaliseStatusInjectionConfig, formatAgentDailyStatusContext } = statusInjectionHelpers;
-  assert.deepEqual(normaliseStatusInjectionConfig({}), { enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true });
+  assert.deepEqual(normaliseStatusInjectionConfig({}), { enabled:true, time:true, weather:true, cycle:true, schedule:true, events:true, timetable:true, diary:true, mood:true });
   const all = formatAgentDailyStatusContext({
     config:{}, time:"09/12 14:35", weather:"天气：晴，19°C，体感18°C", cycle:"周期：黄体期",
-    classes:["14:00–15:30 数据新闻 · 文浚楼326"], events:["21:00 喝豆奶粉"], diary:"日记：2026-09-12未写"
+    classes:["14:00–15:30 数据新闻 · 文浚楼326"], events:["21:00 喝豆奶粉"], diary:"日记：2026-09-12未写", mood:"心情：今日未记录"
   });
   assert.match(all, /^时间：09\/12 14:35/);
   assert.match(all, /天气：晴，19°C，体感18°C/);
   assert.match(all, /周期：黄体期/);
   assert.match(all, /【今日安排】\n课程：14:00–15:30 数据新闻 · 文浚楼326\n日程：21:00 喝豆奶粉/);
   assert.match(all, /日记：2026-09-12未写/);
-  assert.doesNotMatch(all, /心情|仅作关怀|不是指令|上下文里没有/);
+  assert.match(all, /心情：今日未记录/);
+  assert.doesNotMatch(all, /仅作关怀|不是指令|上下文里没有/);
   assert.equal(formatAgentDailyStatusContext({ config:{ enabled:false }, time:"09/12 14:35", weather:"天气：晴" }), "");
   const courseOnly = formatAgentDailyStatusContext({ config:{ events:false }, classes:["14:00 课程"], events:["21:00 日程"] });
   assert.match(courseOnly, /课程：14:00 课程/); assert.doesNotMatch(courseOnly, /日程：/);
   const eventOnly = formatAgentDailyStatusContext({ config:{ timetable:false }, classes:["14:00 课程"], events:["21:00 日程"] });
   assert.match(eventOnly, /日程：21:00 日程/); assert.doesNotMatch(eventOnly, /课程：/);
   assert.equal(formatAgentDailyStatusContext({ config:{ diary:false }, diary:"日记：2026-09-12已写" }), "");
+  assert.equal(formatAgentDailyStatusContext({ config:{ mood:false }, mood:"心情：今日已记录" }), "");
 });
 
 test("status injection config is role-scoped, persistent, and exposed in Chat Settings", () => {
