@@ -130,16 +130,31 @@
   (function(){
     var KEY='whisper_global_appearance_v1', DB='whisper_global_appearance', STORE='assets', WALLPAPER='wallpaper';
     var DEFAULTS={wallpaperVisibility:100,wallpaperBlur:0,uiOpacity:100,glassBlur:0};
-    var isChatRoom=/\/chat\.html$/i.test(location.pathname||'');
+    var isChatPage=/\/chat\.html$/i.test(location.pathname||'');
     var state=read(), wallpaperUrl='', wallpaperBlob=null, wallpaperDirty=false;
     function clamp(value,min,max,fallback){ value=Number(value); return Number.isFinite(value)?Math.max(min,Math.min(max,Math.round(value))):fallback; }
-    function normalize(value){ value=value||{}; return {wallpaperVisibility:clamp(value.wallpaperVisibility,0,100,DEFAULTS.wallpaperVisibility),wallpaperBlur:clamp(value.wallpaperBlur,0,24,DEFAULTS.wallpaperBlur),uiOpacity:clamp(value.uiOpacity,60,100,DEFAULTS.uiOpacity),glassBlur:clamp(value.glassBlur,0,30,DEFAULTS.glassBlur)}; }
+    function normalize(value){ value=value||{}; return {wallpaperVisibility:clamp(value.wallpaperVisibility,0,100,DEFAULTS.wallpaperVisibility),wallpaperBlur:clamp(value.wallpaperBlur,0,24,DEFAULTS.wallpaperBlur),uiOpacity:clamp(value.uiOpacity,20,100,DEFAULTS.uiOpacity),glassBlur:clamp(value.glassBlur,0,30,DEFAULTS.glassBlur)}; }
     function read(){ try{return normalize(JSON.parse(localStorage.getItem(KEY)||'{}'));}catch(error){return normalize({});} }
     function persist(){ try{localStorage.setItem(KEY,JSON.stringify(state));}catch(error){} }
     function setRootVar(name,value){ document.documentElement.style.setProperty(name,value); }
+    function isChatRoom(){ return !!(isChatPage&&document.body&&document.body.classList.contains('chat-room')&&!document.body.classList.contains('workspace-open')); }
+    function clearBodyWallpaper(){
+      if(!document.body)return;
+      var layer=document.getElementById('whisperWallpaperLayer');
+      if(layer)layer.style.display='none';
+      delete document.documentElement.dataset.whisperWallpaperActive;
+      document.body.classList.remove('has-whisper-wallpaper');
+      document.body.style.removeProperty('position');
+      document.body.style.removeProperty('isolation');
+      document.body.style.removeProperty('background');
+    }
+    function disable(){
+      delete document.documentElement.dataset.whisperGlobalAppearance;
+      clearBodyWallpaper();
+    }
     function apply(){
-      if(isChatRoom) return;
-      var root=document.documentElement, card=Math.max(60,state.uiOpacity-8), panel=Math.max(70,state.uiOpacity-4), modal=Math.max(88,state.uiOpacity), nav=Math.max(76,state.uiOpacity-3);
+      if(isChatRoom()){disable();return;}
+      var root=document.documentElement, card=Math.max(20,state.uiOpacity-8), panel=Math.max(24,state.uiOpacity-4), modal=Math.max(70,state.uiOpacity);
       root.dataset.whisperGlobalAppearance='true';
       setRootVar('--whisper-wallpaper-visibility',state.wallpaperVisibility);
       setRootVar('--whisper-wallpaper-overlay',(100-state.wallpaperVisibility)+'%');
@@ -148,7 +163,6 @@
       setRootVar('--card-surface-opacity',card+'%');
       setRootVar('--panel-surface-opacity',panel+'%');
       setRootVar('--modal-surface-opacity',modal+'%');
-      setRootVar('--nav-surface-opacity',nav+'%');
       setRootVar('--glass-blur',state.glassBlur+'px');
       ensureLayer();
     }
@@ -157,6 +171,7 @@
       if(!document.body) return;
       var layer=document.getElementById('whisperWallpaperLayer');
       if(!layer){ layer=document.createElement('div'); layer.id='whisperWallpaperLayer'; layer.className='whisper-wallpaper-layer'; layer.setAttribute('aria-hidden','true'); document.body.insertBefore(layer,document.body.firstChild); }
+      if(isChatRoom()){clearBodyWallpaper();return;}
       /* Keep the wallpaper functional even when a mobile WebView still has an
          older style.css in its HTTP cache.  These critical layout properties
          intentionally live inline; the shared stylesheet continues to own the
@@ -166,7 +181,8 @@
       layer.style.inset='-36px';
       layer.style.pointerEvents='none';
       layer.style.display=wallpaperBlob?'block':'none';
-      layer.style.backgroundColor='var(--bg)';
+      layer.style.opacity=String(state.wallpaperVisibility/100);
+      layer.style.backgroundColor='transparent';
       layer.style.backgroundPosition='center';
       layer.style.backgroundRepeat='no-repeat';
       layer.style.backgroundSize='cover';
@@ -174,6 +190,7 @@
       layer.style.transform='scale(1.04)';
       layer.style.backgroundImage=wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none';
       document.documentElement.style.setProperty('--whisper-wallpaper-image',wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none');
+      if(wallpaperBlob)document.documentElement.dataset.whisperWallpaperActive='true';else delete document.documentElement.dataset.whisperWallpaperActive;
       document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperBlob);
       if(wallpaperBlob){
         document.body.style.setProperty('position','relative');
@@ -189,7 +206,6 @@
     function openDb(){ return new Promise(function(resolve,reject){ if(!window.indexedDB){reject(new Error('当前浏览器不支持本地壁纸存储'));return;} var request=indexedDB.open(DB,1); request.onupgradeneeded=function(){var db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);}; request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error||new Error('无法打开本地壁纸存储'));}; }); }
     function withStore(mode,work){ return openDb().then(function(db){ return new Promise(function(resolve,reject){var tx=db.transaction(STORE,mode),store=tx.objectStore(STORE),request=work(store); request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error||new Error('本地壁纸存储失败'));};tx.onabort=function(){reject(tx.error||new Error('本地壁纸存储失败'));}; }).finally(function(){db.close();}); }); }
     function refreshWallpaper(){
-      if(isChatRoom) return Promise.resolve(false);
       return withStore('readonly',function(store){return store.get(WALLPAPER);}).then(function(blob){
         useWallpaper(blob,false); return !!wallpaperBlob;
       }).catch(function(){ useWallpaper(null,false);return false; });
@@ -217,7 +233,11 @@
     window.WhisperGlobalAppearance={getState:getState,preview:preview,previewWallpaper:previewWallpaper,previewRemoveWallpaper:previewRemoveWallpaper,save:save,revert:revert,reset:reset,refreshWallpaper:refreshWallpaper,set:preview,setWallpaper:previewWallpaper,removeWallpaper:previewRemoveWallpaper};
     window.addEventListener('message',function(event){if(event.origin===location.origin&&event.data&&event.data.type==='whisper:global-appearance-changed'){state=read();apply();refreshWallpaper();}});
     window.addEventListener('storage',function(event){if(event.key===KEY){state=read();apply();}});
-    if(!isChatRoom){ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){apply();refreshWallpaper();},{once:true});else{apply();refreshWallpaper();} }
+    function start(){
+      apply();refreshWallpaper();
+      if(isChatPage&&window.MutationObserver)new MutationObserver(function(records){if(records.some(function(record){return record.attributeName==='class';}))apply();}).observe(document.body,{attributes:true,attributeFilter:['class']});
+    }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
   })();
 
   /* ---- Custom Fonts ---- */

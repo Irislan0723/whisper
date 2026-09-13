@@ -320,7 +320,6 @@ html[data-whisper-global-appearance="true"] {
   --card-surface-opacity: 92%;
   --panel-surface-opacity: 96%;
   --modal-surface-opacity: 100%;
-  --nav-surface-opacity: 97%;
   --glass-blur: 0px;
   --whisper-wallpaper-image: none;
   background: var(--bg);
@@ -341,21 +340,21 @@ html[data-whisper-global-appearance="true"]::before {
   transform: scale(1.04);
   will-change: filter;
 }
+html[data-whisper-global-appearance="true"][data-whisper-wallpaper-active="true"]::before {
+  display: none;
+}
 html[data-whisper-global-appearance="true"] body {
   position: relative;
   isolation: isolate;
   background: transparent;
   z-index: 1;
 }
+html[data-whisper-global-appearance="true"] body:not(.chat-room) .chat-main,
+html[data-whisper-global-appearance="true"] body.workspace-open .workspace {
+  background: transparent;
+}
 .whisper-wallpaper-layer {
   display: none;
-}
-html[data-whisper-global-appearance="true"] .top-bar,
-html[data-whisper-global-appearance="true"] .dock,
-html[data-whisper-global-appearance="true"] .dock::after {
-  background: color-mix(in srgb, var(--bg-card) var(--nav-surface-opacity), transparent);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
 }
 html[data-whisper-global-appearance="true"] .card,
 html[data-whisper-global-appearance="true"] .more-card,
@@ -375,13 +374,9 @@ html[data-whisper-global-appearance="true"] .player-search-card {
   backdrop-filter: blur(var(--glass-blur));
 }
 html[data-whisper-global-appearance="true"] .input,
-html[data-whisper-global-appearance="true"] .settings-item,
 html[data-whisper-global-appearance="true"] .panel {
   background-color: color-mix(in srgb, var(--bg-card) var(--panel-surface-opacity), transparent);
 }
-html[data-appearance="dark"][data-whisper-global-appearance="true"] .top-bar,
-html[data-appearance="dark"][data-whisper-global-appearance="true"] .dock,
-html[data-appearance="dark"][data-whisper-global-appearance="true"] .dock::after,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .card,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .more-card,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .settings-list,

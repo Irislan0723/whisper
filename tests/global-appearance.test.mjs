@@ -33,7 +33,8 @@ test('5. scalar visual settings have one localStorage key and normalized readabl
   assert.match(init, /KEY='whisper_global_appearance_v1'/);
   assert.match(init, /wallpaperVisibility:clamp\(value\.wallpaperVisibility,0,100/);
   assert.match(init, /wallpaperBlur:clamp\(value\.wallpaperBlur,0,24/);
-  assert.match(init, /uiOpacity:clamp\(value\.uiOpacity,60,100/);
+  assert.match(init, /uiOpacity:clamp\(value\.uiOpacity,20,100/);
+  assert.match(more, /id="uiOpacity" type="range" min="20" max="100"/);
   assert.match(init, /glassBlur:clamp\(value\.glassBlur,0,30/);
 });
 
@@ -51,17 +52,19 @@ test('7. wallpaper uses a root-level cover layer with independent visibility and
 });
 
 test('8. global surfaces derive layered opacity variables and use both backdrop-filter variants', () => {
-  for (const variable of ['--ui-surface-opacity', '--card-surface-opacity', '--panel-surface-opacity', '--modal-surface-opacity', '--nav-surface-opacity', '--glass-blur']) {
+  for (const variable of ['--ui-surface-opacity', '--card-surface-opacity', '--panel-surface-opacity', '--modal-surface-opacity', '--glass-blur']) {
     assert.match(css, new RegExp(variable.replace(/[-]/g, '\\-')));
   }
   assert.match(css, /-webkit-backdrop-filter: blur\(var\(--glass-blur\)\)/);
   assert.match(css, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
 });
 
-test('9. top nav, bottom nav, cards, modal, sidebar, drawer and settings all receive the glass treatment', () => {
-  for (const selector of ['.top-bar', '.dock', '.card', '.modal', '.sidebar', '.drawer', '.settings-list']) {
+test('9. cards, modal, sidebar, drawer and settings receive glass while shared navigation stays original', () => {
+  for (const selector of ['.card', '.modal', '.sidebar', '.drawer', '.settings-list']) {
     assert.match(css, new RegExp(selector.replace('.', '\\.') + '[,\\s]'));
   }
+  assert.doesNotMatch(css, /data-whisper-global-appearance="true"\] \.top-bar/);
+  assert.doesNotMatch(css, /data-whisper-global-appearance="true"\] \.dock/);
 });
 
 test('10. dark glass selectors retain the html[data-appearance="dark"] convention', () => {
@@ -69,12 +72,16 @@ test('10. dark glass selectors retain the html[data-appearance="dark"] conventio
   assert.doesNotMatch(css, /(^|\n)\[data-appearance="dark"\]/);
 });
 
-test('11. wallpaper is above the theme background but below ordinary page content, while Chat remains isolated', () => {
+test('11. wallpaper is above the theme background and only an active Chat room remains isolated', () => {
   assert.match(css, /html\[data-whisper-global-appearance="true"\]::before[\s\S]*?z-index: 0/);
   assert.match(css, /html\[data-whisper-global-appearance="true"\] body[\s\S]*?z-index: 1/);
   assert.match(init, /setProperty\('--whisper-wallpaper-image'/);
-  assert.match(init, /var isChatRoom=\/\\\/chat\\\.html\$\/i/);
-  assert.match(init, /if\(isChatRoom\) return;/);
+  assert.match(init, /var isChatPage=\/\\\/chat\\\.html\$\/i/);
+  assert.match(init, /function isChatRoom\(\)/);
+  assert.match(init, /classList\.contains\('chat-room'\).*classList\.contains\('workspace-open'\)/);
+  assert.match(init, /if\(isChatRoom\(\)\)\{disable\(\);return;\}/);
+  assert.match(css, /body:not\(\.chat-room\) \.chat-main/);
+  assert.match(css, /body\.workspace-open \.workspace/);
   assert.doesNotMatch(more, /Chat.*壁纸|Chat.*透明度/);
 });
 
@@ -111,5 +118,7 @@ test('15. every shared appearance asset reference is explicitly cache-busted', (
 test('16. the runtime wallpaper layer survives a stale mobile stylesheet', () => {
   assert.match(init, /layer\.style\.position='fixed'/);
   assert.match(init, /layer\.style\.display=wallpaperBlob\?'block':'none'/);
+  assert.match(init, /layer\.style\.opacity=String\(state\.wallpaperVisibility\/100\)/);
+  assert.match(css, /data-whisper-wallpaper-active="true"\]\::before\s*\{\s*display: none/);
   assert.match(init, /document\.body\.style\.setProperty\('background','transparent','important'\)/);
 });
