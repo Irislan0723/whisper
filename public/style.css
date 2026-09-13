@@ -373,8 +373,7 @@ html[data-whisper-global-appearance="true"] .player-search-card {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
 }
-html[data-whisper-global-appearance="true"] .input,
-html[data-whisper-global-appearance="true"] .panel {
+html[data-whisper-global-appearance="true"] .input {
   background-color: color-mix(in srgb, var(--bg-card) var(--panel-surface-opacity), transparent);
 }
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .card,

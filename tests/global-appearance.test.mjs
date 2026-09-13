@@ -65,6 +65,7 @@ test('9. cards, modal, sidebar, drawer and settings receive glass while shared n
   }
   assert.doesNotMatch(css, /data-whisper-global-appearance="true"\] \.top-bar/);
   assert.doesNotMatch(css, /data-whisper-global-appearance="true"\] \.dock/);
+  assert.doesNotMatch(css, /data-whisper-global-appearance="true"\] \.panel\s*\{/);
 });
 
 test('10. dark glass selectors retain the html[data-appearance="dark"] convention', () => {
