@@ -55,12 +55,14 @@ test('Web roam is transform-based, bounded, randomized, and pauses after manual 
   assert.match(pet, /scheduleRoam\(90000\)/);
 });
 
-test('drag uses Pointer Events, capture, cancellation, and persistent positions', () => {
-  for (const name of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture']) assert.ok(pet.includes(`addEventListener('${name}'`));
+test('drag and friendly interactions use Pointer Events, capture, cancellation, and persistent positions', () => {
+  for (const name of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture','pointerenter']) assert.ok(pet.includes(`addEventListener('${name}'`));
   assert.match(pet, /setPointerCapture/);
   assert.match(pet, /releasePointerCapture/);
   assert.match(pet, /whisper_clawd_position/);
   assert.match(pet, /visualViewport\?\.addEventListener\('resize'/);
+  assert.match(pet, /peek:'clawd-mini-peek\.svg', shy:'clawd-aegyo-shy\.svg'/);
+  assert.match(pet, /setTimeout\(\(\) => \{[\s\S]*showReaction\(REACTIONS\.shy, 2800\);[\s\S]*\}, 650\)/);
 });
 
 test('visibility and iframe overlays pause or cover the pet without sharing music drag state', () => {
@@ -73,8 +75,10 @@ test('visibility and iframe overlays pause or cover the pet without sharing musi
   assert.doesNotMatch(pet, /floatRoot|floatDisc|iris_global_player_float/);
 });
 
-test('More exposes a default-off switch, three sizes, and reset position', () => {
+test('More keeps the Clawd entry minimal with a flower icon, switch, three sizes, and reset position', () => {
   assert.match(more, /id="clawdPetBtn"/);
+  assert.match(more, /<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6\.8"/);
+  assert.doesNotMatch(more, /clawdPetSummary/);
   assert.match(more, /id="clawdEnabled"/);
   assert.match(more, /data-clawd-size="small"/);
   assert.match(more, /data-clawd-size="medium"/);
@@ -87,6 +91,14 @@ test('Chat sends only narrow lifecycle states to the parent pet bridge', () => {
   assert.match(chat, /whisperPetStateV103\('thinking'\)/);
   assert.match(chat, /whisperPetStateV103\(toolFailed\|\|pendingTurnGroupId\?'error':'attention'\)/);
   assert.match(init, /payload deliberately contains only UI state, never chat text or data/);
+});
+
+test('active user typing sends only a typing state and settles without sharing draft text', () => {
+  assert.match(chat, /function syncWhisperPetTypingV104\(\)/);
+  assert.match(chat, /input\.addEventListener\('input',syncWhisperPetTypingV104\)/);
+  assert.match(chat, /whisperPetStateV103\('working'\)/);
+  assert.match(chat, /setTimeout\(settleWhisperPetTypingV104,1200\)/);
+  assert.doesNotMatch(chat, /WhisperPetBridge\?\.state\([^)]*input\.value/);
 });
 
 test('the Web pet introduces no Electron or native-module runtime dependency', () => {

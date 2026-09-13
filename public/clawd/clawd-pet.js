@@ -21,6 +21,7 @@
   };
   const REACTIONS = {
     drag:'clawd-react-drag.svg', left:'clawd-react-left.svg', right:'clawd-react-right.svg',
+    peek:'clawd-mini-peek.svg', shy:'clawd-aegyo-shy.svg',
     annoyed:'clawd-react-annoyed.svg', double:['clawd-react-double.svg','clawd-react-double-jump.svg']
   };
   // Mirrors the original state-priority.js ordering for the web-supported states.
@@ -32,7 +33,7 @@
   let enabled = read(KEYS.enabled) === '1';
   let sizeName = Object.prototype.hasOwnProperty.call(SIZES, read(KEYS.size)) ? read(KEYS.size) : 'medium';
   let point = null, activeState = 'idle', baseState = 'idle', temporary = null;
-  let drag = null, roamTimer = 0, tickTimer = 0, stateTimer = 0, lastActivity = Date.now(), clickTimer = 0, clickCount = 0, covered = false;
+  let drag = null, roamTimer = 0, tickTimer = 0, stateTimer = 0, lastActivity = Date.now(), clickTimer = 0, clickCount = 0, pressTimer = 0, pressHandled = false, lastPeek = 0, covered = false;
   let pausedForVisibility = document.visibilityState !== 'visible';
 
   function read(key) { try { return localStorage.getItem(key) || ''; } catch (_) { return ''; } }
@@ -162,16 +163,17 @@
     if (covered) { stopRoam(); stopTick(); } else { activity(); startTick(); scheduleRoam(); }
   }
   function resetPosition() { point = defaultPoint(); savePoint(); paintPoint(false); }
+  function clearPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; } }
 
   function finishDrag(event, cancelled) {
     if (!drag || event.pointerId !== drag.pointerId) return;
     try { hit.releasePointerCapture(event.pointerId); } catch (_) {}
-    const moved = drag.moved; drag = null; root.classList.remove('clawd-dragging');
+    const moved = drag.moved, held = pressHandled; drag = null; clearPress(); root.classList.remove('clawd-dragging');
     if (moved) {
       savePoint(); lastActivity = Date.now();
       if (!cancelled) setState('dizzy', { temporary:true, duration:TIMING.dizzy, returnTo:'idle', force:true });
       scheduleRoam(90000);
-    } else if (!cancelled) {
+    } else if (!cancelled && !held) {
       clickCount += 1;
       clearTimeout(clickTimer);
       clickTimer = setTimeout(() => {
@@ -185,21 +187,30 @@
   hit.addEventListener('pointerdown', event => {
     if (!enabled || event.button > 0) return;
     event.preventDefault(); event.stopPropagation(); activity(); stopRoam();
+    pressHandled = false;
     drag = { pointerId:event.pointerId, startX:event.clientX, startY:event.clientY, origin:{ ...point }, moved:false };
     hit.setPointerCapture(event.pointerId);
+    pressTimer = setTimeout(() => {
+      if (!drag || drag.moved) return;
+      pressHandled = true; showReaction(REACTIONS.shy, 2800);
+    }, 650);
   });
   hit.addEventListener('pointermove', event => {
     if (!drag || event.pointerId !== drag.pointerId) return;
     event.preventDefault();
     const dx = event.clientX - drag.startX, dy = event.clientY - drag.startY;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 5) {
-      drag.moved = true; root.classList.add('clawd-dragging'); showReaction(REACTIONS.drag, 300000);
+      drag.moved = true; clearPress(); root.classList.add('clawd-dragging'); showReaction(REACTIONS.drag, 300000);
     }
     if (drag.moved) { point = clamp({ x:drag.origin.x + dx, y:drag.origin.y + dy }); paintPoint(false); }
   });
   hit.addEventListener('pointerup', event => finishDrag(event, false));
   hit.addEventListener('pointercancel', event => finishDrag(event, true));
   hit.addEventListener('lostpointercapture', event => finishDrag(event, true));
+  hit.addEventListener('pointerenter', event => {
+    if (event.pointerType !== 'mouse' || !enabled || drag || temporary || Date.now() - lastPeek < 6000) return;
+    lastPeek = Date.now(); showReaction(REACTIONS.peek, 1700);
+  });
 
   window.addEventListener('resize', () => { if (enabled) paintPoint(false); }, { passive:true });
   window.visualViewport?.addEventListener('resize', () => { if (enabled && !drag) paintPoint(false); }, { passive:true });

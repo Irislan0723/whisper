@@ -2909,3 +2909,25 @@ requestAiReply=async function(){
   }catch(error){if(canRequest)whisperPetStateV103('error');throw error;}
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{if($('sendBtn'))$('sendBtn').onclick=sendUserBubble;if($('askReplyBtn'))$('askReplyBtn').onclick=requestAiReply});else{if($('sendBtn'))$('sendBtn').onclick=sendUserBubble;if($('askReplyBtn'))$('askReplyBtn').onclick=requestAiReply}
+
+// V104: show the retained Clawd typing animation only while the user is actively composing.
+let whisperPetTypingTimerV104=0;
+function settleWhisperPetTypingV104(){
+  clearTimeout(whisperPetTypingTimerV104);
+  if(pendingTurnGroupId)whisperPetStateV103('thinking');else whisperPetStateV103('idle');
+}
+function syncWhisperPetTypingV104(){
+  const input=$('chatInput');
+  clearTimeout(whisperPetTypingTimerV104);
+  if(!input||!input.value.trim()){settleWhisperPetTypingV104();return}
+  whisperPetStateV103('working');
+  whisperPetTypingTimerV104=setTimeout(settleWhisperPetTypingV104,1200);
+}
+function bindWhisperPetTypingV104(){
+  const input=$('chatInput');
+  if(!input||input.dataset.whisperPetTypingV104)return;
+  input.dataset.whisperPetTypingV104='true';
+  input.addEventListener('input',syncWhisperPetTypingV104);
+  input.addEventListener('blur',()=>{if(!input.value.trim())settleWhisperPetTypingV104()});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindWhisperPetTypingV104);else bindWhisperPetTypingV104();
