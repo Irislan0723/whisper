@@ -36,10 +36,11 @@ test('5. scalar visual settings have one localStorage key and normalized readabl
   assert.match(init, /glassBlur:clamp\(value\.glassBlur,0,30/);
 });
 
-test('6. wallpaper data is stored as an IndexedDB Blob rather than localStorage image data', () => {
+test('6. wallpaper data is staged as a Blob and only reaches IndexedDB when Save is pressed', () => {
   assert.match(init, /indexedDB\.open\(DB,1\)/);
-  assert.match(init, /store\.put\(file,WALLPAPER\)/);
-  assert.match(init, /blob instanceof Blob\?URL\.createObjectURL\(blob\)/);
+  assert.match(init, /function previewWallpaper\(file\)/);
+  assert.match(init, /function save\(\)[\s\S]*?store\.put\(wallpaperBlob,WALLPAPER\)/);
+  assert.match(init, /wallpaperBlob\?URL\.createObjectURL\(wallpaperBlob\)/);
   assert.doesNotMatch(init, /localStorage\.setItem\([^\n]*wallpaper[^\n]*file/i);
 });
 
@@ -67,7 +68,9 @@ test('10. dark glass selectors retain the html[data-appearance="dark"] conventio
   assert.doesNotMatch(css, /(^|\n)\[data-appearance="dark"\]/);
 });
 
-test('11. the global layer explicitly excludes Chat and leaves its room styling alone', () => {
+test('11. wallpaper is above the theme background but below ordinary page content, while Chat remains isolated', () => {
+  assert.match(css, /\.whisper-wallpaper-layer[\s\S]*?z-index: 0/);
+  assert.match(css, /body > :not\(\.whisper-wallpaper-layer\)[\s\S]*?z-index: 1/);
   assert.match(init, /var isChatRoom=\/\\\/chat\\\.html\$\/i/);
   assert.match(init, /if\(isChatRoom\) return;/);
   assert.doesNotMatch(more, /Chat.*壁纸|Chat.*透明度/);
@@ -79,10 +82,18 @@ test('12. active frames are notified without transferring wallpaper bytes', () =
   assert.doesNotMatch(init, /postMessage\([^\n]*wallpaperUrl/);
 });
 
-test('13. removal preserves controls while reset removes wallpaper and restores defaults after an in-app confirmation', () => {
-  assert.match(init, /function removeWallpaper\(\)/);
+test('13. removal can be staged, reset remains protected, and settings have an explicit save action', () => {
+  assert.match(init, /function previewRemoveWallpaper\(\)/);
   assert.match(init, /function reset\(\).*state=normalize\(DEFAULTS\)/s);
   assert.match(more, /id="beautifyConfirm" hidden/);
   assert.match(more, /id="confirmBeautifyReset"/);
+  assert.match(more, /id="saveBeautify"/);
   assert.doesNotMatch(more, /confirm\(/);
+});
+
+test('14. the beautify sheet scrolls internally and prevents the page behind it from scrolling', () => {
+  assert.match(more, /\.beautify-modal\{overflow:hidden;overscroll-behavior:contain\}/);
+  assert.match(more, /\.beautify-modal \.modal\{[^}]*overflow:auto;overscroll-behavior:contain/);
+  assert.match(more, /body\.beautify-open\{overflow:hidden;overscroll-behavior:none\}/);
+  assert.match(more, /document\.body\.classList\.add\('beautify-open'\)/);
 });

@@ -131,7 +131,7 @@
     var KEY='whisper_global_appearance_v1', DB='whisper_global_appearance', STORE='assets', WALLPAPER='wallpaper';
     var DEFAULTS={wallpaperVisibility:100,wallpaperBlur:0,uiOpacity:100,glassBlur:0};
     var isChatRoom=/\/chat\.html$/i.test(location.pathname||'');
-    var state=read(), wallpaperUrl='';
+    var state=read(), wallpaperUrl='', wallpaperBlob=null, wallpaperDirty=false;
     function clamp(value,min,max,fallback){ value=Number(value); return Number.isFinite(value)?Math.max(min,Math.min(max,Math.round(value))):fallback; }
     function normalize(value){ value=value||{}; return {wallpaperVisibility:clamp(value.wallpaperVisibility,0,100,DEFAULTS.wallpaperVisibility),wallpaperBlur:clamp(value.wallpaperBlur,0,24,DEFAULTS.wallpaperBlur),uiOpacity:clamp(value.uiOpacity,60,100,DEFAULTS.uiOpacity),glassBlur:clamp(value.glassBlur,0,30,DEFAULTS.glassBlur)}; }
     function read(){ try{return normalize(JSON.parse(localStorage.getItem(KEY)||'{}'));}catch(error){return normalize({});} }
@@ -151,39 +151,45 @@
       setRootVar('--nav-surface-opacity',nav+'%');
       setRootVar('--glass-blur',state.glassBlur+'px');
       ensureLayer();
-      document.dispatchEvent(new CustomEvent('whisper:global-appearance-applied',{detail:getState()}));
     }
+    function notify(){ document.dispatchEvent(new CustomEvent('whisper:global-appearance-applied',{detail:getState()})); }
     function ensureLayer(){
       if(!document.body) return;
       var layer=document.getElementById('whisperWallpaperLayer');
       if(!layer){ layer=document.createElement('div'); layer.id='whisperWallpaperLayer'; layer.className='whisper-wallpaper-layer'; layer.setAttribute('aria-hidden','true'); document.body.insertBefore(layer,document.body.firstChild); }
       layer.style.backgroundImage=wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none';
-      document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperUrl);
+      document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperBlob);
     }
+    function useWallpaper(blob,dirty){ if(wallpaperUrl)URL.revokeObjectURL(wallpaperUrl);wallpaperBlob=blob instanceof Blob?blob:null;wallpaperUrl=wallpaperBlob?URL.createObjectURL(wallpaperBlob):'';wallpaperDirty=!!dirty;ensureLayer();notify(); }
     function openDb(){ return new Promise(function(resolve,reject){ if(!window.indexedDB){reject(new Error('当前浏览器不支持本地壁纸存储'));return;} var request=indexedDB.open(DB,1); request.onupgradeneeded=function(){var db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);}; request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error||new Error('无法打开本地壁纸存储'));}; }); }
     function withStore(mode,work){ return openDb().then(function(db){ return new Promise(function(resolve,reject){var tx=db.transaction(STORE,mode),store=tx.objectStore(STORE),request=work(store); request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error||new Error('本地壁纸存储失败'));};tx.onabort=function(){reject(tx.error||new Error('本地壁纸存储失败'));}; }).finally(function(){db.close();}); }); }
     function refreshWallpaper(){
       if(isChatRoom) return Promise.resolve(false);
       return withStore('readonly',function(store){return store.get(WALLPAPER);}).then(function(blob){
-        if(wallpaperUrl) URL.revokeObjectURL(wallpaperUrl);
-        wallpaperUrl=blob instanceof Blob?URL.createObjectURL(blob):''; ensureLayer(); return !!wallpaperUrl;
-      }).catch(function(){ if(wallpaperUrl)URL.revokeObjectURL(wallpaperUrl); wallpaperUrl='';ensureLayer();return false; });
+        useWallpaper(blob,false); return !!wallpaperBlob;
+      }).catch(function(){ useWallpaper(null,false);return false; });
     }
     function broadcast(){
       var message={type:'whisper:global-appearance-changed'};
       try{if(window.parent!==window)window.parent.postMessage(message,location.origin);}catch(error){}
       try{window.opener&&window.opener.postMessage(message,location.origin);}catch(error){}
     }
-    function getState(){ return {wallpaperVisibility:state.wallpaperVisibility,wallpaperBlur:state.wallpaperBlur,uiOpacity:state.uiOpacity,glassBlur:state.glassBlur,hasWallpaper:!!wallpaperUrl}; }
-    function update(next,announce){ state=normalize(Object.assign({},state,next||{}));persist();apply();if(announce!==false)broadcast();return getState(); }
-    function setWallpaper(file){
+    function getState(){ return {wallpaperVisibility:state.wallpaperVisibility,wallpaperBlur:state.wallpaperBlur,uiOpacity:state.uiOpacity,glassBlur:state.glassBlur,hasWallpaper:!!wallpaperBlob,dirty:wallpaperDirty}; }
+    function preview(next){ state=normalize(Object.assign({},state,next||{}));apply();return getState(); }
+    function previewWallpaper(file){
       if(!(file instanceof Blob))return Promise.reject(new Error('请选择图片文件'));
       if(file.size>20*1024*1024)return Promise.reject(new Error('壁纸请控制在 20MB 以内'));
-      return withStore('readwrite',function(store){return store.put(file,WALLPAPER);}).then(function(){return refreshWallpaper();}).then(function(){broadcast();return getState();});
+      useWallpaper(file,true);return Promise.resolve(getState());
     }
-    function removeWallpaper(){ return withStore('readwrite',function(store){return store.delete(WALLPAPER);}).then(function(){return refreshWallpaper();}).then(function(){broadcast();return getState();}); }
-    function reset(){ state=normalize(DEFAULTS);persist();apply();return withStore('readwrite',function(store){return store.delete(WALLPAPER);}).catch(function(){}).then(function(){return refreshWallpaper();}).then(function(){broadcast();return getState();}); }
-    window.WhisperGlobalAppearance={getState:getState,set:update,setWallpaper:setWallpaper,removeWallpaper:removeWallpaper,reset:reset,refreshWallpaper:refreshWallpaper};
+    function previewRemoveWallpaper(){ useWallpaper(null,true);return getState(); }
+    function save(){
+      persist();apply();
+      var write=wallpaperDirty?withStore('readwrite',function(store){return wallpaperBlob?store.put(wallpaperBlob,WALLPAPER):store.delete(WALLPAPER);}):Promise.resolve();
+      return write.then(function(){wallpaperDirty=false;notify();broadcast();return getState();});
+    }
+    function revert(){ state=read();apply();return refreshWallpaper().then(getState); }
+    function reset(){ state=normalize(DEFAULTS);apply();previewRemoveWallpaper();return save(); }
+    window.WhisperGlobalAppearance={getState:getState,preview:preview,previewWallpaper:previewWallpaper,previewRemoveWallpaper:previewRemoveWallpaper,save:save,revert:revert,reset:reset,refreshWallpaper:refreshWallpaper,set:preview,setWallpaper:previewWallpaper,removeWallpaper:previewRemoveWallpaper};
     window.addEventListener('message',function(event){if(event.origin===location.origin&&event.data&&event.data.type==='whisper:global-appearance-changed'){state=read();apply();refreshWallpaper();}});
     window.addEventListener('storage',function(event){if(event.key===KEY){state=read();apply();}});
     if(!isChatRoom){ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){apply();refreshWallpaper();},{once:true});else{apply();refreshWallpaper();} }

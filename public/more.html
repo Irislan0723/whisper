@@ -363,12 +363,13 @@ html[data-appearance="dark"] .appearance-check{border-color:#3A3A3A}
 html[data-appearance="dark"] .clawd-setting-row{border-color:#3A3A3A}html[data-appearance="dark"] .clawd-setting-row strong{color:#F2F2F2}html[data-appearance="dark"] .clawd-size-options button,html[data-appearance="dark"] .clawd-reset{background:#262626;color:#F2F2F2}
 
 /* ---- Global visual customization ---- */
-.beautify-modal .modal{max-width:480px;max-height:min(82dvh,720px);overflow:auto}
+.beautify-modal{overflow:hidden;overscroll-behavior:contain}.beautify-modal .modal{max-width:480px;max-height:min(82dvh,720px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+body.beautify-open{overflow:hidden;overscroll-behavior:none}
 .beautify-group{padding:2px 0 16px}.beautify-group+.beautify-group{padding-top:16px;border-top:1px solid var(--border)}
 .beautify-group-title{margin-bottom:10px;color:var(--text-light);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 .beautify-upload{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-secondary);color:var(--text);cursor:pointer;font-size:13px}.beautify-upload svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.beautify-upload span{display:flex;align-items:center;gap:8px}.beautify-upload input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;clip-path:inset(50%)}
 .beautify-range-row{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:12px;align-items:center;padding:11px 0}.beautify-range-label{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--text);font-size:13px}.beautify-range-value{color:var(--text-light);font-family:var(--font-en);font-size:14px;text-align:right}.beautify-range-row input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
-.beautify-action-row{display:flex;gap:8px}.beautify-action{flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-secondary);color:var(--text);font:13px var(--font-b);cursor:pointer}.beautify-action.danger{color:var(--error)}.beautify-action:disabled{opacity:.45;cursor:not-allowed}.beautify-confirm{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-secondary);color:var(--text);font-size:13px;line-height:1.55}.beautify-confirm p{margin-bottom:10px}.beautify-confirm-actions{display:flex;justify-content:flex-end;gap:8px}.beautify-confirm-actions button{border:0;border-radius:8px;padding:7px 11px;background:var(--bg-card);color:var(--text);font:12px var(--font-b);cursor:pointer}.beautify-confirm-actions .danger{background:var(--error);color:#fff}
+.beautify-action-row{display:flex;gap:8px}.beautify-action{flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-secondary);color:var(--text);font:13px var(--font-b);cursor:pointer}.beautify-action.danger{color:var(--error)}.beautify-action:disabled{opacity:.45;cursor:not-allowed}.beautify-save{width:100%;margin-top:2px;border:0;border-radius:12px;padding:13px;background:var(--accent);color:var(--accent-contrast);font:600 14px var(--font-b);cursor:pointer}.beautify-save:disabled{opacity:.55;cursor:wait}.beautify-confirm{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-secondary);color:var(--text);font-size:13px;line-height:1.55}.beautify-confirm p{margin-bottom:10px}.beautify-confirm-actions{display:flex;justify-content:flex-end;gap:8px}.beautify-confirm-actions button{border:0;border-radius:8px;padding:7px 11px;background:var(--bg-card);color:var(--text);font:12px var(--font-b);cursor:pointer}.beautify-confirm-actions .danger{background:var(--error);color:#fff}
 html[data-appearance="dark"] .beautify-upload,html[data-appearance="dark"] .beautify-action,html[data-appearance="dark"] .beautify-confirm{background:#2C2C2C;border-color:#3A3A3A;color:#F2F2F2}html[data-appearance="dark"] .beautify-confirm-actions button{background:#3A3A3A;color:#F2F2F2}
 </style>
 </head>
@@ -495,10 +496,10 @@ html[data-appearance="dark"] .beautify-upload,html[data-appearance="dark"] .beau
       <label class="beautify-range-row"><span class="beautify-range-label"><span>磨砂强度</span><output id="glassBlurValue" class="beautify-range-value">0px</output></span><input id="glassBlur" type="range" min="0" max="30" step="1" value="0"></label>
     </section>
     <section class="beautify-group">
-      <div class="beautify-group-title">其他</div>
       <div class="beautify-action-row"><button class="beautify-action danger" id="resetBeautify" type="button">恢复默认</button></div>
       <div class="beautify-confirm" id="beautifyConfirm" hidden><p>恢复默认会移除壁纸，并还原全部美化设置。</p><div class="beautify-confirm-actions"><button type="button" id="cancelBeautifyReset">取消</button><button type="button" class="danger" id="confirmBeautifyReset">恢复默认</button></div></div>
     </section>
+    <button class="beautify-save" id="saveBeautify" type="button">保存设置</button>
   </div>
 </div>
 
@@ -1336,8 +1337,9 @@ document.getElementById('fontModal').addEventListener('click', function(e) {
 (function(){
   var api=window.WhisperGlobalAppearance;
   if(!api) return;
-  var modal=document.getElementById('beautifyModal'), upload=document.getElementById('wallpaperUpload'), remove=document.getElementById('removeWallpaper'), confirm=document.getElementById('beautifyConfirm');
+  var modal=document.getElementById('beautifyModal'), upload=document.getElementById('wallpaperUpload'), remove=document.getElementById('removeWallpaper'), confirm=document.getElementById('beautifyConfirm'), save=document.getElementById('saveBeautify');
   var controls={wallpaperVisibility:['wallpaperVisibility','wallpaperVisibilityValue','%'],wallpaperBlur:['wallpaperBlur','wallpaperBlurValue','px'],uiOpacity:['uiOpacity','uiOpacityValue','%'],glassBlur:['glassBlur','glassBlurValue','px']};
+  var dirty=false;
   function showError(error){ showToast((error&&error.message)||'美化设置保存失败','error'); }
   function paint(){
     var state=api.getState();
@@ -1345,21 +1347,23 @@ document.getElementById('fontModal').addEventListener('click', function(e) {
     document.getElementById('wallpaperName').textContent=state.hasWallpaper?'当前壁纸':'未选择图片';
     remove.disabled=!state.hasWallpaper;
   }
-  function open(){paint();confirm.hidden=true;modal.classList.add('open');}
+  function open(){dirty=false;confirm.hidden=true;document.body.classList.add('beautify-open');modal.classList.add('open');api.revert().then(paint);}
+  function close(revert){modal.classList.remove('open');document.body.classList.remove('beautify-open');if(revert&&dirty)api.revert().then(paint);dirty=false;}
   document.getElementById('beautifyBtn').addEventListener('click',open);
-  document.getElementById('closeBeautifyModal').addEventListener('click',function(){modal.classList.remove('open');});
-  modal.addEventListener('click',function(event){if(event.target===modal)modal.classList.remove('open');});
-  Object.keys(controls).forEach(function(key){var input=document.getElementById(controls[key][0]);input.addEventListener('input',function(){var value={};value[key]=input.value;api.set(value);paint();});});
+  document.getElementById('closeBeautifyModal').addEventListener('click',function(){close(true);});
+  modal.addEventListener('click',function(event){if(event.target===modal)close(true);});
+  Object.keys(controls).forEach(function(key){var input=document.getElementById(controls[key][0]);input.addEventListener('input',function(){var value={};value[key]=input.value;api.preview(value);dirty=true;paint();});});
   upload.addEventListener('change',function(){
     var file=upload.files&&upload.files[0]; if(!file)return;
     var supported=/\.(jpe?g|png|webp)$/i.test(file.name||'')||/^image\/(jpeg|png|webp)$/i.test(file.type||'');
     if(!supported){showToast('请选择 jpg、png 或 webp 图片','error');upload.value='';return;}
-    api.setWallpaper(file).then(function(){paint();showToast('壁纸已应用');}).catch(showError).finally(function(){upload.value='';});
+    api.previewWallpaper(file).then(function(){dirty=true;paint();showToast('壁纸预览已应用');}).catch(showError).finally(function(){upload.value='';});
   });
-  remove.addEventListener('click',function(){api.removeWallpaper().then(function(){paint();showToast('已移除壁纸');}).catch(showError);});
+  remove.addEventListener('click',function(){api.previewRemoveWallpaper();dirty=true;paint();showToast('壁纸已移除，请保存设置');});
   document.getElementById('resetBeautify').addEventListener('click',function(){confirm.hidden=false;});
   document.getElementById('cancelBeautifyReset').addEventListener('click',function(){confirm.hidden=true;});
-  document.getElementById('confirmBeautifyReset').addEventListener('click',function(){api.reset().then(function(){confirm.hidden=true;paint();showToast('已恢复默认外观');}).catch(showError);});
+  document.getElementById('confirmBeautifyReset').addEventListener('click',function(){api.reset().then(function(){dirty=false;confirm.hidden=true;paint();showToast('已恢复默认外观');}).catch(showError);});
+  save.addEventListener('click',function(){save.disabled=true;save.textContent='保存中…';api.save().then(function(){dirty=false;paint();showToast('美化设置已保存');}).catch(showError).finally(function(){save.disabled=false;save.textContent='保存设置';});});
   document.addEventListener('whisper:global-appearance-applied',paint);
   paint();
 })();

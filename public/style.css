@@ -328,9 +328,16 @@ html[data-whisper-global-appearance="true"] body {
   isolation: isolate;
   background: transparent;
 }
+html[data-whisper-global-appearance="true"] body > :not(.whisper-wallpaper-layer) {
+  position: relative;
+  z-index: 1;
+}
+html[data-whisper-global-appearance="true"] body > .top-bar { position: sticky; z-index: 101; }
+html[data-whisper-global-appearance="true"] body > .dock { position: fixed; z-index: 100; }
+html[data-whisper-global-appearance="true"] body > .modal-overlay { position: fixed; z-index: 1000; }
 .whisper-wallpaper-layer {
   position: fixed;
-  z-index: -1;
+  z-index: 0;
   inset: -36px;
   pointer-events: none;
   background-color: var(--bg);
