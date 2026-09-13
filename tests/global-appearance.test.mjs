@@ -7,6 +7,7 @@ const init = fs.readFileSync(new URL('public/init.js', root), 'utf8');
 const css = fs.readFileSync(new URL('public/style.css', root), 'utf8');
 const more = fs.readFileSync(new URL('public/more.html', root), 'utf8');
 const shell = fs.readFileSync(new URL('public/app.html', root), 'utf8');
+const publicDirectory = new URL('public/', root);
 
 test('1. More places the beautify entry directly after Clawd', () => {
   assert.match(more, /id="clawdPetBtn"[\s\S]*?<\/button>\s*<button class="settings-item" id="beautifyBtn"/);
@@ -97,4 +98,18 @@ test('14. the beautify sheet scrolls internally and prevents the page behind it 
   assert.match(more, /\.beautify-modal \.modal\{[^}]*overflow:auto;overscroll-behavior:contain/);
   assert.match(more, /body\.beautify-open\{overflow:hidden;overscroll-behavior:none\}/);
   assert.match(more, /document\.body\.classList\.add\('beautify-open'\)/);
+});
+
+test('15. every shared appearance asset reference is explicitly cache-busted', () => {
+  const htmlFiles = fs.readdirSync(publicDirectory).filter((name) => name.endsWith('.html'));
+  for (const name of htmlFiles) {
+    const source = fs.readFileSync(new URL(name, publicDirectory), 'utf8');
+    assert.doesNotMatch(source, /(?:src="init\.js"|href="style\.css")/, `${name} contains an unversioned appearance asset`);
+  }
+});
+
+test('16. the runtime wallpaper layer survives a stale mobile stylesheet', () => {
+  assert.match(init, /layer\.style\.position='fixed'/);
+  assert.match(init, /layer\.style\.display=wallpaperBlob\?'block':'none'/);
+  assert.match(init, /document\.body\.style\.setProperty\('background','transparent','important'\)/);
 });

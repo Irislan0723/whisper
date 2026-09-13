@@ -157,9 +157,33 @@
       if(!document.body) return;
       var layer=document.getElementById('whisperWallpaperLayer');
       if(!layer){ layer=document.createElement('div'); layer.id='whisperWallpaperLayer'; layer.className='whisper-wallpaper-layer'; layer.setAttribute('aria-hidden','true'); document.body.insertBefore(layer,document.body.firstChild); }
+      /* Keep the wallpaper functional even when a mobile WebView still has an
+         older style.css in its HTTP cache.  These critical layout properties
+         intentionally live inline; the shared stylesheet continues to own the
+         richer glass treatment once its versioned copy has loaded. */
+      layer.style.position='fixed';
+      layer.style.zIndex='-1';
+      layer.style.inset='-36px';
+      layer.style.pointerEvents='none';
+      layer.style.display=wallpaperBlob?'block':'none';
+      layer.style.backgroundColor='var(--bg)';
+      layer.style.backgroundPosition='center';
+      layer.style.backgroundRepeat='no-repeat';
+      layer.style.backgroundSize='cover';
+      layer.style.filter='blur(var(--whisper-wallpaper-blur, 0px))';
+      layer.style.transform='scale(1.04)';
       layer.style.backgroundImage=wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none';
       document.documentElement.style.setProperty('--whisper-wallpaper-image',wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none');
       document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperBlob);
+      if(wallpaperBlob){
+        document.body.style.setProperty('position','relative');
+        document.body.style.setProperty('isolation','isolate');
+        document.body.style.setProperty('background','transparent','important');
+      }else{
+        document.body.style.removeProperty('position');
+        document.body.style.removeProperty('isolation');
+        document.body.style.removeProperty('background');
+      }
     }
     function useWallpaper(blob,dirty){ if(wallpaperUrl)URL.revokeObjectURL(wallpaperUrl);wallpaperBlob=blob instanceof Blob?blob:null;wallpaperUrl=wallpaperBlob?URL.createObjectURL(wallpaperBlob):'';wallpaperDirty=!!dirty;ensureLayer();notify(); }
     function openDb(){ return new Promise(function(resolve,reject){ if(!window.indexedDB){reject(new Error('当前浏览器不支持本地壁纸存储'));return;} var request=indexedDB.open(DB,1); request.onupgradeneeded=function(){var db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);}; request.onsuccess=function(){resolve(request.result);};request.onerror=function(){reject(request.error||new Error('无法打开本地壁纸存储'));}; }); }
