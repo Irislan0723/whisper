@@ -309,6 +309,87 @@ body {
   overflow-x: hidden;
 }
 
+/* ---- Global visual customization ----
+   Only ordinary pages opt in through init.js.  Chat deliberately never gets
+   this attribute, preserving its room-specific composition. */
+html[data-whisper-global-appearance="true"] {
+  --whisper-wallpaper-visibility: 100;
+  --whisper-wallpaper-overlay: 0%;
+  --whisper-wallpaper-blur: 0px;
+  --ui-surface-opacity: 100%;
+  --card-surface-opacity: 92%;
+  --panel-surface-opacity: 96%;
+  --modal-surface-opacity: 100%;
+  --nav-surface-opacity: 97%;
+  --glass-blur: 0px;
+}
+html[data-whisper-global-appearance="true"] body {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+.whisper-wallpaper-layer {
+  position: fixed;
+  z-index: -1;
+  inset: -36px;
+  pointer-events: none;
+  background-color: var(--bg);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  filter: blur(var(--whisper-wallpaper-blur));
+  transform: scale(1.04);
+  will-change: filter;
+}
+.whisper-wallpaper-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) var(--whisper-wallpaper-overlay), transparent);
+}
+html[data-whisper-global-appearance="true"] .top-bar,
+html[data-whisper-global-appearance="true"] .dock,
+html[data-whisper-global-appearance="true"] .dock::after {
+  background: color-mix(in srgb, var(--bg-card) var(--nav-surface-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+html[data-whisper-global-appearance="true"] .card,
+html[data-whisper-global-appearance="true"] .more-card,
+html[data-whisper-global-appearance="true"] .settings-list,
+html[data-whisper-global-appearance="true"] .sidebar,
+html[data-whisper-global-appearance="true"] .drawer,
+html[data-whisper-global-appearance="true"] .workspace {
+  background: color-mix(in srgb, var(--bg-card) var(--card-surface-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+html[data-whisper-global-appearance="true"] .modal,
+html[data-whisper-global-appearance="true"] .bottom-sheet,
+html[data-whisper-global-appearance="true"] .player-search-card {
+  background: color-mix(in srgb, var(--bg-card) var(--modal-surface-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+html[data-whisper-global-appearance="true"] .input,
+html[data-whisper-global-appearance="true"] .settings-item,
+html[data-whisper-global-appearance="true"] .panel {
+  background-color: color-mix(in srgb, var(--bg-card) var(--panel-surface-opacity), transparent);
+}
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .top-bar,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .dock,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .dock::after,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .card,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .more-card,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .settings-list,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .sidebar,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .drawer,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .workspace,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .modal,
+html[data-appearance="dark"][data-whisper-global-appearance="true"] .bottom-sheet {
+  background: color-mix(in srgb, #262626 var(--panel-surface-opacity), transparent);
+}
+
 /* ---- Typography ---- */
 h1, h2, h3 {
   font-family: var(--font-en);

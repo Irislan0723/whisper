@@ -361,6 +361,15 @@ html[data-appearance="dark"] .appearance-check{border-color:#3A3A3A}
 .clawd-switch{position:relative;display:block;flex:0 0 46px;width:46px;height:27px;border:0;border-radius:99px;background:var(--accent-pale);cursor:pointer;transition:background .2s}.clawd-switch:after{content:'';position:absolute;top:4px;left:4px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.16);transition:transform .2s}.clawd-switch.on{background:var(--accent)}.clawd-switch.on:after{transform:translateX(19px)}
 .clawd-size-options{display:flex;gap:7px;flex-wrap:wrap}.clawd-size-options button,.clawd-reset{border:1px solid var(--accent-light);border-radius:10px;background:var(--bg-card);color:var(--text);font:13px var(--font-b);cursor:pointer}.clawd-size-options button{min-width:56px;padding:8px 11px}.clawd-size-options button.active{border-color:var(--accent);background:var(--accent-pale);color:var(--accent);font-weight:600}.clawd-reset{padding:9px 12px;color:var(--accent)}
 html[data-appearance="dark"] .clawd-setting-row{border-color:#3A3A3A}html[data-appearance="dark"] .clawd-setting-row strong{color:#F2F2F2}html[data-appearance="dark"] .clawd-size-options button,html[data-appearance="dark"] .clawd-reset{background:#262626;color:#F2F2F2}
+
+/* ---- Global visual customization ---- */
+.beautify-modal .modal{max-width:480px;max-height:min(82dvh,720px);overflow:auto}
+.beautify-group{padding:2px 0 16px}.beautify-group+.beautify-group{padding-top:16px;border-top:1px solid var(--border)}
+.beautify-group-title{margin-bottom:10px;color:var(--text-light);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.beautify-upload{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-secondary);color:var(--text);cursor:pointer;font-size:13px}.beautify-upload svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.beautify-upload span{display:flex;align-items:center;gap:8px}.beautify-upload input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;clip-path:inset(50%)}
+.beautify-range-row{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:12px;align-items:center;padding:11px 0}.beautify-range-label{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--text);font-size:13px}.beautify-range-value{color:var(--text-light);font-family:var(--font-en);font-size:14px;text-align:right}.beautify-range-row input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.beautify-action-row{display:flex;gap:8px}.beautify-action{flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-secondary);color:var(--text);font:13px var(--font-b);cursor:pointer}.beautify-action.danger{color:var(--error)}.beautify-action:disabled{opacity:.45;cursor:not-allowed}.beautify-confirm{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-secondary);color:var(--text);font-size:13px;line-height:1.55}.beautify-confirm p{margin-bottom:10px}.beautify-confirm-actions{display:flex;justify-content:flex-end;gap:8px}.beautify-confirm-actions button{border:0;border-radius:8px;padding:7px 11px;background:var(--bg-card);color:var(--text);font:12px var(--font-b);cursor:pointer}.beautify-confirm-actions .danger{background:var(--error);color:#fff}
+html[data-appearance="dark"] .beautify-upload,html[data-appearance="dark"] .beautify-action,html[data-appearance="dark"] .beautify-confirm{background:#2C2C2C;border-color:#3A3A3A;color:#F2F2F2}html[data-appearance="dark"] .beautify-confirm-actions button{background:#3A3A3A;color:#F2F2F2}
 </style>
 </head>
 <body>
@@ -447,6 +456,13 @@ html[data-appearance="dark"] .clawd-setting-row{border-color:#3A3A3A}html[data-a
         </span>
         <span class="settings-item-arrow">›</span>
       </button>
+      <button class="settings-item" id="beautifyBtn">
+        <span class="settings-item-left">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 4.2 5.1 5.1-8.9 8.9-5.8 1.1 1.1-5.8z"/><path d="m12.8 6.1 5.1 5.1"/><path d="M4.5 21h15"/></svg>
+          <span>美化</span>
+        </span>
+        <span class="settings-item-arrow">›</span>
+      </button>
     </div>
   </div>
 
@@ -459,6 +475,30 @@ html[data-appearance="dark"] .clawd-setting-row{border-color:#3A3A3A}html[data-a
     <div class="clawd-setting-row"><div><strong>Clawd 桌宠</strong><small>在 Whisper 页面之间持续陪伴。</small></div><button class="clawd-switch" id="clawdEnabled" type="button" role="switch" aria-checked="false" aria-label="开关 Clawd 桌宠"></button></div>
     <div class="clawd-setting-row"><div><strong>尺寸</strong><small>保持原始 Clawd 比例。</small></div><div class="clawd-size-options" id="clawdSizeOptions"><button type="button" data-clawd-size="small">小</button><button type="button" data-clawd-size="medium">中</button><button type="button" data-clawd-size="large">大</button></div></div>
     <div class="clawd-setting-row"><div><strong>位置</strong><small>恢复左下方的默认位置。</small></div><button class="clawd-reset" id="clawdResetPosition" type="button">恢复默认</button></div>
+  </div>
+</div>
+
+<!-- Global visual customization -->
+<div class="modal-overlay beautify-modal" id="beautifyModal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">美化</span><button class="modal-close" id="closeBeautifyModal" aria-label="关闭">✕</button></div>
+    <section class="beautify-group">
+      <div class="beautify-group-title">壁纸</div>
+      <label class="beautify-upload" for="wallpaperUpload"><span><svg viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/></svg>上传壁纸</span><small id="wallpaperName">未选择图片</small><input id="wallpaperUpload" type="file" accept="image/jpeg,image/png,image/webp"></label>
+      <label class="beautify-range-row"><span class="beautify-range-label"><span>壁纸可见度</span><output id="wallpaperVisibilityValue" class="beautify-range-value">100%</output></span><input id="wallpaperVisibility" type="range" min="0" max="100" step="1" value="100"></label>
+      <label class="beautify-range-row"><span class="beautify-range-label"><span>壁纸模糊</span><output id="wallpaperBlurValue" class="beautify-range-value">0px</output></span><input id="wallpaperBlur" type="range" min="0" max="24" step="1" value="0"></label>
+      <div class="beautify-action-row"><button class="beautify-action danger" id="removeWallpaper" type="button">移除壁纸</button></div>
+    </section>
+    <section class="beautify-group">
+      <div class="beautify-group-title">玻璃效果</div>
+      <label class="beautify-range-row"><span class="beautify-range-label"><span>界面透明度</span><output id="uiOpacityValue" class="beautify-range-value">100%</output></span><input id="uiOpacity" type="range" min="60" max="100" step="1" value="100"></label>
+      <label class="beautify-range-row"><span class="beautify-range-label"><span>磨砂强度</span><output id="glassBlurValue" class="beautify-range-value">0px</output></span><input id="glassBlur" type="range" min="0" max="30" step="1" value="0"></label>
+    </section>
+    <section class="beautify-group">
+      <div class="beautify-group-title">其他</div>
+      <div class="beautify-action-row"><button class="beautify-action danger" id="resetBeautify" type="button">恢复默认</button></div>
+      <div class="beautify-confirm" id="beautifyConfirm" hidden><p>恢复默认会移除壁纸，并还原全部美化设置。</p><div class="beautify-confirm-actions"><button type="button" id="cancelBeautifyReset">取消</button><button type="button" class="danger" id="confirmBeautifyReset">恢复默认</button></div></div>
+    </section>
   </div>
 </div>
 
@@ -1290,6 +1330,38 @@ document.getElementById('fontModal').addEventListener('click', function(e) {
   document.querySelectorAll('[data-clawd-size]').forEach(function(button){button.addEventListener('click',function(){state.size=button.dataset.clawdSize;save();showToast('Clawd 尺寸已更新');});});
   document.getElementById('clawdResetPosition').addEventListener('click',function(){try{localStorage.removeItem(KEY_POSITION);}catch(e){}tellParent({resetPosition:true});showToast('Clawd 已回到默认位置');});
   load(); paint();
+})();
+
+/* ---- Global visual customization ---- */
+(function(){
+  var api=window.WhisperGlobalAppearance;
+  if(!api) return;
+  var modal=document.getElementById('beautifyModal'), upload=document.getElementById('wallpaperUpload'), remove=document.getElementById('removeWallpaper'), confirm=document.getElementById('beautifyConfirm');
+  var controls={wallpaperVisibility:['wallpaperVisibility','wallpaperVisibilityValue','%'],wallpaperBlur:['wallpaperBlur','wallpaperBlurValue','px'],uiOpacity:['uiOpacity','uiOpacityValue','%'],glassBlur:['glassBlur','glassBlurValue','px']};
+  function showError(error){ showToast((error&&error.message)||'美化设置保存失败','error'); }
+  function paint(){
+    var state=api.getState();
+    Object.keys(controls).forEach(function(key){var pair=controls[key],input=document.getElementById(pair[0]),output=document.getElementById(pair[1]);input.value=state[key];output.textContent=state[key]+pair[2];});
+    document.getElementById('wallpaperName').textContent=state.hasWallpaper?'当前壁纸':'未选择图片';
+    remove.disabled=!state.hasWallpaper;
+  }
+  function open(){paint();confirm.hidden=true;modal.classList.add('open');}
+  document.getElementById('beautifyBtn').addEventListener('click',open);
+  document.getElementById('closeBeautifyModal').addEventListener('click',function(){modal.classList.remove('open');});
+  modal.addEventListener('click',function(event){if(event.target===modal)modal.classList.remove('open');});
+  Object.keys(controls).forEach(function(key){var input=document.getElementById(controls[key][0]);input.addEventListener('input',function(){var value={};value[key]=input.value;api.set(value);paint();});});
+  upload.addEventListener('change',function(){
+    var file=upload.files&&upload.files[0]; if(!file)return;
+    var supported=/\.(jpe?g|png|webp)$/i.test(file.name||'')||/^image\/(jpeg|png|webp)$/i.test(file.type||'');
+    if(!supported){showToast('请选择 jpg、png 或 webp 图片','error');upload.value='';return;}
+    api.setWallpaper(file).then(function(){paint();showToast('壁纸已应用');}).catch(showError).finally(function(){upload.value='';});
+  });
+  remove.addEventListener('click',function(){api.removeWallpaper().then(function(){paint();showToast('已移除壁纸');}).catch(showError);});
+  document.getElementById('resetBeautify').addEventListener('click',function(){confirm.hidden=false;});
+  document.getElementById('cancelBeautifyReset').addEventListener('click',function(){confirm.hidden=true;});
+  document.getElementById('confirmBeautifyReset').addEventListener('click',function(){api.reset().then(function(){confirm.hidden=true;paint();showToast('已恢复默认外观');}).catch(showError);});
+  document.addEventListener('whisper:global-appearance-applied',paint);
+  paint();
 })();
 
 /* ---- Top bar init ---- */
