@@ -143,7 +143,7 @@
       var layer=document.getElementById('whisperWallpaperLayer');
       if(layer)layer.style.display='none';
       delete document.documentElement.dataset.whisperWallpaperActive;
-      document.body.classList.remove('has-whisper-wallpaper');
+      if(document.body.classList.contains('has-whisper-wallpaper'))document.body.classList.remove('has-whisper-wallpaper');
       document.body.style.removeProperty('position');
       document.body.style.removeProperty('isolation');
       document.body.style.removeProperty('background');
@@ -191,7 +191,7 @@
       layer.style.backgroundImage=wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none';
       document.documentElement.style.setProperty('--whisper-wallpaper-image',wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none');
       if(wallpaperBlob)document.documentElement.dataset.whisperWallpaperActive='true';else delete document.documentElement.dataset.whisperWallpaperActive;
-      document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperBlob);
+      if(document.body.classList.contains('has-whisper-wallpaper')!==!!wallpaperBlob)document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperBlob);
       if(wallpaperBlob){
         document.body.style.setProperty('position','relative');
         document.body.style.setProperty('isolation','isolate');
@@ -234,8 +234,15 @@
     window.addEventListener('message',function(event){if(event.origin===location.origin&&event.data&&event.data.type==='whisper:global-appearance-changed'){state=read();apply();refreshWallpaper();}});
     window.addEventListener('storage',function(event){if(event.key===KEY){state=read();apply();}});
     function start(){
+      var lastChatRoom=isChatRoom();
       apply();refreshWallpaper();
-      if(isChatPage&&window.MutationObserver)new MutationObserver(function(records){if(records.some(function(record){return record.attributeName==='class';}))apply();}).observe(document.body,{attributes:true,attributeFilter:['class']});
+      if(isChatPage&&window.MutationObserver)new MutationObserver(function(records){
+        if(!records.some(function(record){return record.attributeName==='class';}))return;
+        var nextChatRoom=isChatRoom();
+        if(nextChatRoom===lastChatRoom)return;
+        lastChatRoom=nextChatRoom;
+        apply();
+      }).observe(document.body,{attributes:true,attributeFilter:['class']});
     }
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
   })();

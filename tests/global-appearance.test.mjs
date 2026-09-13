@@ -125,3 +125,10 @@ test('16. the runtime wallpaper layer survives a stale mobile stylesheet', () =>
   assert.match(css, /data-whisper-wallpaper-active="true"\]\::before\s*\{\s*display: none/);
   assert.match(init, /document\.body\.style\.setProperty\('background','transparent','important'\)/);
 });
+
+test('17. Chat scope observation cannot loop on its own body class writes', () => {
+  assert.match(init, /var lastChatRoom=isChatRoom\(\)/);
+  assert.match(init, /if\(nextChatRoom===lastChatRoom\)return/);
+  assert.match(init, /classList\.contains\('has-whisper-wallpaper'\)\)document\.body\.classList\.remove/);
+  assert.match(init, /classList\.contains\('has-whisper-wallpaper'\)!==!!wallpaperBlob/);
+});
