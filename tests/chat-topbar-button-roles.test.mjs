@@ -6,16 +6,16 @@ const root = new URL('..', import.meta.url);
 const app = fs.readFileSync(new URL('public/chat-app-20260821-1310.js', root), 'utf8');
 const html = fs.readFileSync(new URL('public/chat.html', root), 'utf8');
 
-test('1. left header button no longer starts as the hamburger action', () => {
-  assert.match(app, /function initIcons\(\)\{\$\('openLeft'\)\.innerHTML=ICON\.back/);
+test('1. left arrow opens the main Chat sidebar', () => {
+  assert.match(app, /\$\('openLeft'\)\.onclick=\(\)=>openDrawer\('left'\)/);
 });
 
 test('2. left header button uses the existing chevron back SVG', () => {
   assert.match(app, /back:'<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/);
 });
 
-test('3. left header button returns through same-origin history or Home', () => {
-  assert.match(app, /function navigateChatBackV100\(\).*history\.back\(\).*location\.href='index\.html'/s);
+test('3. left arrow has no Home or history back handler', () => {
+  assert.doesNotMatch(app, /navigateChatBackV100|\$\('openLeft'\)\.onclick=.*history\.back|\$\('openLeft'\)\.onclick=.*location\.href/);
 });
 
 test('4. right header button no longer starts as the gear action', () => {
@@ -27,13 +27,12 @@ test('5. right header button uses the three-line menu SVG', () => {
   assert.match(app, /menu:'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/);
 });
 
-test('6. right header button opens the main left Chat drawer', () => {
-  assert.match(app, /\$\('openRight'\)\.onclick=\(\)=>openDrawer\('left'\)/);
+test('6. right header button opens the existing Chat Settings drawer', () => {
+  assert.match(app, /\$\('openRight'\)\.onclick=\(\)=>openDrawer\('right'\)/);
 });
 
-test('7. Chat Settings remains reachable from the main sidebar', () => {
-  assert.match(app, /function ensureConversationSettingsEntryV100\(\).*button\.onclick=\(\)=>openDrawer\('right'\)/s);
-  assert.match(app, /conversationSettingsEntryV100/);
+test('7. either drawer still uses the unchanged shared close behavior', () => {
+  assert.match(app, /function closeDrawers\(\)\{\$\('leftDrawer'\)\.classList\.remove\('open'\);\$\('rightDrawer'\)\.classList\.remove\('open'\)/);
 });
 
 test('8. light-mode icons inherit currentColor', () => {
