@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+
+const root = new URL('..', import.meta.url);
+const app = fs.readFileSync(new URL('public/chat-app-20260821-1310.js', root), 'utf8');
+const html = fs.readFileSync(new URL('public/chat.html', root), 'utf8');
+
+test('1. user send button no longer uses the paper-plane path', () => assert.doesNotMatch(app, /ICON\.send='<svg[^>]*><path d="m5 12 14-7/));
+test('2. user send button uses the upward-arrow path', () => assert.match(app, /ICON\.send='<svg[^>]*><path d="M12 19V5M7 10l5-5 5 5"/));
+test('3. user send retains the shared send handler', () => assert.match(app, /\$\('sendBtn'\)\.onclick=sendUserBubble/));
+test('4. AI reply button no longer receives the spark or upward-arrow icon', () => assert.match(app, /\$\('askReplyBtn'\)\.innerHTML=ICON\.fingerprint/));
+test('5. AI reply button uses the inline fingerprint SVG', () => assert.match(app, /ICON\.fingerprint='<svg[^>]*><path d="M5 9\.5a7 7 0 0 1 14 0"/));
+test('6. AI reply retains its request handler', () => assert.match(app, /\$\('askReplyBtn'\)\.onclick=requestAiReply/));
+test('7. API and Agent rooms share one composer instance', () => assert.equal((html.match(/id="chatInput"/g) || []).length, 1));
+test('8. desktop keeps the existing fixed composer structure', () => assert.match(html, /\.composer\{position:fixed/));
+test('9. mobile layout has a dynamic-viewport fallback', () => assert.match(app, /\.chat-page\{min-height:100dvh\}/));
+test('10. visualViewport height is recorded for mobile layout', () => assert.match(app, /--chat-visual-viewport-height/));
+test('11. visualViewport resize is observed', () => assert.match(app, /viewport\.addEventListener\('resize',\(\)=>\{syncMobileViewportV101\(\)/));
+test('12. keyboard inset continues to come from visualViewport geometry', () => assert.match(app, /const keyboard=Math\.max\(0,Math\.round\(layoutHeight-viewport\.height-top\)\)/));
+test('13. message viewport reserves the measured composer height', () => assert.match(app, /bottom:calc\(var\(--chat-keyboard,0px\) \+ var\(--chat-composer-height\)\)/));
+test('14. an explicit send restores bottom-follow before rendering the message', () => assert.match(app, /\['sendBtn','askReplyBtn'\].*chatBottomFollowV101=true/s));
+test('15. inserted AI bubbles use the bottom-follow-aware scroll helper', () => assert.match(app, /scrollBottom=function\(\)\{scrollToLatestV101\(\)\}/));
+test('16. growing content is coalesced through requestAnimationFrame', () => assert.match(app, /chatBottomFrameV101=requestAnimationFrame/));
+test('17. browsing history disables automatic bottom follow', () => assert.match(app, /main\.addEventListener\('scroll',\(\)=>\{chatBottomFollowV101=isNearChatBottomV101\(\)/));
+test('18. moving back near the bottom restores automatic follow', () => assert.match(app, /CHAT_BOTTOM_FOLLOW_THRESHOLD_V101=120/));
+test('19. keyboard dismissal recomputes the layout from visualViewport', () => assert.match(app, /viewport\.addEventListener\('resize',\(\)=>\{syncMobileViewportV101\(\);scrollLatestForKeyboardV22\(\)\}/));
+test('20. composer height is measured rather than hardcoded', () => assert.match(app, /new ResizeObserver\(syncComposerHeightV101\)/));
+test('21. textarea input refreshes the composer measurement', () => assert.match(app, /input\.addEventListener\('input',syncComposerHeightV101\)/));
+test('22. Android-compatible visualViewport fallback uses window dimensions', () => assert.match(app, /viewport\?\.height\|\|window\.innerHeight\|\|root\.clientHeight/));
+test('23. dark mode keeps the fingerprint button variable-driven', () => assert.match(app, /html\[data-appearance="dark"\] \.chat-room \.composer-box #askReplyBtn/));
+test('24. light mode keeps primary and secondary button hierarchy', () => assert.match(app, /#askReplyBtn\{background:var\(--chat-surface\);color:var\(--chat-muted\)/));
+test('25. safe-area remains owned by the existing composer padding', () => assert.match(html, /padding-bottom:max\(12px,env\(safe-area-inset-bottom\)\)/));
+test('26. the chat-room-only layout continues to hide the bottom dock', () => assert.match(html, /\.chat-room \.top-bar,\.chat-room \.dock\{display:none!important\}/));
