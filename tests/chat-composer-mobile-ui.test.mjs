@@ -5,6 +5,7 @@ import test from 'node:test';
 const root = new URL('..', import.meta.url);
 const app = fs.readFileSync(new URL('public/chat-app-20260821-1310.js', root), 'utf8');
 const html = fs.readFileSync(new URL('public/chat.html', root), 'utf8');
+const shell = fs.readFileSync(new URL('public/app.html', root), 'utf8');
 
 test('1. user send button no longer uses the paper-plane path', () => assert.doesNotMatch(app, /ICON\.send='<svg[^>]*><path d="m5 12 14-7/));
 test('2. user send button uses the upward-arrow path', () => assert.match(app, /ICON\.send='<svg[^>]*><path d="M12 19V5M7 10l5-5 5 5"/));
@@ -37,6 +38,12 @@ test('24. AI reply stays visually neutral while only the send control carries th
   assert.match(app, /function injectReplyButtonNeutralV106\(\)/);
   assert.match(app, /\.composer-box #askReplyBtn,\.chat-room \.composer-box #askReplyBtn\.active\{background:#fff!important/);
   assert.match(app, /#sendBtn svg\{width:22px!important;height:22px!important;stroke-width:2\.2!important\}/);
+});
+test('25. the outer app shell keeps the chat iframe in the top-level visual viewport', () => {
+  assert.match(shell, /function syncViewFrameViewportV107\(\)/);
+  assert.match(shell, /view\.style\.top=top\+'px';view\.style\.bottom='auto';view\.style\.height=height\+'px'/);
+  assert.match(shell, /shellViewportV107\.addEventListener\('resize',syncViewFrameViewportV107\)/);
+  assert.match(shell, /if\(window\.scrollY\)window\.scrollTo\(0,0\)/);
 });
 test('23. dark mode leaves the Claude logo un-tinted', () => assert.match(app, /#askReplyBtn \.ai-reply-logo\{display:block;width:22px!important;height:22px!important/));
 test('24. light mode keeps primary and secondary button hierarchy', () => assert.match(app, /#askReplyBtn\{background:var\(--chat-surface\);color:var\(--chat-muted\)/));
