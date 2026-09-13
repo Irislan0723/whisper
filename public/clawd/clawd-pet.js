@@ -13,7 +13,7 @@
   const SIZES = { small:78, medium:104, large:136 };
   const ASSET = 'clawd/assets/';
   const STATES = {
-    idle:'clawd-idle-follow.svg', roam:'clawd-mini-crabwalk.svg', yawning:'clawd-idle-yawn.svg',
+    idle:'clawd-idle-follow.svg', roam:'clawd-mini-crabwalk.svg', look:'clawd-idle-look.svg', yawning:'clawd-idle-yawn.svg',
     dozing:'clawd-idle-doze.svg', collapsing:'clawd-collapse-sleep.svg', thinking:'clawd-working-thinking.svg',
     working:'clawd-working-typing.svg', juggling:'clawd-headphones-groove.svg', sweeping:'clawd-working-sweeping.svg',
     error:'clawd-error.svg', attention:'clawd-happy.svg', notification:'clawd-notification.svg',
@@ -26,14 +26,14 @@
   };
   // Mirrors the original state-priority.js ordering for the web-supported states.
   const PRIORITY = { error:8, notification:7, sweeping:6, attention:5, carrying:4, juggling:4, working:3, thinking:2, roaming:1, roam:1, idle:1, yawning:1, dozing:1, sleeping:0, waking:1, dizzy:5, reaction:5 };
-  const TIMING = { attention:4000, error:5000, notification:5000, carrying:3000, dizzy:6000, yawn:3000, wake:1500, mouseIdle:20000, mouseSleep:60000 };
+  const TIMING = { attention:4000, error:5000, notification:5000, carrying:3000, dizzy:6000, yawn:3000, wake:1500, mouseIdle:20000, mouseSleep:120000 };
 
   const visual = root.querySelector('.clawd-visual');
   const hit = root.querySelector('.clawd-hit');
   let enabled = read(KEYS.enabled) === '1';
   let sizeName = Object.prototype.hasOwnProperty.call(SIZES, read(KEYS.size)) ? read(KEYS.size) : 'medium';
   let point = null, activeState = 'idle', baseState = 'idle', temporary = null;
-  let drag = null, roamTimer = 0, tickTimer = 0, stateTimer = 0, lastActivity = Date.now(), clickTimer = 0, clickCount = 0, pressTimer = 0, pressHandled = false, lastPeek = 0, covered = false;
+  let drag = null, roamTimer = 0, tickTimer = 0, stateTimer = 0, lastActivity = Date.now(), clickTimer = 0, clickCount = 0, pressTimer = 0, pressHandled = false, lastPeek = 0, musicPlaying = false, covered = false;
   let pausedForVisibility = document.visibilityState !== 'visible';
 
   function read(key) { try { return localStorage.getItem(key) || ''; } catch (_) { return ''; } }
@@ -83,9 +83,10 @@
     object.setAttribute('aria-hidden', 'true');
     visual.appendChild(object);
   }
-  function fallbackState() { return baseState === 'roam' ? 'idle' : baseState; }
+  function fallbackState() { return musicPlaying ? 'juggling' : (baseState === 'roam' ? 'idle' : baseState); }
   function clearStateTimer() { if (stateTimer) { clearTimeout(stateTimer); stateTimer = 0; } }
   function setState(state, options = {}) {
+    if (musicPlaying && state === 'idle') state = 'juggling';
     if (!enabled || !STATES[state]) return false;
     const incoming = PRIORITY[state] ?? 1;
     const current = PRIORITY[activeState] ?? 1;
@@ -118,31 +119,46 @@
       setState('waking', { temporary:true, duration:TIMING.wake, returnTo:'idle', force:true });
     }
   }
+  function setMusicPlaying(next) {
+    const changed = musicPlaying !== !!next;
+    musicPlaying = !!next;
+    if (!enabled || !changed) return;
+    if (musicPlaying && !temporary && !['working','thinking'].includes(activeState)) setState('juggling', { force:true });
+    else if (!musicPlaying && activeState === 'juggling') setState('idle', { force:true });
+  }
   function stopRoam() { if (roamTimer) { clearTimeout(roamTimer); roamTimer = 0; } root.classList.remove('clawd-roaming'); }
   function stopTick() { if (tickTimer) { clearInterval(tickTimer); tickTimer = 0; } }
   function startTick() { if (!tickTimer && enabled && !pausedForVisibility && !covered) tickTimer = setInterval(tick, 1000); }
+  function roamToRandomSpot() {
+    const v = viewport(), s = petSize(), edge = 10;
+    const x = v.left + edge + Math.random() * Math.max(0, v.width - s - edge * 2);
+    const y = v.top + edge + Math.random() * Math.max(0, v.height - s - 84 - edge);
+    setState('roam', { force:true });
+    point = clamp({ x, y }); paintPoint(true); savePoint();
+    setTimeout(() => { if (activeState === 'roam') setState('idle', { force:true }); }, 5600);
+  }
+  function chooseIdleMoment() {
+    const choice = Math.random();
+    if (choice < 0.55) return roamToRandomSpot();
+    if (choice < 0.85) {
+      baseState = 'dozing';
+      return setState('yawning', { temporary:true, duration:TIMING.yawn, returnTo:'dozing', force:true });
+    }
+    return setState('look', { temporary:true, duration:3000, returnTo:'idle', force:true });
+  }
   function scheduleRoam(delay) {
     stopRoam();
     if (!enabled || pausedForVisibility || covered) return;
     roamTimer = setTimeout(() => {
       if (!enabled || pausedForVisibility || covered || drag || temporary || activeState !== 'idle' || Date.now() - lastActivity < TIMING.mouseIdle) return scheduleRoam(9000 + Math.random() * 16000);
-      const v = viewport(), s = petSize(), edge = 10;
-      const x = v.left + edge + Math.random() * Math.max(0, v.width - s - edge * 2);
-      const y = v.top + edge + Math.random() * Math.max(0, v.height - s - 84 - edge);
-      setState('roam', { force:true });
-      point = clamp({ x, y }); paintPoint(true); savePoint();
-      setTimeout(() => { if (activeState === 'roam') setState('idle', { force:true }); }, 5600);
+      chooseIdleMoment();
       scheduleRoam(22000 + Math.random() * 26000);
     }, delay == null ? 22000 + Math.random() * 26000 : delay);
   }
   function tick() {
-    if (!enabled || pausedForVisibility || covered || drag || temporary) return;
+    if (!enabled || pausedForVisibility || covered || drag || temporary || musicPlaying) return;
     const idleFor = Date.now() - lastActivity;
     if (idleFor >= TIMING.mouseSleep && activeState !== 'sleeping') setState('sleeping', { force:true });
-    else if (idleFor >= TIMING.mouseIdle && activeState === 'idle') {
-      baseState = 'dozing';
-      setState('yawning', { temporary:true, duration:TIMING.yawn, returnTo:'dozing', force:true });
-    }
   }
   function start() {
     root.hidden = !enabled;
@@ -233,6 +249,6 @@
       if (data.resetPosition) resetPosition();
     }
   });
-  window.WhisperClawd = { setCovered, setEnabled, setSize, resetPosition, state:(name, options) => setState(name, options), activity };
+  window.WhisperClawd = { setCovered, setEnabled, setSize, setMusicPlaying, resetPosition, state:(name, options) => setState(name, options), activity };
   setSize(sizeName); start();
 })();

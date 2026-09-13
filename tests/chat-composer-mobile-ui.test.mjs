@@ -28,6 +28,16 @@ test('19. keyboard dismissal recomputes the layout from visualViewport', () => a
 test('20. composer height is measured rather than hardcoded', () => assert.match(app, /new ResizeObserver\(syncComposerHeightV101\)/));
 test('21. textarea input refreshes the composer measurement', () => assert.match(app, /input\.addEventListener\('input',syncComposerHeightV101\)/));
 test('22. Android-compatible visualViewport fallback uses window dimensions', () => assert.match(app, /viewport\?\.height\|\|window\.innerHeight\|\|root\.clientHeight/));
+test('23. keyboard panning keeps the companion header fixed at the top', () => {
+  assert.match(app, /function injectKeyboardHeaderFixV105\(\)/);
+  assert.match(app, /\.chat-room \.chat-head\{top:0!important;z-index:190!important\}/);
+  assert.match(app, /\.chat-room \.chat-main\{top:var\(--chat-head-height,54px\)!important\}/);
+});
+test('24. AI reply stays visually neutral while only the send control carries theme emphasis', () => {
+  assert.match(app, /function injectReplyButtonNeutralV106\(\)/);
+  assert.match(app, /\.composer-box #askReplyBtn,\.chat-room \.composer-box #askReplyBtn\.active\{background:#fff!important/);
+  assert.match(app, /#sendBtn svg\{width:22px!important;height:22px!important;stroke-width:2\.2!important\}/);
+});
 test('23. dark mode leaves the Claude logo un-tinted', () => assert.match(app, /#askReplyBtn \.ai-reply-logo\{display:block;width:22px!important;height:22px!important/));
 test('24. light mode keeps primary and secondary button hierarchy', () => assert.match(app, /#askReplyBtn\{background:var\(--chat-surface\);color:var\(--chat-muted\)/));
 test('25. safe-area remains owned by the existing composer padding', () => assert.match(html, /padding-bottom:max\(12px,env\(safe-area-inset-bottom\)\)/));

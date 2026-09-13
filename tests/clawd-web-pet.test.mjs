@@ -34,12 +34,12 @@ test('regular pages enter the persistent shell when either music or Clawd is ena
 });
 
 test('Clawd state mapping and priority retain the original Web-relevant states', () => {
-  for (const state of ['idle','roam','yawning','dozing','thinking','working','error','sleeping','waking','notification','attention','dizzy']) {
+  for (const state of ['idle','roam','look','yawning','dozing','thinking','working','error','sleeping','waking','notification','attention','dizzy']) {
     assert.match(pet, new RegExp(`${state}:'clawd-`));
   }
   assert.match(pet, /error:8, notification:7, sweeping:6, attention:5/);
   assert.match(pet, /working:3, thinking:2/);
-  assert.match(pet, /mouseIdle:20000, mouseSleep:60000/);
+  assert.match(pet, /mouseIdle:20000, mouseSleep:120000/);
 });
 
 test('Clawd uses external original SVG documents and rebuilds them on state swaps', () => {
@@ -48,10 +48,13 @@ test('Clawd uses external original SVG documents and rebuilds them on state swap
   assert.match(pet, /visual\.replaceChildren\(\)/);
 });
 
-test('Web roam is transform-based, bounded, randomized, and pauses after manual movement', () => {
+test('idle moments randomly choose roaming, dozing, or looking before a later sleep', () => {
   assert.match(pet, /translate3d/);
   assert.match(pet, /function clamp\(candidate\)/);
-  assert.match(pet, /Math\.random\(\)/);
+  assert.match(pet, /function chooseIdleMoment\(\)/);
+  assert.match(pet, /if \(choice < 0\.55\) return roamToRandomSpot\(\)/);
+  assert.match(pet, /if \(choice < 0\.85\)/);
+  assert.match(pet, /setState\('look', \{ temporary:true, duration:3000/);
   assert.match(pet, /scheduleRoam\(90000\)/);
 });
 
@@ -93,11 +96,23 @@ test('Chat sends only narrow lifecycle states to the parent pet bridge', () => {
   assert.match(init, /payload deliberately contains only UI state, never chat text or data/);
 });
 
-test('active user typing sends only a typing state and settles without sharing draft text', () => {
+test('music playback enters the retained headphone groove and yields to chat states', () => {
+  assert.match(app, /function syncClawdMusic\(\)/);
+  assert.match(app, /WhisperClawd\?\.setMusicPlaying\(!!audio&&!audio\.paused&&!audio\.ended\)/);
+  assert.match(pet, /juggling:'clawd-headphones-groove\.svg'/);
+  assert.match(pet, /function setMusicPlaying\(next\)/);
+  assert.match(pet, /!\['working','thinking'\]\.includes\(activeState\)/);
+  assert.match(pet, /setMusicPlaying, resetPosition/);
+});
+
+test('an open composer keeps the typing state until keyboard focus leaves without sharing draft text', () => {
   assert.match(chat, /function syncWhisperPetTypingV104\(\)/);
+  assert.match(chat, /input\.addEventListener\('focus',syncWhisperPetTypingV104\)/);
   assert.match(chat, /input\.addEventListener\('input',syncWhisperPetTypingV104\)/);
+  assert.match(chat, /input\.addEventListener\('blur',settleWhisperPetTypingV104\)/);
+  assert.match(chat, /keyboardDismissed=nextViewportHeight>lastViewportHeight\+80/);
   assert.match(chat, /whisperPetStateV103\('working'\)/);
-  assert.match(chat, /setTimeout\(settleWhisperPetTypingV104,1200\)/);
+  assert.doesNotMatch(chat, /setTimeout\(settleWhisperPetTypingV104,1200\)/);
   assert.doesNotMatch(chat, /WhisperPetBridge\?\.state\([^)]*input\.value/);
 });
 

@@ -2910,24 +2910,44 @@ requestAiReply=async function(){
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{if($('sendBtn'))$('sendBtn').onclick=sendUserBubble;if($('askReplyBtn'))$('askReplyBtn').onclick=requestAiReply});else{if($('sendBtn'))$('sendBtn').onclick=sendUserBubble;if($('askReplyBtn'))$('askReplyBtn').onclick=requestAiReply}
 
-// V104: show the retained Clawd typing animation only while the user is actively composing.
-let whisperPetTypingTimerV104=0;
+// V104: keep the retained Clawd typing animation up for the entire keyboard session.
 function settleWhisperPetTypingV104(){
-  clearTimeout(whisperPetTypingTimerV104);
   if(pendingTurnGroupId)whisperPetStateV103('thinking');else whisperPetStateV103('idle');
 }
 function syncWhisperPetTypingV104(){
   const input=$('chatInput');
-  clearTimeout(whisperPetTypingTimerV104);
-  if(!input||!input.value.trim()){settleWhisperPetTypingV104();return}
+  if(!input||document.activeElement!==input){settleWhisperPetTypingV104();return}
   whisperPetStateV103('working');
-  whisperPetTypingTimerV104=setTimeout(settleWhisperPetTypingV104,1200);
 }
 function bindWhisperPetTypingV104(){
   const input=$('chatInput');
   if(!input||input.dataset.whisperPetTypingV104)return;
   input.dataset.whisperPetTypingV104='true';
+  input.addEventListener('focus',syncWhisperPetTypingV104);
   input.addEventListener('input',syncWhisperPetTypingV104);
-  input.addEventListener('blur',()=>{if(!input.value.trim())settleWhisperPetTypingV104()});
+  input.addEventListener('blur',settleWhisperPetTypingV104);
+  const viewport=window.visualViewport;
+  if(viewport){
+    let lastViewportHeight=viewport.height;
+    viewport.addEventListener('resize',()=>{
+      const nextViewportHeight=viewport.height, keyboardDismissed=nextViewportHeight>lastViewportHeight+80;
+      lastViewportHeight=nextViewportHeight;
+      if(keyboardDismissed||document.activeElement!==input)settleWhisperPetTypingV104();else syncWhisperPetTypingV104();
+    });
+  }
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindWhisperPetTypingV104);else bindWhisperPetTypingV104();
+
+// V105: Android keyboard panning must never move the companion header offscreen.
+function injectKeyboardHeaderFixV105(){
+  if($('keyboardHeaderFixV105'))return;
+  document.head.insertAdjacentHTML('beforeend','<style id="keyboardHeaderFixV105">.chat-room .chat-head{top:0!important;z-index:190!important}.chat-room .chat-main{top:var(--chat-head-height,54px)!important}</style>');
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectKeyboardHeaderFixV105);else injectKeyboardHeaderFixV105();
+
+// V106: only the user's send control carries the active theme color.
+function injectReplyButtonNeutralV106(){
+  if($('replyButtonNeutralV106'))return;
+  document.head.insertAdjacentHTML('beforeend','<style id="replyButtonNeutralV106">.chat-room .composer-box #askReplyBtn,.chat-room .composer-box #askReplyBtn.active{background:#fff!important;color:var(--chat-muted)!important;border-color:var(--chat-border)!important}</style>');
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',injectReplyButtonNeutralV106);else injectReplyButtonNeutralV106();
