@@ -349,9 +349,16 @@ html[data-whisper-global-appearance="true"] body {
   background: transparent;
   z-index: 1;
 }
-html[data-whisper-global-appearance="true"] body:not(.chat-room) .chat-main,
-html[data-whisper-global-appearance="true"] body.workspace-open .workspace {
+html[data-whisper-global-appearance="true"][data-whisper-wallpaper-active="true"] body:not(.chat-room):not(.workspace-open) .chat-main {
   background: transparent;
+}
+html[data-whisper-global-appearance="true"][data-whisper-wallpaper-active="true"] body.workspace-open .workspace {
+  background: color-mix(in srgb, var(--chat-bg) var(--ui-surface-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+body.workspace-open .chat-main {
+  visibility: hidden;
 }
 .whisper-wallpaper-layer {
   display: none;
@@ -360,8 +367,7 @@ html[data-whisper-global-appearance="true"] .card,
 html[data-whisper-global-appearance="true"] .more-card,
 html[data-whisper-global-appearance="true"] .settings-list,
 html[data-whisper-global-appearance="true"] .sidebar,
-html[data-whisper-global-appearance="true"] .drawer,
-html[data-whisper-global-appearance="true"] .workspace {
+html[data-whisper-global-appearance="true"] .drawer {
   background: color-mix(in srgb, var(--bg-card) var(--card-surface-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
@@ -381,7 +387,6 @@ html[data-appearance="dark"][data-whisper-global-appearance="true"] .more-card,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .settings-list,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .sidebar,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .drawer,
-html[data-appearance="dark"][data-whisper-global-appearance="true"] .workspace,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .modal,
 html[data-appearance="dark"][data-whisper-global-appearance="true"] .bottom-sheet {
   background: color-mix(in srgb, #262626 var(--panel-surface-opacity), transparent);

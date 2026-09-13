@@ -81,8 +81,10 @@ test('11. wallpaper is above the theme background and only an active Chat room r
   assert.match(init, /function isChatRoom\(\)/);
   assert.match(init, /classList\.contains\('chat-room'\).*classList\.contains\('workspace-open'\)/);
   assert.match(init, /if\(isChatRoom\(\)\)\{disable\(\);return;\}/);
-  assert.match(css, /body:not\(\.chat-room\) \.chat-main/);
-  assert.match(css, /body\.workspace-open \.workspace/);
+  assert.match(css, /data-whisper-wallpaper-active="true"\] body:not\(\.chat-room\):not\(\.workspace-open\) \.chat-main/);
+  assert.match(css, /data-whisper-wallpaper-active="true"\] body\.workspace-open \.workspace/);
+  assert.match(css, /body\.workspace-open \.chat-main\s*\{\s*visibility: hidden/);
+  assert.doesNotMatch(css, /data-whisper-global-appearance="true"\] \.drawer,\s*html\[data-whisper-global-appearance="true"\] \.workspace/);
   assert.doesNotMatch(more, /Chat.*壁纸|Chat.*透明度/);
 });
 
