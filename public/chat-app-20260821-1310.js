@@ -2884,3 +2884,28 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 function applyComposerButtonUiV102(){const start=$('startChatBtn'),reply=$('askReplyBtn'),send=$('sendBtn');if(start)start.innerHTML=ICON.plus;if(reply)reply.innerHTML=AI_REPLY_CLAUDE_LOGO;if(send)send.innerHTML=ICON.send}
 function injectComposerButtonUiV102(){if($('composerButtonUiV102'))return;document.head.insertAdjacentHTML('beforeend','<style id="composerButtonUiV102">.chat-room .composer-box #askReplyBtn,.chat-room .composer-box #sendBtn{box-sizing:border-box!important;width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;flex:0 0 48px!important;align-self:center!important;border-radius:50%!important}.chat-room .composer-box #askReplyBtn .ai-reply-logo{display:block;width:22px!important;height:22px!important;max-width:22px!important;max-height:22px!important;object-fit:contain}.chat-room .composer-box #sendBtn svg{width:22px!important;height:22px!important;stroke-width:2.2!important}</style>')}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{injectComposerButtonUiV102();applyComposerButtonUiV102()});else{injectComposerButtonUiV102();applyComposerButtonUiV102()}
+
+// V103: narrow parent-frame signals for the Web Clawd pet. No chat content is sent.
+function whisperPetStateV103(state){try{window.WhisperPetBridge?.state(state)}catch{}}
+const sendUserBubbleV103Base=sendUserBubble;
+sendUserBubble=async function(){
+  const input=$('chatInput'),hasContent=!!input&&(input.value.trim()||((pendingImages||[]).length));
+  if(hasContent)whisperPetStateV103('thinking');
+  return await sendUserBubbleV103Base.apply(this,arguments);
+};
+const requestAiReplyV103Base=requestAiReply;
+requestAiReply=async function(){
+  const groupId=pendingTurnGroupId||getPendingTurnGroupId(messages),canRequest=!sending&&!!current&&!savingBubble&&!!groupId&&messages.some(message=>message.role==='iris'&&message.replyGroupId===groupId);
+  const knownIds=new Set(messages.map(message=>message.id));
+  if(canRequest)whisperPetStateV103('thinking');
+  try{
+    const result=await requestAiReplyV103Base.apply(this,arguments);
+    if(canRequest){
+      const fresh=messages.filter(message=>!knownIds.has(message.id));
+      const toolFailed=fresh.some(message=>(message.toolCalls||[]).some(tool=>tool?.ok===false));
+      whisperPetStateV103(toolFailed||pendingTurnGroupId?'error':'attention');
+    }
+    return result;
+  }catch(error){if(canRequest)whisperPetStateV103('error');throw error;}
+};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{if($('sendBtn'))$('sendBtn').onclick=sendUserBubble;if($('askReplyBtn'))$('askReplyBtn').onclick=requestAiReply});else{if($('sendBtn'))$('sendBtn').onclick=sendUserBubble;if($('askReplyBtn'))$('askReplyBtn').onclick=requestAiReply}

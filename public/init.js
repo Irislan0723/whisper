@@ -152,14 +152,32 @@
   } catch(e) {}
 })();
 
+/* ---- Clawd parent-frame bridge ----
+   The payload deliberately contains only UI state, never chat text or data. */
+(function(){
+  if(window.parent===window) return;
+  function post(type, detail){ try { window.parent.postMessage(Object.assign({type:type},detail||{}),location.origin); } catch(e) {} }
+  function pageName(){ var file=(location.pathname.split('/').pop()||'index.html').replace(/\.html$/i,''); return file==='chat'?'chat':file==='calendar'?'calendar':file==='memories'?'memories':file==='more'?'more':file; }
+  function activity(){ post('whisper:pet-activity'); }
+  function syncOverlay(){ post('whisper:pet-overlay',{open:!!document.querySelector('.modal-overlay.open,.workspace.open,.drawer.open,#turnInsightSheetV23.show,dialog[open],.player-search:not([hidden])')}); }
+  window.WhisperPetBridge={state:function(state,extra){post('whisper:pet-state',Object.assign({state:state},extra||{}));},activity:activity,page:function(){post('whisper:pet-page',{page:pageName()});}};
+  post('whisper:pet-page',{page:pageName()});
+  document.addEventListener('pointerdown',activity,{capture:true,passive:true});
+  document.addEventListener('keydown',activity,{capture:true});
+  document.addEventListener('input',activity,{capture:true,passive:true});
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')activity();});
+  function install(){ syncOverlay(); new MutationObserver(syncOverlay).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class','hidden','open']}); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+})();
+
 /* ---- Persistent in-site music shell ----
    When enabled from the listening-room menu, regular pages render inside an
    app shell while the listening document (and its audio element) stays alive. */
 (function(){
-  var enabled=false;
-  try { var playerFlag=localStorage.getItem('listen_global_player_enabled'); if(localStorage.getItem('listen_global_player_default_off_v2')!=='1'){ localStorage.setItem('listen_global_player_default_off_v2','1'); if(playerFlag==='1'){ localStorage.setItem('listen_global_player_enabled','0'); playerFlag='0'; } } enabled=playerFlag==='1'&&localStorage.getItem('listen_global_player_hidden')!=='1'; } catch(e) {}
+  var enabled=false, petEnabled=false;
+  try { var playerFlag=localStorage.getItem('listen_global_player_enabled'); if(localStorage.getItem('listen_global_player_default_off_v2')!=='1'){ localStorage.setItem('listen_global_player_default_off_v2','1'); if(playerFlag==='1'){ localStorage.setItem('listen_global_player_enabled','0'); playerFlag='0'; } } enabled=playerFlag==='1'&&localStorage.getItem('listen_global_player_hidden')!=='1'; petEnabled=localStorage.getItem('whisper_clawd_enabled')==='1'; } catch(e) {}
   var path=location.pathname||'';
-  if(enabled&&window.top===window&&!/\/app\.html$/i.test(path)){
+  if((enabled||petEnabled)&&window.top===window&&!/\/app\.html$/i.test(path)){
     var view=path.split('/').pop()+(location.search||'')+(location.hash||'');
     location.replace('app.html?view='+encodeURIComponent(view));
     return;

@@ -1,0 +1,11 @@
+/* Web host for the original Clawd SVG artwork. The art itself is unmodified. */
+#clawdRoot{--clawd-size:104px;position:fixed;z-index:3;left:0;top:0;width:var(--clawd-size);height:var(--clawd-size);margin:0;padding:0;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;will-change:transform;transition:transform 4.6s cubic-bezier(.22,.8,.28,1)}
+#clawdRoot[hidden],#clawdRoot.clawd-covered{display:none!important}
+#clawdRoot.clawd-dragging{transition:none;cursor:grabbing}
+#clawdRoot.clawd-roaming{transition-duration:5.4s}
+#clawdRoot .clawd-visual{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
+#clawdRoot .clawd-visual object{display:block;width:100%;height:100%;border:0;overflow:visible;pointer-events:none}
+#clawdRoot .clawd-hit{position:absolute;inset:8% 11% 5%;border:0;padding:0;background:transparent;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}
+#clawdRoot.clawd-dragging .clawd-hit{cursor:grabbing}
+@media (max-width:540px){#clawdRoot{--clawd-size:96px}}
+@media (prefers-reduced-motion:reduce){#clawdRoot{transition-duration:.01ms!important}}
