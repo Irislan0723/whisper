@@ -322,25 +322,18 @@ html[data-whisper-global-appearance="true"] {
   --modal-surface-opacity: 100%;
   --nav-surface-opacity: 97%;
   --glass-blur: 0px;
+  --whisper-wallpaper-image: none;
+  background: var(--bg);
 }
-html[data-whisper-global-appearance="true"] body {
-  position: relative;
-  isolation: isolate;
-  background: transparent;
-}
-html[data-whisper-global-appearance="true"] body > :not(.whisper-wallpaper-layer) {
-  position: relative;
-  z-index: 1;
-}
-html[data-whisper-global-appearance="true"] body > .top-bar { position: sticky; z-index: 101; }
-html[data-whisper-global-appearance="true"] body > .dock { position: fixed; z-index: 100; }
-html[data-whisper-global-appearance="true"] body > .modal-overlay { position: fixed; z-index: 1000; }
-.whisper-wallpaper-layer {
+html[data-whisper-global-appearance="true"]::before {
+  content: '';
   position: fixed;
   z-index: 0;
   inset: -36px;
   pointer-events: none;
   background-color: var(--bg);
+  background-image: var(--whisper-wallpaper-image);
+  background-image: linear-gradient(color-mix(in srgb, var(--bg) var(--whisper-wallpaper-overlay), transparent), color-mix(in srgb, var(--bg) var(--whisper-wallpaper-overlay), transparent)), var(--whisper-wallpaper-image);
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -348,11 +341,14 @@ html[data-whisper-global-appearance="true"] body > .modal-overlay { position: fi
   transform: scale(1.04);
   will-change: filter;
 }
-.whisper-wallpaper-layer::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--bg) var(--whisper-wallpaper-overlay), transparent);
+html[data-whisper-global-appearance="true"] body {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  z-index: 1;
+}
+.whisper-wallpaper-layer {
+  display: none;
 }
 html[data-whisper-global-appearance="true"] .top-bar,
 html[data-whisper-global-appearance="true"] .dock,

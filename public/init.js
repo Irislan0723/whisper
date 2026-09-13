@@ -158,6 +158,7 @@
       var layer=document.getElementById('whisperWallpaperLayer');
       if(!layer){ layer=document.createElement('div'); layer.id='whisperWallpaperLayer'; layer.className='whisper-wallpaper-layer'; layer.setAttribute('aria-hidden','true'); document.body.insertBefore(layer,document.body.firstChild); }
       layer.style.backgroundImage=wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none';
+      document.documentElement.style.setProperty('--whisper-wallpaper-image',wallpaperUrl?'url("'+wallpaperUrl.replace(/"/g,'%22')+'")':'none');
       document.body.classList.toggle('has-whisper-wallpaper',!!wallpaperBlob);
     }
     function useWallpaper(blob,dirty){ if(wallpaperUrl)URL.revokeObjectURL(wallpaperUrl);wallpaperBlob=blob instanceof Blob?blob:null;wallpaperUrl=wallpaperBlob?URL.createObjectURL(wallpaperBlob):'';wallpaperDirty=!!dirty;ensureLayer();notify(); }

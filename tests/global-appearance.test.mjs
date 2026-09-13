@@ -44,9 +44,9 @@ test('6. wallpaper data is staged as a Blob and only reaches IndexedDB when Save
   assert.doesNotMatch(init, /localStorage\.setItem\([^\n]*wallpaper[^\n]*file/i);
 });
 
-test('7. wallpaper is a separate cover layer with independent visibility and blur', () => {
-  assert.match(css, /\.whisper-wallpaper-layer[\s\S]*?background-position: center;[\s\S]*?background-size: cover;[\s\S]*?filter: blur\(var\(--whisper-wallpaper-blur\)\)/);
-  assert.match(css, /\.whisper-wallpaper-layer::after[\s\S]*?--whisper-wallpaper-overlay/);
+test('7. wallpaper uses a root-level cover layer with independent visibility and blur', () => {
+  assert.match(css, /html\[data-whisper-global-appearance="true"\]::before[\s\S]*?background-image:[\s\S]*?--whisper-wallpaper-image[\s\S]*?background-position: center;[\s\S]*?background-size: cover;[\s\S]*?filter: blur\(var\(--whisper-wallpaper-blur\)\)/);
+  assert.match(css, /--whisper-wallpaper-overlay/);
 });
 
 test('8. global surfaces derive layered opacity variables and use both backdrop-filter variants', () => {
@@ -69,8 +69,9 @@ test('10. dark glass selectors retain the html[data-appearance="dark"] conventio
 });
 
 test('11. wallpaper is above the theme background but below ordinary page content, while Chat remains isolated', () => {
-  assert.match(css, /\.whisper-wallpaper-layer[\s\S]*?z-index: 0/);
-  assert.match(css, /body > :not\(\.whisper-wallpaper-layer\)[\s\S]*?z-index: 1/);
+  assert.match(css, /html\[data-whisper-global-appearance="true"\]::before[\s\S]*?z-index: 0/);
+  assert.match(css, /html\[data-whisper-global-appearance="true"\] body[\s\S]*?z-index: 1/);
+  assert.match(init, /setProperty\('--whisper-wallpaper-image'/);
   assert.match(init, /var isChatRoom=\/\\\/chat\\\.html\$\/i/);
   assert.match(init, /if\(isChatRoom\) return;/);
   assert.doesNotMatch(more, /Chat.*壁纸|Chat.*透明度/);
