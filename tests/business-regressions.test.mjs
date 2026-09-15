@@ -164,11 +164,16 @@ test("Whisper thinking blocks use the parser-supported format and stay outside v
   assert.match(staticPrompt, /正常聊天一律不得省略/);
   assert.match(staticPrompt, /像脑内碎碎念/);
   assert.match(staticPrompt, /第一人称/);
-  for (const forbiddenThought of ["我应该怎么回复", "我得认真接住", "不能敷衍", "这个问题很重"]) assert.match(staticPrompt, new RegExp(forbiddenThought));
+  assert.match(staticPrompt, /长短由当下自然决定/);
+  assert.doesNotMatch(staticPrompt, /(?:通常\s*)?[1-4１-４]+\s*[～~\-]\s*[4４]\s*句/);
+  assert.doesNotMatch(staticPrompt, /(?:通常\s*)?[2２]\s*[～~\-]\s*[3３]\s*句/);
+  for (const forbiddenThought of ["接住", "怎么回应", "怎么回复", "安慰她", "顺便……", "我应该……", "我得……", "不能敷衍", "认真对待"]) assert.match(staticPrompt, new RegExp(forbiddenThought));
   for (const bannedPhrase of ["好家伙", "这波", "绷不住", "绷住", "绝了", "笑死"]) assert.match(staticPrompt, new RegExp(bannedPhrase));
   const dynamicPrompt = source.slice(source.indexOf("const ccDynamic = ["), source.indexOf("// ── 首次调用"));
   assert.match(dynamicPrompt, /【表达约束】/);
   assert.match(dynamicPrompt, /不要因此改变原有自然文风/);
+  assert.match(dynamicPrompt, /【thinking 提醒】thinking 只写当下自然冒出的内心念头，不写回复策略、用户分析或“接住\/回应\/安慰\/我应该\/我得”等行动计划。/);
+  assert.doesNotMatch(dynamicPrompt, /正确示例：<thinking>/);
   const claudeInstructions = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
   assert.match(claudeInstructions, /thinking block 格式/);
   for (const bannedPhrase of ["好家伙", "这波", "绷不住", "绷住", "绝了", "笑死"]) assert.match(claudeInstructions, new RegExp(bannedPhrase));
