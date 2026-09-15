@@ -36,31 +36,29 @@ function createDecoder({ failWriteAt } = {}) {
 
 const image = label => `data:image/png;base64,${Buffer.from(label).toString('base64')}`;
 
-test('single image keeps a concise Read instruction', () => {
+test('single image is an explicit native Claude Code attachment', () => {
   const prompt = buildImagePrompt(paths(1));
   assert.match(prompt, /【本轮图片附件：共 1 张】/);
-  assert.match(prompt, /\[Image 1\/1\]\n\/tmp\/image-1\.png/);
-  assert.match(prompt, /请使用 Read 工具读取 Image 1\/1 后/);
-  assert.doesNotMatch(prompt, /不要只读取第一张/);
+  assert.match(prompt, /\[Image 1\/1\]\n@\/tmp\/image-1\.png/);
+  assert.match(prompt, /原生图片附件引用/);
+  assert.doesNotMatch(prompt, /Read 工具/);
 });
 
-test('two and three images require every numbered image to be read first', () => {
+test('two and three images are all native attachments in source order', () => {
   for (const count of [2, 3]) {
     const prompt = buildImagePrompt(paths(count));
     assert.match(prompt, new RegExp(`本消息包含 ${count} 张图片`));
-    assert.match(prompt, new RegExp(`Image 1 到 Image ${count} 的全部图片`));
-    assert.match(prompt, /不要只读取第一张/);
-    assert.match(prompt, /不要在全部图片读取完成前开始作答/);
-    for (let index = 1; index <= count; index++) assert.match(prompt, new RegExp(`\\[Image ${index}/${count}\\]`));
+    assert.match(prompt, new RegExp(`Image 1 到 Image ${count} 的顺序作为本轮视觉上下文`));
+    for (let index = 1; index <= count; index++) assert.match(prompt, new RegExp(`\\[Image ${index}/${count}\\]\\n@/tmp/image-${index}\\.png`));
   }
 });
 
-test('six images are all numbered in original order and the instruction precedes them', () => {
+test('six images are all native attachments in original order and the instruction precedes them', () => {
   const prompt = buildImagePrompt(paths(6));
   assert.match(prompt, /【本轮图片附件：共 6 张】/);
-  assert.ok(prompt.indexOf('必须依次使用 Read 工具') < prompt.indexOf('[Image 1/6]'));
+  assert.ok(prompt.indexOf('原生图片附件引用') < prompt.indexOf('[Image 1/6]'));
   for (let index = 1; index <= 6; index++) {
-    assert.match(prompt, new RegExp(`\\[Image ${index}/6\\]\\n/tmp/image-${index}\\.png`));
+    assert.match(prompt, new RegExp(`\\[Image ${index}/6\\]\\n@/tmp/image-${index}\\.png`));
   }
 });
 
@@ -77,7 +75,7 @@ test('a partial save failure uses the readable count, reports failure, and renum
   const prompt = buildImagePrompt(paths(5), 6);
   assert.match(prompt, /【本轮图片附件：共 5 张】/);
   assert.match(prompt, /本轮用户上传了 6 张，其中 1 张处理失败，当前可读取 5 张。/);
-  assert.match(prompt, /Image 1 到 Image 5 的全部图片/);
+  assert.match(prompt, /Image 1 到 Image 5 的顺序作为本轮视觉上下文/);
   assert.match(prompt, /\[Image 5\/5\]/);
   assert.doesNotMatch(prompt, /\[Image 6\/6\]/);
 });
@@ -115,5 +113,5 @@ test('relay keeps ordered saving and emits only count-based image lifecycle logs
   assert.match(relay, /saved\.push\(filepath\)/);
   assert.match(relay, /\[images\] received=\$\{imageBatch\.received\}/);
   assert.match(relay, /\[images\] saved=\$\{imagePaths\.length\}/);
-  assert.match(relay, /\[images\] passed_to_cc=\$\{imagePaths\.length\}/);
+  assert.match(relay, /\[images\] native_attached=\$\{imagePaths\.length\}/);
 });

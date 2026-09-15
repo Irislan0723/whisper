@@ -238,13 +238,17 @@ function buildImagePrompt(paths, received = paths.length) {
     ? `\n本轮用户上传了 ${received} 张，其中 ${failed} 张处理失败，当前可读取 ${readable} 张。\n`
     : "";
   const attachments = paths
-    .map((path, index) => `[Image ${index + 1}/${readable}]\n${path}`)
+    // Claude Code treats an @-prefixed local path in an interactive message as
+    // a file reference.  For images, that is its native visual input route;
+    // unlike a plain path it is not contingent on the model deciding to call
+    // the Read tool later in the turn.
+    .map((path, index) => `[Image ${index + 1}/${readable}]\n@${path}`)
     .join("\n\n");
-  const readInstruction = readable > 1
-    ? `本消息包含 ${readable} 张图片。\n在回答用户之前，必须依次使用 Read 工具读取 Image 1 到 Image ${readable} 的全部图片。\n不要只读取第一张。\n不要在全部图片读取完成前开始作答。\n读取完全部图片后，再综合所有图片与用户文字一起回答。`
-    : "请使用 Read 工具读取 Image 1/1 后，再结合用户文字回答。";
+  const nativeAttachmentInstruction = readable > 1
+    ? `本消息包含 ${readable} 张图片。以下每个 @ 路径都是 Claude Code 的原生图片附件引用，会按 Image 1 到 Image ${readable} 的顺序作为本轮视觉上下文提供。\n请综合全部 ${readable} 张图片与用户文字回答；不要把文件保存或路径传入误称为“已查看”。`
+    : "以下 @ 路径是 Claude Code 的原生图片附件引用。请结合这张图片与用户文字回答；不要把文件保存或路径传入误称为“已查看”。";
 
-  return `【本轮图片附件：共 ${readable} 张】${failureNotice}\n${readInstruction}\n\n${attachments}`;
+  return `【本轮图片附件：共 ${readable} 张】${failureNotice}\n${nativeAttachmentInstruction}\n\n${attachments}`;
 }
 
 function composeMessageWithImages(message, paths, received) {
@@ -298,7 +302,7 @@ async function processMessage({ message, systemPrompt, images }) {
     const failed = imageBatch.received - imagePaths.length;
     console.log(`[images] received=${imageBatch.received}`);
     console.log(`[images] saved=${imagePaths.length}${failed ? ` failed=${failed}` : ""}`);
-    console.log(`[images] passed_to_cc=${imagePaths.length}`);
+    console.log(`[images] native_attached=${imagePaths.length}`);
     message = composeMessageWithImages(message, imagePaths, imageBatch.received);
   }
 

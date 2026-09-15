@@ -3760,7 +3760,35 @@ async function executeChatTool(name, args = {}, toolState = {}) {
     default: throw new Error(`Unknown tool: ${name}`);
   }
 }
+const TOOL_RESULT_MAX_CHARS = 48_000;
+
+// Tool-call cards deliberately use a very small preview.  The continuation
+// sent back to the Claude Code Agent is a separate channel and must retain
+// normal structured results in full.
 function toolTracePreview(value, limit = 260) { const text = JSON.stringify(value ?? {}).replace(/data:[^"\s]+/g, "[图片数据]"); return text.length > limit ? `${text.slice(0, limit)}…` : text; }
+
+function formatToolResultForCcContinuation(name, result, maxChars = TOOL_RESULT_MAX_CHARS) {
+  const raw = JSON.stringify(result, null, 0);
+  if (raw.length <= maxChars) {
+    return { text:raw, rawChars:raw.length, sentChars:raw.length, truncated:false };
+  }
+
+  // Do not silently hand Claude a broken partial JSON document.  Preserve as
+  // much of the source as the safety budget allows and make the loss explicit.
+  const marker = sentChars => `\n\n【工具结果已截断】name=${name} raw_chars=${raw.length} sent_chars=${sentChars}；请明确说明结果不完整，并缩小范围、分页或继续读取。】`;
+  let previewLength = Math.max(0, maxChars - marker(maxChars).length);
+  let text = "";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    // The length of sent_chars itself changes the marker by a few characters,
+    // so converge on the exact final message size before returning it.
+    let sentChars = 0;
+    for (let pass = 0; pass < 4; pass++) sentChars = raw.slice(0, previewLength).length + marker(sentChars).length;
+    text = raw.slice(0, previewLength) + marker(sentChars);
+    if (text.length <= maxChars) break;
+    previewLength = Math.max(0, previewLength - (text.length - maxChars));
+  }
+  return { text, rawChars:raw.length, sentChars:text.length, truncated:true };
+}
 function nativeReasoningText(value) {
   if (typeof value === "string") return value.trim();
   if (Array.isArray(value)) return value.map(nativeReasoningText).filter(Boolean).join("\n").trim();
@@ -4351,7 +4379,9 @@ async function callOpenAICompatible({ preset, settings, content, image, images, 
         }
         try {
           const result = await executeRecordedChatTool(call.name, safeToolArgs(call.args), toolState);
-          resultParts.push(`${call.name}: 成功\n${JSON.stringify(result, null, 0).slice(0, 2000)}`);
+          const continuation = formatToolResultForCcContinuation(call.name, result);
+          console.log(`[tool-result] name=${call.name} raw_chars=${continuation.rawChars} sent_chars=${continuation.sentChars} truncated=${continuation.truncated}`);
+          resultParts.push(`${call.name}: 成功\n${continuation.text}`);
         } catch (e) {
           resultParts.push(`${call.name}: 失败\n${e.message}`);
           batchFailed = true;
