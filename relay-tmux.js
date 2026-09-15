@@ -195,10 +195,15 @@ async function drain() {
 // ════════════════════════════════════════
 const MIME_TO_EXT = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp" };
 
+function receivedImageCount(images) {
+  return Array.isArray(images) ? Math.min(images.length, IMAGE_MAX_PER_MSG) : 0;
+}
+
 function decodeAndSaveImages(images) {
-  if (!Array.isArray(images) || !images.length) return [];
+  const received = receivedImageCount(images);
+  if (!received) return { received, paths: [] };
   const saved = [];
-  const batch = images.slice(0, IMAGE_MAX_PER_MSG);
+  const batch = images.slice(0, received);
   for (const item of batch) {
     if (typeof item !== "string") continue;
     const match = item.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i);
@@ -213,18 +218,38 @@ function decodeAndSaveImages(images) {
     try {
       writeFileSync(filepath, Buffer.from(b64, "base64"));
       saved.push(filepath);
-      console.log(`[image] 已保存: ${filename} (${Math.round(b64.length * 3 / 4 / 1024)} KB)`);
     } catch (e) {
-      console.warn("[image] 写入失败:", e.message);
+      console.warn("[images] save_failed");
     }
   }
-  return saved;
+  return { received, paths: saved };
 }
 
-function buildImagePrompt(paths) {
-  if (!paths.length) return "";
-  const list = paths.map(p => `- ${p}`).join("\n");
-  return `\n\n本轮用户附带了图片，请先使用 Read 工具逐一读取以下图片文件，理解图片内容后再结合用户文字回复：\n${list}`;
+function buildImagePrompt(paths, received = paths.length) {
+  const readable = paths.length;
+  if (!readable) {
+    return received
+      ? `【本轮图片附件】\n本轮用户上传了 ${received} 张，但全部处理失败，当前无可读取图片。`
+      : "";
+  }
+
+  const failed = Math.max(0, received - readable);
+  const failureNotice = failed
+    ? `\n本轮用户上传了 ${received} 张，其中 ${failed} 张处理失败，当前可读取 ${readable} 张。\n`
+    : "";
+  const attachments = paths
+    .map((path, index) => `[Image ${index + 1}/${readable}]\n${path}`)
+    .join("\n\n");
+  const readInstruction = readable > 1
+    ? `本消息包含 ${readable} 张图片。\n在回答用户之前，必须依次使用 Read 工具读取 Image 1 到 Image ${readable} 的全部图片。\n不要只读取第一张。\n不要在全部图片读取完成前开始作答。\n读取完全部图片后，再综合所有图片与用户文字一起回答。`
+    : "请使用 Read 工具读取 Image 1/1 后，再结合用户文字回答。";
+
+  return `【本轮图片附件：共 ${readable} 张】${failureNotice}\n${readInstruction}\n\n${attachments}`;
+}
+
+function composeMessageWithImages(message, paths, received) {
+  const imagePrompt = buildImagePrompt(paths, received);
+  return imagePrompt ? `${imagePrompt}\n\n【用户原始消息】\n${message}` : message;
 }
 
 // ── 定时清理过期临时图片 ──
@@ -266,10 +291,15 @@ async function processMessage({ message, systemPrompt, images }) {
   // 如果传了新的系统提示词，存起来（下次轮换用）
   if (systemPrompt) lastSysPrompt = systemPrompt;
 
-  // ── 处理图片：解码为本地文件，追加读取提示到消息 ──
-  const imagePaths = decodeAndSaveImages(images);
-  if (imagePaths.length) {
-    message = message + buildImagePrompt(imagePaths);
+  // ── 处理图片：解码为本地文件，并把图片要求放在本轮用户消息之前 ──
+  const imageBatch = decodeAndSaveImages(images);
+  const imagePaths = imageBatch.paths;
+  if (imageBatch.received) {
+    const failed = imageBatch.received - imagePaths.length;
+    console.log(`[images] received=${imageBatch.received}`);
+    console.log(`[images] saved=${imagePaths.length}${failed ? ` failed=${failed}` : ""}`);
+    console.log(`[images] passed_to_cc=${imagePaths.length}`);
+    message = composeMessageWithImages(message, imagePaths, imageBatch.received);
   }
 
   return new Promise(async (resolve, reject) => {
